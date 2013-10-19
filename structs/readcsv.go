@@ -14,6 +14,15 @@ import (
 )
 
 // ReadCsv reads the given csv file as user_arguments
+// The csv should be an export of
+/*
+   SELECT object_id, subprogram_id, package_name, object_name,
+          data_level, position, argument_name, in_out,
+          data_type, data_precision, data_scale, character_set_name,
+          pls_type, char_length, type_owner, type_name, type_subname, type_link
+     FROM user_arguments
+     ORDER BY object_id, subprogram_id, SEQUENCE;
+*/
 func ReadCsv(filename string) error {
 	var (
 		err error
@@ -39,10 +48,8 @@ func ReadCsv(filename string) error {
 	}
 	r.LazyQuotes, r.TrailingComma, r.TrimLeadingSpace = true, true, true
 	var (
-		arg       Argument
 		rec       []string
 		csvFields = make(map[string]int, 20)
-		numFields = make([]int, 0, 8)
 	)
 	for _, h := range []string{"OBJECT_ID", "SUBPROGRAM_ID", "PACKAGE_NAME",
 		"OBJECT_NAME", "DATA_LEVEL", "POSITION", "ARGUMENT_NAME", "IN_OUT",
@@ -56,10 +63,12 @@ func ReadCsv(filename string) error {
 		return fmt.Errorf("cannot read head: %s", err)
 	}
 	var (
+		level   uint8
 		j       int
 		ok      bool
 		funName string
 		fun     *Function
+		lastArg *Argument
 	)
 	for i, h := range rec {
 		h = strings.ToUpper(h)
@@ -69,10 +78,6 @@ func ReadCsv(filename string) error {
 			csvFields[h] = i
 		}
 	}
-	for _, h := range []string{"OBJECT_ID", "SUBPROGRAM_ID", "DATA_LEVEL",
-		"POSITION", "DATA_PRECISION", "DATA_SCALE", "CHAR_LENGTH"} {
-		numFields = append(numFields, csvFields[h])
-	}
 	glog.Infof("field order: %v", csvFields)
 	for {
 		if rec, err = r.Read(); err != nil {
@@ -81,43 +86,81 @@ func ReadCsv(filename string) error {
 			}
 			break
 		}
-		funName = "" + "." + rec[csvFields["PACKAGE_NAME"]] + "." +
+		funName = rec[csvFields["PACKAGE_NAME"]] + "." +
 			rec[csvFields["OBJECT_NAME"]]
 		if fun, ok = Functions[funName]; !ok {
 			glog.Infof("New function %s", funName)
-			fun = &Function{Owner: "", Package: rec[csvFields["PACKAGE_NAME"]], Name: rec[csvFields["OBJECT_NAME"]]}
+			fun = &Function{Package: rec[csvFields["PACKAGE_NAME"]],
+				name: rec[csvFields["OBJECT_NAME"]]}
 			Functions[funName] = fun
+			lastArg = nil
 		}
 		if fun.Args == nil {
 			fun.Args = make([]Argument, 0, 1)
 		}
-		arg = Argument{Level: mustBeUint8(rec[csvFields["DATA_LEVEL"]]),
-			Position: mustBeUint8(rec[csvFields["POSITION"]]),
-			Name:     rec[csvFields["ARGUMENT_NAME"]],
-			Type:     rec[csvFields["DATA_TYPE"]],
-			PlsType:  rec[csvFields["PLS_TYPE"]],
-			TypeName: rec[csvFields["TYPE_OWNER"]] + "." +
-				rec[csvFields["TYPE_NAME"]] + "." +
-				rec[csvFields["TYPE_SUBNAME"]] + "@" +
+		level = mustBeUint8(rec[csvFields["DATA_LEVEL"]])
+		arg := NewArgument(rec[csvFields["ARGUMENT_NAME"]],
+			rec[csvFields["DATA_TYPE"]],
+			rec[csvFields["PLS_TYPE"]],
+			rec[csvFields["TYPE_OWNER"]]+"."+
+				rec[csvFields["TYPE_NAME"]]+"."+
+				rec[csvFields["TYPE_SUBNAME"]]+"@"+
 				rec[csvFields["TYPE_LINK"]],
+			rec[csvFields["IN_OUT"]],
+			0,
+			rec[csvFields["CHARACTER_SET_NAME"]],
+			mustBeUint8(rec[csvFields["DATA_PRECISION"]]),
+			mustBeUint8(rec[csvFields["DATA_SCALE"]]),
+			mustBeUint(rec[csvFields["CHAR_LENGTH"]]),
+		)
+		glog.Infof("%s level=%d last=%q", arg.Name, level, lastArg)
+		// Possibilities:
+		// 1. SIMPLE
+		// 2. RECORD at level 0
+		// 3. TABLE OF simple
+		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
+		if level == 0 {
+			fun.Args = append(fun.Args, arg)
+		} else {
+			if lastArg.Flavor == FLAVOR_RECORD {
+				if lastArg.RecordOf == nil {
+					lastArg.RecordOf = make(map[string]Argument, 1)
+				}
+				lastArg.RecordOf[arg.Name] = arg
+			} else {
+				lastArg.TableOf = append(lastArg.TableOf, arg)
+			}
 		}
-		switch rec[csvFields["IN_OUT"]] {
-		case "IN/OUT":
-			arg.InOut = 2
-		case "OUT":
-			arg.InOut = 1
+		glog.Infof("last arg: %q", fun.Args[len(fun.Args)-1])
+		if arg.Flavor != FLAVOR_SIMPLE {
+			lastArg = &arg
 		}
-		if arg.TypeName == "..@" {
-			arg.TypeName = ""
-		}
-		fun.Args = append(fun.Args, arg)
 		//glog.Infof("arg=%#v", arg)
 	}
-	glog.Infof("Functions: %#v", Functions)
+	for _, fun = range Functions {
+		fmt.Printf("%s\n\n", fun)
+	}
 	return err
 }
 
+func mustBeUint(text string) uint {
+	if text == "" {
+		return 0
+	}
+	u, e := strconv.Atoi(text)
+	if e != nil {
+		panic(e)
+	}
+	if u < 0 || u > 1<<32 {
+		panic(fmt.Sprintf("%d out of range (not uint8)", u))
+	}
+	return uint(u)
+}
+
 func mustBeUint8(text string) uint8 {
+	if text == "" {
+		return 0
+	}
 	u, e := strconv.Atoi(text)
 	if e != nil {
 		panic(e)
