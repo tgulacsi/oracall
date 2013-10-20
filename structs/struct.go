@@ -8,7 +8,7 @@ var Functions = make(map[string]*Function)
 
 type Function struct {
 	Package, name string
-	Args          []Argument
+	Args          []*Argument
 }
 
 func (f Function) Name() string {
@@ -19,7 +19,7 @@ func (f Function) Name() string {
 }
 
 func (f Function) String() string {
-	return f.Name() + "(" + fmt.Sprintf("%#v", f.Args) + ")"
+	return f.Name() + "(" + fmt.Sprintf("%s", f.Args) + ")"
 }
 
 const (
@@ -42,8 +42,8 @@ type Argument struct {
 	Scale                   uint8
 	Charset                 string
 	Charlength              uint
-	TableOf                 []Argument
-	RecordOf                map[string]Argument
+	TableOf                 []*Argument
+	RecordOf                map[string]*Argument
 }
 
 func (a Argument) String() string {
