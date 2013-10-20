@@ -2,9 +2,8 @@ package structs
 
 import (
 	"fmt"
+	"strings"
 )
-
-var Functions = make(map[string]*Function)
 
 type Function struct {
 	Package, name string
@@ -13,9 +12,9 @@ type Function struct {
 
 func (f Function) Name() string {
 	if f.Package == "" {
-		return f.name
+		return strings.ToLower(f.name)
 	}
-	return f.Package + "." + f.name
+	return unocap(f.Package) + "." + strings.ToLower(f.name)
 }
 
 func (f Function) String() string {

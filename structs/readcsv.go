@@ -23,17 +23,14 @@ import (
      FROM user_arguments
      ORDER BY object_id, subprogram_id, SEQUENCE;
 */
-func ReadCsv(filename string) error {
-	var (
-		err error
-		fh  *os.File
-	)
+func ReadCsv(filename string) (functions []Function, err error) {
+	var fh *os.File
 	if filename == "" || filename == "-" {
 		fh = os.Stdin
 	} else {
 		fh, err = os.Open(filename)
 		if err != nil {
-			return fmt.Errorf("cannot open %q: %s", filename, err)
+			return nil, fmt.Errorf("cannot open %q: %s", filename, err)
 		}
 	}
 	defer fh.Close()
@@ -41,7 +38,7 @@ func ReadCsv(filename string) error {
 	r := csv.NewReader(br)
 	b, err := br.Peek(100)
 	if err != nil {
-		return fmt.Errorf("error peeking into file: %s", err)
+		return nil, fmt.Errorf("error peeking into file: %s", err)
 	}
 	if bytes.IndexByte(b, ';') >= 0 {
 		r.Comma = ';'
@@ -60,7 +57,7 @@ func ReadCsv(filename string) error {
 	}
 	// get head
 	if rec, err = r.Read(); err != nil {
-		return fmt.Errorf("cannot read head: %s", err)
+		return nil, fmt.Errorf("cannot read head: %s", err)
 	}
 	var (
 		level   uint8
@@ -79,6 +76,8 @@ func ReadCsv(filename string) error {
 			csvFields[h] = i
 		}
 	}
+	seen := make(map[string]struct{}, 8)
+	functions = make([]Function, 8)
 	glog.Infof("field order: %v", csvFields)
 	for {
 		if rec, err = r.Read(); err != nil {
@@ -90,11 +89,12 @@ func ReadCsv(filename string) error {
 		row++
 		funName = rec[csvFields["PACKAGE_NAME"]] + "." +
 			rec[csvFields["OBJECT_NAME"]]
-		if fun, ok = Functions[funName]; !ok {
+		if _, ok = seen[funName]; !ok {
 			glog.V(1).Infof("New function %s", funName)
 			fun = &Function{Package: rec[csvFields["PACKAGE_NAME"]],
 				name: rec[csvFields["OBJECT_NAME"]]}
-			Functions[funName] = fun
+			functions = append(functions, *fun)
+			seen[funName] = struct{}{}
 		}
 		if fun.Args == nil {
 			fun.Args = make([]*Argument, 0, 1)
@@ -126,7 +126,7 @@ func ReadCsv(filename string) error {
 			lastArg = fun.Args[len(fun.Args)-1]
 			for i := level - 1; i > 0; i-- {
 				if lastArg.Flavor == FLAVOR_RECORD {
-					return fmt.Errorf("records can contain only simple types (%q level=%d i=%d)", fun, level, i)
+					return nil, fmt.Errorf("records can contain only simple types (%q level=%d i=%d)", fun, level, i)
 				}
 				lastArg = lastArg.TableOf[len(lastArg.TableOf)-1]
 			}
@@ -145,11 +145,8 @@ func ReadCsv(filename string) error {
 		glog.V(2).Infof("last arg: %q tof=%#v", fun.Args[len(fun.Args)-1], fun.Args[len(fun.Args)-1].TableOf)
 		//glog.Infof("arg=%#v", arg)
 	}
-	glog.V(1).Infof("functions=%s", Functions)
-	for _, fun = range Functions {
-		fmt.Printf("%s\n\n", fun)
-	}
-	return err
+	glog.V(1).Infof("functions=%s", functions)
+	return
 }
 
 func mustBeUint(text string) uint {

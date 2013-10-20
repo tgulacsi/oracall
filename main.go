@@ -10,8 +10,15 @@ import (
 
 func main() {
 	flag.Parse()
-	if err := structs.ReadCsv(flag.Arg(0)); err != nil {
+	functions, err := structs.ReadCsv(flag.Arg(0))
+	if err != nil {
 		log.Printf("error reading %q: %s", flag.Arg(0), err)
+		os.Exit(1)
+	}
+
+	defer os.Stdout.Sync()
+	if err = structs.SaveFunctions(os.Stdout, functions); err != nil {
+		log.Printf("error saving functions: %s", err)
 		os.Exit(1)
 	}
 }
