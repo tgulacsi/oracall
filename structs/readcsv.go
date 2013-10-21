@@ -60,13 +60,13 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		return nil, fmt.Errorf("cannot read head: %s", err)
 	}
 	var (
-		level   uint8
-		j       int
-		ok      bool
-		funName string
-		fun     *Function
-		lastArg *Argument
-		row     int
+		level    uint8
+		j        int
+		ok       bool
+		funName  string
+		fun      *Function
+		lastArgs = make([]*Argument, 0, 3)
+		row      int
 	)
 	for i, h := range rec {
 		h = strings.ToUpper(h)
@@ -93,11 +93,9 @@ func ReadCsv(filename string) (functions []Function, err error) {
 			glog.V(1).Infof("New function %s", funName)
 			fun = &Function{Package: rec[csvFields["PACKAGE_NAME"]],
 				name: rec[csvFields["OBJECT_NAME"]]}
+			lastArgs = lastArgs[:0]
 			functions = append(functions, *fun)
 			seen[funName] = struct{}{}
-		}
-		if fun.Args == nil {
-			fun.Args = make([]*Argument, 0, 1)
 		}
 		level = mustBeUint8(rec[csvFields["DATA_LEVEL"]])
 		arg := NewArgument(rec[csvFields["ARGUMENT_NAME"]],
@@ -120,27 +118,32 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		// 3. TABLE OF simple
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
 		if level == 0 {
-			fun.Args = append(fun.Args, &arg)
+			fun.Args = append(fun.Args, arg)
 		} else {
 			glog.V(1).Infof("row %d: level=%d fun.Args: %s", row, level, fun.Args)
-			lastArg = fun.Args[len(fun.Args)-1]
-			for i := level - 1; i > 0; i-- {
-				if lastArg.Flavor == FLAVOR_RECORD {
-					return nil, fmt.Errorf("records can contain only simple types (%q level=%d i=%d)", fun, level, i)
-				}
-				lastArg = lastArg.TableOf[len(lastArg.TableOf)-1]
-			}
+			lastArgs = lastArgs[:level]
+			lastArg := lastArgs[level-1]
 			if lastArg.Flavor == FLAVOR_RECORD {
 				if lastArg.RecordOf == nil {
-					lastArg.RecordOf = make(map[string]*Argument, 1)
+					lastArg.RecordOf = make(map[string]Argument, 1)
 				}
-				lastArg.RecordOf[arg.Name] = &arg
+				lastArg.RecordOf[arg.Name] = arg
 			} else {
-				lastArg.TableOf = append(lastArg.TableOf, &arg)
+				lastArg.TableOf = append(lastArg.TableOf, arg)
+			}
+			for i := 0; i < int(level)-2; i++ {
+				if lastArgs[i+1].Flavor == FLAVOR_RECORD {
+					lastArgs[i].RecordOf[lastArgs[i].Name] = *lastArgs[i+1]
+				} else {
+					lastArgs[i].TableOf[len(lastArgs[i].TableOf)-1] = *lastArgs[i+1]
+				}
 			}
 		}
-		if lastArg != nil {
-			glog.V(2).Infof("lastArg: %q tof=%#v", lastArg, lastArg.TableOf)
+		if arg.Flavor != FLAVOR_SIMPLE {
+			lastArgs = append(lastArgs[:level], &arg)
+		}
+		if lastArgs != nil && len(lastArgs) > 0 {
+			glog.V(2).Infof("lastArg: %q tof=%#v", lastArgs, lastArgs[len(lastArgs)-1].TableOf)
 		}
 		glog.V(2).Infof("last arg: %q tof=%#v", fun.Args[len(fun.Args)-1], fun.Args[len(fun.Args)-1].TableOf)
 		//glog.Infof("arg=%#v", arg)

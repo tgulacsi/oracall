@@ -7,7 +7,7 @@ import (
 
 type Function struct {
 	Package, name string
-	Args          []*Argument
+	Args          []Argument
 }
 
 func (f Function) Name() string {
@@ -41,8 +41,8 @@ type Argument struct {
 	Scale                   uint8
 	Charset                 string
 	Charlength              uint
-	TableOf                 []*Argument
-	RecordOf                map[string]*Argument
+	TableOf                 []Argument
+	RecordOf                map[string]Argument
 }
 
 func (a Argument) String() string {

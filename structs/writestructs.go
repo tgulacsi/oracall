@@ -31,7 +31,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	for _, arg := range f.Args {
 		glog.Infof("dir=%d map=%d => %d", arg.Direction, dirmap, arg.Direction&dirmap)
 		if arg.Direction&dirmap > 0 {
-			args = append(args, *arg)
+			args = append(args, arg)
 		}
 	}
 	glog.Infof("args[%d]: %s", dirmap, args)
