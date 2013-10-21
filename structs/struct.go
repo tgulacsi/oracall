@@ -87,8 +87,10 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	switch arg.Type {
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
+		arg.RecordOf = make(map[string]Argument, 1)
 	case "TABLE", "PL/SQL TABLE":
 		arg.Flavor = FLAVOR_TABLE
+		arg.TableOf = make([]Argument, 0, 1)
 	}
 	if arg.TypeName == "..@" {
 		arg.TypeName = ""

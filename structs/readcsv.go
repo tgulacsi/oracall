@@ -60,13 +60,14 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		return nil, fmt.Errorf("cannot read head: %s", err)
 	}
 	var (
-		level    uint8
-		j        int
-		ok       bool
-		funName  string
-		fun      *Function
-		lastArgs = make([]*Argument, 0, 3)
-		row      int
+		level        uint8
+		j            int
+		ok           bool
+		funName      string
+		fun, nameFun Function
+		args         = make([]Argument, 0, 16)
+		lastArgs     = make([]*Argument, 0, 3)
+		row          int
 	)
 	for i, h := range rec {
 		h = strings.ToUpper(h)
@@ -76,8 +77,7 @@ func ReadCsv(filename string) (functions []Function, err error) {
 			csvFields[h] = i
 		}
 	}
-	seen := make(map[string]struct{}, 8)
-	functions = make([]Function, 8)
+	functions = make([]Function, 0, 8)
 	glog.Infof("field order: %v", csvFields)
 	for {
 		if rec, err = r.Read(); err != nil {
@@ -87,15 +87,22 @@ func ReadCsv(filename string) (functions []Function, err error) {
 			break
 		}
 		row++
-		funName = rec[csvFields["PACKAGE_NAME"]] + "." +
-			rec[csvFields["OBJECT_NAME"]]
-		if _, ok = seen[funName]; !ok {
+		if fun.name != "" {
+			nameFun.Package, nameFun.name = rec[csvFields["PACKAGE_NAME"]], rec[csvFields["OBJECT_NAME"]]
+			funName = nameFun.Name()
+		}
+		if fun.name == "" || fun.Name() != funName { //new (differs from prev record
 			glog.V(1).Infof("New function %s", funName)
-			fun = &Function{Package: rec[csvFields["PACKAGE_NAME"]],
+			if fun.name != "" {
+				x := fun // copy
+				x.Args = append(make([]Argument, 0, len(args)), args...)
+				//glog.V(1).Infof("old fun: %s", x)
+				functions = append(functions, x)
+			}
+			fun = Function{Package: rec[csvFields["PACKAGE_NAME"]],
 				name: rec[csvFields["OBJECT_NAME"]]}
+			args = args[:0]
 			lastArgs = lastArgs[:0]
-			functions = append(functions, *fun)
-			seen[funName] = struct{}{}
 		}
 		level = mustBeUint8(rec[csvFields["DATA_LEVEL"]])
 		arg := NewArgument(rec[csvFields["ARGUMENT_NAME"]],
@@ -118,9 +125,9 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		// 3. TABLE OF simple
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
 		if level == 0 {
-			fun.Args = append(fun.Args, arg)
+			args = append(args, arg)
 		} else {
-			glog.V(1).Infof("row %d: level=%d fun.Args: %s", row, level, fun.Args)
+			glog.V(2).Infof("row %d: level=%d fun.Args: %s", row, level, fun.Args)
 			lastArgs = lastArgs[:level]
 			lastArg := lastArgs[level-1]
 			if lastArg.Flavor == FLAVOR_RECORD {
@@ -131,10 +138,17 @@ func ReadCsv(filename string) (functions []Function, err error) {
 			} else {
 				lastArg.TableOf = append(lastArg.TableOf, arg)
 			}
-			for i := 0; i < int(level)-2; i++ {
+			for i := 0; i < int(level)-1; i++ {
 				if lastArgs[i+1].Flavor == FLAVOR_RECORD {
-					lastArgs[i].RecordOf[lastArgs[i].Name] = *lastArgs[i+1]
+					glog.V(1).Infof("setting %v.RecordOf[%q] to %v",
+						lastArgs[i], lastArgs[i+1].Name, lastArgs[i+1])
+					if lastArgs[i].RecordOf == nil {
+						lastArgs[i].RecordOf = make(map[string]Argument, 1)
+					}
+					lastArgs[i].RecordOf[lastArgs[i+1].Name] = *lastArgs[i+1]
 				} else {
+					glog.V(1).Infof("setting %v.TableOf[%d] to %v",
+						lastArgs[i], len(lastArgs[i].TableOf)-1, lastArgs[i+1])
 					lastArgs[i].TableOf[len(lastArgs[i].TableOf)-1] = *lastArgs[i+1]
 				}
 			}
@@ -145,8 +159,12 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		if lastArgs != nil && len(lastArgs) > 0 {
 			glog.V(2).Infof("lastArg: %q tof=%#v", lastArgs, lastArgs[len(lastArgs)-1].TableOf)
 		}
-		glog.V(2).Infof("last arg: %q tof=%#v", fun.Args[len(fun.Args)-1], fun.Args[len(fun.Args)-1].TableOf)
+		//glog.V(2).Infof("last arg: %q tof=%#v", args[len(args)-1], args[len(args)-1].TableOf)
 		//glog.Infof("arg=%#v", arg)
+	}
+	if fun.name != "" {
+		fun.Args = args
+		functions = append(functions, fun)
 	}
 	glog.V(1).Infof("functions=%s", functions)
 	return

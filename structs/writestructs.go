@@ -29,12 +29,12 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	var err error
 	args := make([]Argument, 0, len(f.Args))
 	for _, arg := range f.Args {
-		glog.Infof("dir=%d map=%d => %d", arg.Direction, dirmap, arg.Direction&dirmap)
+		//glog.Infof("dir=%d map=%d => %d", arg.Direction, dirmap, arg.Direction&dirmap)
 		if arg.Direction&dirmap > 0 {
 			args = append(args, arg)
 		}
 	}
-	glog.Infof("args[%d]: %s", dirmap, args)
+	//glog.Infof("args[%d]: %s", dirmap, args)
 
 	if len(args) == 0 { // no args
 		return nil
@@ -59,6 +59,9 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 }
 
 func capitalize(text string) string {
+	if text == "" {
+		return text
+	}
 	return strings.ToUpper(text[:1]) + strings.ToLower(text[1:])
 }
 
