@@ -18,7 +18,11 @@ func (f Function) Name() string {
 }
 
 func (f Function) String() string {
-	return f.Name() + "(" + fmt.Sprintf("%s", f.Args) + ")"
+	args := make([]string, len(f.Args))
+	for i := range args {
+		args[i] = f.Args[i].String()
+	}
+	return f.Name() + "(" + strings.Join(args, ", ") + ")"
 }
 
 const (
@@ -41,7 +45,7 @@ type Argument struct {
 	Scale                   uint8
 	Charset                 string
 	Charlength              uint
-	TableOf                 []Argument
+	TableOf                 *Argument
 	RecordOf                map[string]Argument
 }
 
@@ -67,33 +71,38 @@ func (a Argument) String() string {
 
 func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	charset string, precision, scale uint8, charlength uint) Argument {
+
+	if typeName == "..@" {
+		typeName = ""
+	}
+	if typeName != "" && typeName[len(typeName)-1] == '@' {
+		typeName = typeName[:len(typeName)-1]
+	}
+
+	if dirName != "" {
+		switch dirName {
+		case "IN/OUT":
+			dir = DIR_IN | DIR_OUT
+		case "OUT":
+			dir = DIR_OUT
+		default:
+			dir = DIR_IN
+		}
+	}
+	if dir < DIR_IN {
+		dir = DIR_IN
+	}
+
 	arg := Argument{Name: name, Type: dataType, PlsType: plsType,
 		TypeName: typeName, Direction: dir,
 		Precision: precision, Scale: scale, Charlength: charlength,
 		Charset: charset}
-	if arg.Direction < DIR_IN {
-		arg.Direction = DIR_IN
-	}
-	if dirName != "" {
-		switch dirName {
-		case "IN/OUT":
-			arg.Direction = DIR_IN | DIR_OUT
-		case "OUT":
-			arg.Direction = DIR_OUT
-		default:
-			arg.Direction = DIR_IN
-		}
-	}
 	switch arg.Type {
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
 		arg.RecordOf = make(map[string]Argument, 1)
 	case "TABLE", "PL/SQL TABLE":
 		arg.Flavor = FLAVOR_TABLE
-		arg.TableOf = make([]Argument, 0, 1)
-	}
-	if arg.TypeName == "..@" {
-		arg.TypeName = ""
 	}
 	return arg
 }

@@ -17,7 +17,7 @@ func main() {
 	}
 
 	defer os.Stdout.Sync()
-	if err = structs.SaveFunctions(os.Stdout, functions); err != nil {
+	if err = structs.SaveFunctions(os.Stdout, functions, "main"); err != nil {
 		log.Printf("error saving functions: %s", err)
 		os.Exit(1)
 	}

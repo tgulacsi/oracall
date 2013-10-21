@@ -87,6 +87,11 @@ func ReadCsv(filename string) (functions []Function, err error) {
 			break
 		}
 		row++
+		funName = rec[csvFields["OBJECT_NAME"]]
+		if funName[len(funName)-1] == '#' { //hidden
+			continue
+		}
+
 		if fun.name != "" {
 			nameFun.Package, nameFun.name = rec[csvFields["PACKAGE_NAME"]], rec[csvFields["OBJECT_NAME"]]
 			funName = nameFun.Name()
@@ -130,28 +135,32 @@ func ReadCsv(filename string) (functions []Function, err error) {
 			glog.V(2).Infof("row %d: level=%d fun.Args: %s", row, level, fun.Args)
 			lastArgs = lastArgs[:level]
 			lastArg := lastArgs[level-1]
-			if lastArg.Flavor == FLAVOR_RECORD {
+			if lastArg.Flavor == FLAVOR_TABLE {
+				lastArg.TableOf = &arg
+			} else {
 				if lastArg.RecordOf == nil {
 					lastArg.RecordOf = make(map[string]Argument, 1)
 				}
 				lastArg.RecordOf[arg.Name] = arg
-			} else {
-				lastArg.TableOf = append(lastArg.TableOf, arg)
 			}
-			for i := 0; i < int(level)-1; i++ {
-				if lastArgs[i+1].Flavor == FLAVOR_RECORD {
-					glog.V(1).Infof("setting %v.RecordOf[%q] to %v",
-						lastArgs[i], lastArgs[i+1].Name, lastArgs[i+1])
-					if lastArgs[i].RecordOf == nil {
-						lastArgs[i].RecordOf = make(map[string]Argument, 1)
-					}
-					lastArgs[i].RecordOf[lastArgs[i+1].Name] = *lastArgs[i+1]
-				} else {
-					glog.V(1).Infof("setting %v.TableOf[%d] to %v",
-						lastArgs[i], len(lastArgs[i].TableOf)-1, lastArgs[i+1])
-					lastArgs[i].TableOf[len(lastArgs[i].TableOf)-1] = *lastArgs[i+1]
+			/*
+				for i := int(level) - 2; i >= 0; i-- {
+						if lastArgs[i].Flavor == FLAVOR_TABLE {
+							glog.V(1).Infof("setting %v.TableOf to %v",
+								lastArgs[i], lastArgs[i+1])
+							lastArgs[i].TableOf = lastArgs[i+1]
+						} else {
+							glog.V(1).Infof("setting %v.RecordOf[%q] to %v",
+								lastArgs[i], lastArgs[i+1].Name, lastArgs[i+1])
+							if lastArgs[i].RecordOf == nil {
+								lastArgs[i].RecordOf = make(map[string]Argument, 1)
+							}
+							lastArgs[i].RecordOf[lastArgs[i+1].Name] = *lastArgs[i+1]
+						}
 				}
-			}
+			*/
+			// copy back to root
+			args[len(args)-1] = *lastArgs[0]
 		}
 		if arg.Flavor != FLAVOR_SIMPLE {
 			lastArgs = append(lastArgs[:level], &arg)
