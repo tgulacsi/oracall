@@ -18,6 +18,7 @@ package structs
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -31,7 +32,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string) error {
 	var err error
 	if pkg != "" {
 		if _, err = io.WriteString(dst,
-			"package "+pkg+"\n\nimport (\n\t\"time\"\n)\n\n"); err != nil {
+			"package "+pkg+"\n\nimport (\n\t_ \"time\"\t// for datetimes\n)\n\n"); err != nil {
 			return err
 		}
 	}
@@ -41,7 +42,14 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string) error {
 			if err = fun.SaveStruct(dst, types, dir); err != nil {
 				return err
 			}
+			if _, err = fmt.Fprintf(dst, "\nconst %s = `",
+				capitalize(fun.Package+"__"+fun.name+"__plsql")); err != nil {
+				return err
+			}
 			if err = fun.SavePlsqlBlock(dst); err != nil {
+				return err
+			}
+			if _, err = io.WriteString(dst, "`\n"); err != nil {
 				return err
 			}
 		}
@@ -61,7 +69,11 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 	if out {
 		dirmap, dirname = DIR_OUT, "output"
 	}
-	var err error
+	var (
+		err                    error
+		aName, structName, got string
+		checks                 []string
+	)
 	args := make([]Argument, 0, len(f.Args))
 	for _, arg := range f.Args {
 		//glog.Infof("dir=%d map=%d => %d", arg.Direction, dirmap, arg.Direction&dirmap)
@@ -75,22 +87,83 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 		return nil
 	}
 
+	if dirmap == uint8(DIR_IN) {
+		checks = make([]string, 0, len(args))
+	}
+	structName = capitalize(f.Package + "__" + f.name + "__" + dirname)
 	if _, err = io.WriteString(dst,
-		"\n// "+f.Name()+" "+dirname+"\ntype "+
-			capitalize(f.Package+"__"+f.name+"__"+dirname)+" struct {\n"); err != nil {
+		"\n// "+f.Name()+" "+dirname+"\ntype "+structName+" struct {\n"); err != nil {
 		return err
 	}
 
 	for _, arg := range args {
-		if _, err = io.WriteString(dst, "\t"+capitalize(goName(arg.Name))+" "+arg.goType(types)+"\n"); err != nil {
+		aName = capitalize(goName(arg.Name))
+		got = arg.goType(types)
+		if _, err = io.WriteString(dst, "\t"+aName+" "+got+"\n"); err != nil {
 			return err
+		}
+		if checks != nil {
+			checks = genChecks(checks, arg, types, "s")
 		}
 	}
 
 	if _, err = io.WriteString(dst, "}\n"); err != nil {
 		return err
 	}
+
+	if checks != nil {
+		if _, err = fmt.Fprintf(dst, "\n// Check checks input bounds for %s\nfunc (s %s) Check() error {\n", structName, structName); err != nil {
+			return err
+		}
+		for _, line := range checks {
+			if _, err = fmt.Fprintf(dst, line+"\n"); err != nil {
+				return err
+			}
+		}
+		if _, err = io.WriteString(dst, "\n\treturn nil\n}\n"); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func genChecks(checks []string, arg Argument, types map[string]string, base string) []string {
+	aName := capitalize(goName(arg.Name))
+	got := arg.goType(types)
+	switch arg.Flavor {
+	case FLAVOR_SIMPLE:
+		switch got {
+		case "string":
+			checks = append(checks,
+				fmt.Sprintf(`if len(%s.%s) > %d {
+    return errors.New("%s.%s is longer then accepted (%d)")
+}`,
+					base, aName, arg.Charlength,
+					base, aName, arg.Charlength))
+		case "int64", "float64":
+			if arg.Precision > 0 {
+				cons := strings.Repeat("9", int(arg.Precision))
+				checks = append(checks,
+					fmt.Sprintf(`if (%s.%s <= -%s || %s.%s > %s) {
+    return errors.New("%s.%s is out of bounds (-%s..%s)")
+}`,
+						base, aName, cons, base, aName, cons,
+						base, aName, cons, cons))
+			}
+		}
+	case FLAVOR_RECORD:
+		for k, sub := range arg.RecordOf {
+			_ = k
+			checks = genChecks(checks, sub, types, base)
+		}
+	case FLAVOR_TABLE:
+		plus := strings.Join(genChecks(nil, *arg.TableOf, types, "v"), "\n\t")
+		checks = append(checks,
+			fmt.Sprintf("for i, v := range %s.%s {\n\t%s\n}", base, aName, plus))
+	default:
+		log.Fatalf("unknown flavor %q", arg.Flavor)
+	}
+	return checks
 }
 
 func capitalize(text string) string {

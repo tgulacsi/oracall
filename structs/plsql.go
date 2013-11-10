@@ -95,6 +95,20 @@ func (fun Function) SavePlsqlBlock(w io.Writer) error {
 }
 
 func prepareCall(fun Function) (decls, pre []string, call string, post []string, err error) {
+	next := int(0)
+	for _, arg := range fun.Args {
+		next++
+		switch arg.Flavor {
+		case FLAVOR_SIMPLE:
+			pre = append(pre, fmt.Sprintf("x%d %s;", next, arg.AbsType))
+		case FLAVOR_RECORD:
+			pre = append(pre, fmt.Sprintf("x%d %s;", next, arg.PlsType))
+		case FLAVOR_TABLE:
+			pre = append(pre, fmt.Sprintf("x%d %s;", next, arg.PlsType))
+		default:
+			log.Fatalf("unkown flavor %q", arg.Flavor)
+		}
+	}
 	return
 }
 

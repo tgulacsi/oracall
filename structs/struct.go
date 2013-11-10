@@ -57,6 +57,7 @@ type Argument struct {
 	//Position                uint8
 	Direction               uint8
 	Type, PlsType, TypeName string
+	AbsType                 string
 	Precision               uint8
 	Scale                   uint8
 	Charset                 string
@@ -119,6 +120,28 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 		arg.RecordOf = make(map[string]Argument, 1)
 	case "TABLE", "PL/SQL TABLE":
 		arg.Flavor = FLAVOR_TABLE
+	}
+
+	switch arg.Type {
+	case "CHAR", "NCHAR", "VARCHAR", "NVARCHAR", "VARCHAR2", "NVARCHAR2":
+		if arg.Charlength <= 0 {
+			if strings.Index(arg.Type, "VAR") >= 0 {
+				arg.Charlength = 1000
+			} else {
+				arg.Charlength = 10
+			}
+		}
+		arg.AbsType = fmt.Sprintf("%s(%d)", arg.Type, arg.Charlength)
+	case "NUMBER":
+		if arg.Scale >= 0 {
+			arg.AbsType = fmt.Sprintf("NUMBER(%d, %d)", arg.Precision, arg.Scale)
+		} else if arg.Precision >= 0 {
+			arg.AbsType = fmt.Sprintf("NUMBER(%d)", arg.Precision)
+		} else {
+			arg.AbsType = "NUMBER"
+		}
+	default:
+		arg.AbsType = arg.Type
 	}
 	return arg
 }
