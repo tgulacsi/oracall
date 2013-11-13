@@ -180,7 +180,9 @@ func ReadCsv(filename string) (functions []Function, err error) {
 				}
 			*/
 			// copy back to root
-			args[len(args)-1] = *lastArgs[0]
+			if len(args) > 0 {
+				args[len(args)-1] = *lastArgs[0]
+			}
 		}
 		if arg.Flavor != FLAVOR_SIMPLE {
 			lastArgs = append(lastArgs[:level], &arg)

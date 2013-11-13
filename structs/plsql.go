@@ -139,7 +139,7 @@ func prepareCall(fun Function) (decls, pre []string, call string, post []string,
 				callArgs[arg.Name] = vn
 				decls = append(decls, vn+" "+arg.TableOf.TypeName+";")
 
-				if arg.IsInput() {
+				if arg.IsOutput() {
 					// DELETE out tables
 					for k := range arg.TableOf.RecordOf {
 						post = append(post,
