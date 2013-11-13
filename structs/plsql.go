@@ -17,6 +17,7 @@ limitations under the License.
 package structs
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -66,15 +67,20 @@ func (fun Function) SavePlsqlBlock(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if _, err = io.WriteString(w, "DECLARE\n"); err != nil {
-		return err
-	}
-	for _, line := range decls {
-		if _, err = fmt.Fprintf(w, "  %s\n", line); err != nil {
+	if len(decls) > 0 {
+		if _, err = io.WriteString(w, "DECLARE\n"); err != nil {
+			return err
+		}
+		for _, line := range decls {
+			if _, err = fmt.Fprintf(w, "  %s\n", line); err != nil {
+				return err
+			}
+		}
+		if _, err = w.Write([]byte{'\n'}); err != nil {
 			return err
 		}
 	}
-	if _, err = io.WriteString(w, "\nBEGIN\n"); err != nil {
+	if _, err = io.WriteString(w, "BEGIN\n"); err != nil {
 		return err
 	}
 	for _, line := range pre {
@@ -82,7 +88,7 @@ func (fun Function) SavePlsqlBlock(w io.Writer) error {
 			return err
 		}
 	}
-	if _, err = fmt.Fprintf(w, "  %s;\n", call); err != nil {
+	if _, err = fmt.Fprintf(w, "\n  %s;\n\n", call); err != nil {
 		return err
 	}
 	for _, line := range post {
@@ -95,21 +101,135 @@ func (fun Function) SavePlsqlBlock(w io.Writer) error {
 }
 
 func prepareCall(fun Function) (decls, pre []string, call string, post []string, err error) {
-	next := int(0)
+	callArgs := make(map[string]string, 16)
+	var (
+		vn, tmp string
+		ok      bool
+	)
+	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
 	for _, arg := range fun.Args {
-		next++
+		if arg.Flavor != FLAVOR_SIMPLE {
+			if arg.IsInput() {
+				pre = append(pre, "", "--"+arg.String())
+			}
+			if arg.IsOutput() {
+				post = append(post, "", "--"+arg.String())
+			}
+		}
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
-			pre = append(pre, fmt.Sprintf("x%d %s;", next, arg.AbsType))
 		case FLAVOR_RECORD:
-			pre = append(pre, fmt.Sprintf("x%d %s;", next, arg.PlsType))
+			vn = getInnerVarName(fun.Name(), arg.Name)
+			callArgs[arg.Name] = vn
+			decls = append(decls, vn+" "+arg.TypeName+";")
+			for k := range arg.RecordOf {
+				tmp = getParamName(fun.Name(), vn+"."+k)
+				if arg.IsInput() {
+					pre = append(pre, vn+"."+k+" := :"+tmp+"."+k+";")
+				}
+				if arg.IsOutput() {
+					post = append(post, ":"+tmp+"."+k+" := "+vn+"."+k+";")
+				}
+			}
 		case FLAVOR_TABLE:
-			pre = append(pre, fmt.Sprintf("x%d %s;", next, arg.PlsType))
+			switch arg.TableOf.Flavor {
+			case FLAVOR_SIMPLE:
+			case FLAVOR_RECORD:
+				vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
+				callArgs[arg.Name] = vn
+				decls = append(decls, vn+" "+arg.TableOf.TypeName+";")
+
+				if arg.IsInput() {
+					// DELETE out tables
+					for k := range arg.TableOf.RecordOf {
+						post = append(post,
+							":"+getParamName(fun.Name(), vn+"."+k)+".DELETE;")
+					}
+				}
+
+				var idxvar string
+				for k := range arg.TableOf.RecordOf {
+					if idxvar == "" {
+						idxvar = getParamName(fun.Name(), vn+"."+k)
+						if arg.IsInput() {
+							pre = append(pre,
+								"i1 := :"+idxvar+".FIRST;",
+								"WHILE i1 IS NOT NULL LOOP")
+						}
+						if arg.IsOutput() {
+							post = append(post,
+								"i1 := "+vn+".FIRST; i2 := 1;",
+								"WHILE i1 IS NOT NULL LOOP")
+						}
+					}
+					tmp = getParamName(fun.Name(), vn+"."+k)
+					if arg.IsInput() {
+						pre = append(pre,
+							"  "+vn+"(i1)."+k+" := :"+tmp+"(i1);")
+					}
+					if arg.IsOutput() {
+						post = append(post,
+							"  :"+tmp+"(i2) := "+vn+"(i1)."+k+";")
+					}
+				}
+				if arg.IsInput() {
+					pre = append(pre,
+						"  i1 := :"+idxvar+".NEXT(i1);",
+						"END LOOP;")
+				}
+				if arg.IsOutput() {
+					post = append(post,
+						"  i1 := "+vn+".NEXT(i1); i2 := i2 + 1;",
+						"END LOOP;")
+				}
+			default:
+				log.Fatalf("%s/%s: only table of simple or record types are allowed (no table of table!)", fun.Name(), arg.Name)
+			}
 		default:
 			log.Fatalf("unkown flavor %q", arg.Flavor)
 		}
 	}
+	callb := bytes.NewBuffer(nil)
+	if fun.Returns != nil {
+		callb.WriteString(":ret := ")
+	}
+	callb.WriteString(fun.Name() + "(")
+	for i, arg := range fun.Args {
+		if i > 0 {
+			callb.WriteString(",\n\t\t")
+		}
+		if vn, ok = callArgs[arg.Name]; !ok {
+			vn = ":" + arg.Name
+		}
+		fmt.Fprintf(callb, "%s=>%s", arg.Name, vn)
+	}
+	callb.WriteString(")")
+	call = callb.String()
 	return
+}
+
+var varNames = make(map[string]map[string]string, 4)
+
+func getVarName(funName, varName, prefix string) string {
+	m, ok := varNames[funName]
+	if !ok {
+		m = make(map[string]string, 16)
+		varNames[funName] = m
+	}
+	x, ok := m[varName]
+	if !ok {
+		x = fmt.Sprintf("%s%03d", prefix, len(m)+1)
+		m[varName] = x
+	}
+	return x
+}
+
+func getInnerVarName(funName, varName string) string {
+	return getVarName(funName, varName, "v")
+}
+
+func getParamName(funName, paramName string) string {
+	return getVarName(funName, paramName, "p")
 }
 
 /*

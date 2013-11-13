@@ -146,7 +146,11 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		// 3. TABLE OF simple
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
 		if level == 0 {
-			args = append(args, arg)
+			if len(args) == 0 && arg.Name == "" {
+				fun.Returns = &arg
+			} else {
+				args = append(args, arg)
+			}
 		} else {
 			glog.V(2).Infof("row %d: level=%d fun.Args: %s", row, level, fun.Args)
 			lastArgs = lastArgs[:level]

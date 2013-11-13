@@ -23,6 +23,7 @@ import (
 
 type Function struct {
 	Package, name string
+	Returns       *Argument
 	Args          []Argument
 }
 
@@ -86,9 +87,17 @@ func (a Argument) String() string {
 	return a.Name + " " + dir + " " + typ
 }
 
+func (a Argument) IsInput() bool {
+	return a.Direction&DIR_IN > 0
+}
+func (a Argument) IsOutput() bool {
+	return a.Direction&DIR_OUT > 0
+}
+
 func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	charset string, precision, scale uint8, charlength uint) Argument {
 
+	name = strings.ToLower(name)
 	if typeName == "..@" {
 		typeName = ""
 	}
@@ -133,9 +142,9 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 		}
 		arg.AbsType = fmt.Sprintf("%s(%d)", arg.Type, arg.Charlength)
 	case "NUMBER":
-		if arg.Scale >= 0 {
+		if arg.Scale > 0 {
 			arg.AbsType = fmt.Sprintf("NUMBER(%d, %d)", arg.Precision, arg.Scale)
-		} else if arg.Precision >= 0 {
+		} else if arg.Precision > 0 {
 			arg.AbsType = fmt.Sprintf("NUMBER(%d)", arg.Precision)
 		} else {
 			arg.AbsType = "NUMBER"
