@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/tgulacsi/goracle/oracle"
 )
@@ -28,8 +29,7 @@ import (
 //
 // OracleArgument
 //
-
-func typeconv(typ string) *oracle.VariableType {
+func oracleVarType(typ string) *oracle.VariableType {
 	switch typ {
 	case "BINARY_INTEGER", "PLS_INTEGER":
 		return oracle.Int32VarType
@@ -55,52 +55,87 @@ func typeconv(typ string) *oracle.VariableType {
 		return oracle.BinaryVarType
 	case "CLOB":
 		return oracle.ClobVarType
+	case "BOOLEAN", "PL/SQL BOOLEAN":
+		return oracle.BooleanVarType
 	default:
 		log.Fatalf("unknown variable type %q", typ)
 	}
 	return nil
 }
 
-// SavePlsqlBlock saves the plsql block definition into writer
-func (fun Function) SavePlsqlBlock(w io.Writer) error {
-	decls, pre, call, post, err := prepareCall(fun)
-	if err != nil {
-		return err
+func oracleVarTypeName(typ string) string {
+	switch typ {
+	case "BINARY_INTEGER", "PLS_INTEGER":
+		return "oracle.Int32VarType"
+	case "STRING", "VARCHAR2":
+		return "oracle.StringVarType"
+	case "INTEGER":
+		return "oracle.Int64VarType"
+	case "ROWID":
+		return "oracle.RowidVarType"
+	case "REF CURSOR":
+		return "oracle.CursorVarType"
+	//case "TIMESTAMP":
+	//return oracle.TimestampVarType
+	case "NUMBER":
+		return "oracle.FloatVarType"
+	case "DATE":
+		return "oracle.DateTimeVarType"
+	case "BLOB":
+		return "oracle.BlobVarType"
+	case "CHAR":
+		return "oracle.FixedCharVarType"
+	case "BINARY":
+		return "oracle.BinaryVarType"
+	case "CLOB":
+		return "oracle.ClobVarType"
+	case "BOOLEAN", "PL/SQL BOOLEAN":
+		return "oracle.BooleanVarType"
+	default:
+		log.Fatalf("unknown variable type %q", typ)
 	}
-	if len(decls) > 0 {
-		if _, err = io.WriteString(w, "DECLARE\n"); err != nil {
-			return err
-		}
-		for _, line := range decls {
-			if _, err = fmt.Fprintf(w, "  %s\n", line); err != nil {
-				return err
-			}
-		}
-		if _, err = w.Write([]byte{'\n'}); err != nil {
-			return err
-		}
-	}
-	if _, err = io.WriteString(w, "BEGIN\n"); err != nil {
-		return err
-	}
-	for _, line := range pre {
-		if _, err = fmt.Fprintf(w, "  %s\n", line); err != nil {
-			return err
-		}
-	}
-	if _, err = fmt.Fprintf(w, "\n  %s;\n\n", call); err != nil {
-		return err
-	}
-	for _, line := range post {
-		if _, err = fmt.Fprintf(w, "  %s\n", line); err != nil {
-			return err
-		}
-	}
-	_, err = io.WriteString(w, "\nEND;\n")
-	return err
+	return ""
 }
 
-func prepareCall(fun Function) (decls, pre []string, call string, post []string, err error) {
+// SavePlsqlBlock saves the plsql block definition into writer
+func (fun Function) PlsqlBlock() (plsql, callFun string) {
+	decls, pre, call, post, conv, err := prepareCall(fun)
+	if err != nil {
+		log.Fatalf("error preparing %s: %s", fun, err)
+	}
+	fn := strings.Replace(fun.Name(), ".", "__", -1)
+	callBuf := bytes.NewBuffer(make([]byte, 0, 16384))
+	fmt.Fprintf(callBuf, `func Call_%s(cur *oracle.Cursor, input %s) (output %s, err error) {
+    `, fn, fun.getStructName(false), fun.getStructName(true))
+	for _, line := range conv {
+		io.WriteString(callBuf, line+"\n")
+	}
+	io.WriteString(callBuf, "\nreturn\n}\n")
+	callFun = callBuf.String()
+
+	plsBuf := callBuf
+	plsBuf.Reset()
+	if len(decls) > 0 {
+		io.WriteString(plsBuf, "DECLARE\n")
+		for _, line := range decls {
+			fmt.Fprintf(plsBuf, "  %s\n", line)
+		}
+		plsBuf.Write([]byte{'\n'})
+	}
+	io.WriteString(plsBuf, "BEGIN\n")
+	for _, line := range pre {
+		fmt.Fprintf(plsBuf, "  %s\n", line)
+	}
+	fmt.Fprintf(plsBuf, "\n  %s;\n\n", call)
+	for _, line := range post {
+		fmt.Fprintf(plsBuf, "  %s\n", line)
+	}
+	io.WriteString(plsBuf, "\nEND;\n")
+	plsql = plsBuf.String()
+	return
+}
+
+func prepareCall(fun Function) (decls, pre []string, call string, post []string, conv []string, err error) {
 	callArgs := make(map[string]string, 16)
 	var (
 		vn, tmp string
@@ -118,6 +153,17 @@ func prepareCall(fun Function) (decls, pre []string, call string, post []string,
 		}
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
+			if arg.Direction == DIR_IN {
+				conv = append(conv,
+					fmt.Sprintf(`   params["%s"] = input.%s`,
+						arg.Name, capitalize(goName(arg.Name))))
+			} else {
+				conv = append(conv,
+					fmt.Sprintf(`  if params["%s"], err = cur.NewVariable(%s, 0, %d); err != nil {
+        return
+    }`,
+						arg.Name, oracleVarTypeName(arg.Type), arg.Charlength))
+			}
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
 			callArgs[arg.Name] = vn

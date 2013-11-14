@@ -36,8 +36,9 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string) error {
 import (
     _ "time"    // for datetimes
     _ "database/sql"    // for NullXxx
-)
 
+    _ "github.com/tgulacsi/goracle/oracle"    // Oracle
+)
 `); err != nil {
 			return err
 		}
@@ -48,14 +49,22 @@ import (
 			if err = fun.SaveStruct(dst, types, dir); err != nil {
 				return err
 			}
+			plsBlock, callFun := fun.PlsqlBlock()
 			if _, err = fmt.Fprintf(dst, "\nconst %s = `",
 				capitalize(fun.Package+"__"+fun.name+"__plsql")); err != nil {
 				return err
 			}
-			if err = fun.SavePlsqlBlock(dst); err != nil {
+			if _, err = io.WriteString(dst, plsBlock); err != nil {
 				return err
 			}
 			if _, err = io.WriteString(dst, "`\n"); err != nil {
+				return err
+			}
+
+			if _, err = io.WriteString(dst, "\n"); err != nil {
+				return err
+			}
+			if _, err = io.WriteString(dst, callFun); err != nil {
 				return err
 			}
 		}
@@ -67,6 +76,14 @@ import (
 	}
 
 	return nil
+}
+
+func (f Function) getStructName(out bool) string {
+	dirname := "input"
+	if out {
+		dirname = "output"
+	}
+	return capitalize(f.Package + "__" + f.name + "__" + dirname)
 }
 
 func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) error {
@@ -96,7 +113,7 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 	if dirmap == uint8(DIR_IN) {
 		checks = make([]string, 0, len(args))
 	}
-	structName = capitalize(f.Package + "__" + f.name + "__" + dirname)
+	structName = f.getStructName(out)
 	if _, err = io.WriteString(dst,
 		"\n// "+f.Name()+" "+dirname+"\ntype "+structName+" struct {\n"); err != nil {
 		return err
@@ -105,9 +122,9 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 	for _, arg := range args {
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(true, types)
-        if strings.Index(got, "__") > 0 {
-            got = "*" + got
-        }
+		if strings.Index(got, "__") > 0 {
+			got = "*" + got
+		}
 		if _, err = io.WriteString(dst, "\t"+aName+" "+got+"\n"); err != nil {
 			return err
 		}
@@ -273,6 +290,9 @@ func (arg Argument) goType(nullable bool, typedefs map[string]string) string {
 		return "[]" + arg.TableOf.goType(true, typedefs)
 	}
 	buf := bytes.NewBuffer(make([]byte, 0, 256))
+	if arg.TypeName == "" {
+		log.Fatalf("arg has no TypeName: %#v\n%s", arg, arg)
+	}
 	buf.WriteString("\n// " + arg.TypeName + "\n")
 	buf.WriteString("type " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
