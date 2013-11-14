@@ -32,7 +32,13 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string) error {
 	var err error
 	if pkg != "" {
 		if _, err = io.WriteString(dst,
-			"package "+pkg+"\n\nimport (\n\t_ \"time\"\t// for datetimes\n)\n\n"); err != nil {
+			"package "+pkg+`
+import (
+    _ "time"    // for datetimes
+    _ "database/sql"    // for NullXxx
+)
+
+`); err != nil {
 			return err
 		}
 	}
@@ -98,7 +104,10 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 
 	for _, arg := range args {
 		aName = capitalize(goName(arg.Name))
-		got = arg.goType(types)
+		got = arg.goType(true, types)
+        if strings.Index(got, "__") > 0 {
+            got = "*" + got
+        }
 		if _, err = io.WriteString(dst, "\t"+aName+" "+got+"\n"); err != nil {
 			return err
 		}
@@ -129,26 +138,50 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 
 func genChecks(checks []string, arg Argument, types map[string]string, base string) []string {
 	aName := capitalize(goName(arg.Name))
-	got := arg.goType(types)
+	got := arg.goType(true, types)
+	var name string
+	if aName == "" {
+		name = base
+	} else {
+		name = base + "." + aName
+	}
 	switch arg.Flavor {
 	case FLAVOR_SIMPLE:
 		switch got {
 		case "string":
 			checks = append(checks,
-				fmt.Sprintf(`if len(%s.%s) > %d {
-    return errors.New("%s.%s is longer then accepted (%d)")
-}`,
-					base, aName, arg.Charlength,
-					base, aName, arg.Charlength))
+				fmt.Sprintf(`if len(%s) > %d {
+        return errors.New("%s is longer then accepted (%d)")
+    }`,
+					name, arg.Charlength,
+					name, arg.Charlength))
+		case "sql.NullString":
+			checks = append(checks,
+				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
+        return errors.New("%s is longer then accepted (%d)")
+    }`,
+					name, name, arg.Charlength,
+					name, arg.Charlength))
 		case "int64", "float64":
 			if arg.Precision > 0 {
 				cons := strings.Repeat("9", int(arg.Precision))
 				checks = append(checks,
-					fmt.Sprintf(`if (%s.%s <= -%s || %s.%s > %s) {
-    return errors.New("%s.%s is out of bounds (-%s..%s)")
-}`,
-						base, aName, cons, base, aName, cons,
-						base, aName, cons, cons))
+					fmt.Sprintf(`if (%s <= -%s || %s > %s) {
+        return errors.New("%s is out of bounds (-%s..%s)")
+    }`,
+						name, cons, name, cons,
+						name, cons, cons))
+			}
+		case "sql.NullInt64", "sql.NullFloat64":
+			if arg.Precision > 0 {
+				vn := got[8:]
+				cons := strings.Repeat("9", int(arg.Precision))
+				checks = append(checks,
+					fmt.Sprintf(`if %s.Valid && (%s.%s <= -%s || %s.%s > %s) {
+        return errors.New("%s is out of bounds (-%s..%s)")
+    }`,
+						name, name, vn, cons, name, vn, cons,
+						name, cons, cons))
 			}
 		}
 	case FLAVOR_RECORD:
@@ -182,21 +215,36 @@ func unocap(text string) string {
 }
 
 // returns a go type for the argument's type
-func (arg Argument) goType(typedefs map[string]string) string {
+func (arg Argument) goType(nullable bool, typedefs map[string]string) string {
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2":
+			if nullable {
+				return "sql.NullString"
+			}
 			return "string"
 		case "NUMBER":
+			if nullable {
+				return "sql.NullFloat64"
+			}
 			return "float64"
 		case "INTEGER":
+			if nullable {
+				return "sql.NullInt64"
+			}
 			return "int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
+			if nullable {
+				return "sql.NullInt64"
+			}
 			return "int32"
+		case "BOOLEAN", "PL/SQL BOOLEAN":
+			if nullable {
+				return "sql.NullBool"
+			}
+			return "bool"
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
 			return "time.Time"
-		case "BOOLEAN", "PL/SQL BOOLEAN":
-			return "bool"
 		case "REF CURSOR":
 			return "*goracle.Cursor"
 		case "CLOB":
@@ -222,13 +270,13 @@ func (arg Argument) goType(typedefs map[string]string) string {
 	}
 	if arg.Flavor == FLAVOR_TABLE {
 		glog.Infof("arg=%s tof=%s", arg, arg.TableOf)
-		return "[]" + arg.TableOf.goType(typedefs)
+		return "[]" + arg.TableOf.goType(true, typedefs)
 	}
 	buf := bytes.NewBuffer(make([]byte, 0, 256))
 	buf.WriteString("\n// " + arg.TypeName + "\n")
 	buf.WriteString("type " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
-		buf.WriteString("\t" + capitalize(goName(k)) + " " + v.goType(typedefs) + "\n")
+		buf.WriteString("\t" + capitalize(goName(k)) + " " + v.goType(true, typedefs) + "\n")
 	}
 	buf.WriteString("}\n")
 	typedefs[typName] = buf.String()
