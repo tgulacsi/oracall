@@ -94,6 +94,7 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		}
 	}
 	functions = make([]Function, 0, 8)
+	seen := make(map[string]uint8, 64)
 	glog.Infof("field order: %v", csvFields)
 	for {
 		if rec, err = r.Read(); err != nil {
@@ -107,18 +108,24 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		if funName[len(funName)-1] == '#' { //hidden
 			continue
 		}
-
-		if fun.name != "" {
-			nameFun.Package, nameFun.name = rec[csvFields["PACKAGE_NAME"]], rec[csvFields["OBJECT_NAME"]]
-			funName = nameFun.Name()
+		nameFun.Package, nameFun.name = rec[csvFields["PACKAGE_NAME"]], rec[csvFields["OBJECT_NAME"]]
+		funName = nameFun.Name()
+		if seen[funName] > 1 {
+			glog.Warningf("function %s already seen! skipping...", funName)
+			continue
 		}
-		if fun.name == "" || fun.Name() != funName { //new (differs from prev record
+		if fun.Name() == "" || funName != fun.Name() { //new (differs from prev record
+			seen[funName]++
+			glog.V(1).Infof("old=%s new=%s seen=%d", fun.Name(), funName, seen[funName])
 			glog.V(1).Infof("New function %s", funName)
 			if fun.name != "" {
 				x := fun // copy
 				x.Args = append(make([]Argument, 0, len(args)), args...)
 				//glog.V(1).Infof("old fun: %s", x)
 				functions = append(functions, x)
+			}
+			if seen[funName] > 1 {
+				continue
 			}
 			fun = Function{Package: rec[csvFields["PACKAGE_NAME"]],
 				name: rec[csvFields["OBJECT_NAME"]]}
@@ -147,6 +154,7 @@ func ReadCsv(filename string) (functions []Function, err error) {
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
 		if level == 0 {
 			if len(args) == 0 && arg.Name == "" {
+				arg.Name = "return"
 				fun.Returns = &arg
 			} else {
 				args = append(args, arg)

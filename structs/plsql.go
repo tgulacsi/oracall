@@ -26,6 +26,9 @@ import (
 	"github.com/tgulacsi/goracle/oracle"
 )
 
+// MaxTableSize is the maximum size of the array arguments
+const MaxTableSize = 1000
+
 //
 // OracleArgument
 //
@@ -106,11 +109,19 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	fn := strings.Replace(fun.Name(), ".", "__", -1)
 	callBuf := bytes.NewBuffer(make([]byte, 0, 16384))
 	fmt.Fprintf(callBuf, `func Call_%s(cur *oracle.Cursor, input %s) (output %s, err error) {
-    `, fn, fun.getStructName(false), fun.getStructName(true))
+    if err = input.Check(); err != nil {
+        return
+    }
+    params := make(map[string]interface{}, %d)
+    `, fn, fun.getStructName(false), fun.getStructName(true), len(fun.Args)+1)
 	for _, line := range conv {
 		io.WriteString(callBuf, line+"\n")
 	}
-	io.WriteString(callBuf, "\nreturn\n}\n")
+	fmt.Fprintf(callBuf, `
+    if err = cur.Execute(%s, nil, params); err != nil { return }
+        return
+    }
+    `, fun.getPlsqlConstName())
 	callFun = callBuf.String()
 
 	plsBuf := callBuf
@@ -137,11 +148,13 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 
 func prepareCall(fun Function) (decls, pre []string, call string, post []string, conv []string, err error) {
 	callArgs := make(map[string]string, 16)
+	//fStructIn, fStructOut := fun.getStructName(false), fun.getStructName(true)
 	var (
 		vn, tmp string
 		ok      bool
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
+	conv = append(conv, "var v *oracle.Variable\n _ = v")
 	for _, arg := range fun.Args {
 		if arg.Flavor != FLAVOR_SIMPLE {
 			if arg.IsInput() {
@@ -153,33 +166,73 @@ func prepareCall(fun Function) (decls, pre []string, call string, post []string,
 		}
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
-			if arg.Direction == DIR_IN {
+			name := capitalize(goName(arg.Name))
+			if arg.IsOutput() {
 				conv = append(conv,
-					fmt.Sprintf(`   params["%s"] = input.%s`,
-						arg.Name, capitalize(goName(arg.Name))))
-			} else {
+					fmt.Sprintf("if v, err = cur.NewVariable(0, %s, %d); err != nil { return }",
+						oracleVarTypeName(arg.Type), arg.Charlength))
+				if arg.IsInput() {
+					conv = append(conv,
+						fmt.Sprintf("if err = v.SetValue(0, input.%s); err != nil { return }",
+							name))
+				}
+			} else { // just and only input
 				conv = append(conv,
-					fmt.Sprintf(`  if params["%s"], err = cur.NewVariable(%s, 0, %d); err != nil {
-        return
-    }`,
-						arg.Name, oracleVarTypeName(arg.Type), arg.Charlength))
+					fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
+						name))
 			}
+			conv = append(conv,
+				fmt.Sprintf(`   params["%s"] = v`, arg.Name))
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
 			callArgs[arg.Name] = vn
 			decls = append(decls, vn+" "+arg.TypeName+";")
-			for k := range arg.RecordOf {
+			aname := capitalize(goName(arg.Name))
+			for k, v := range arg.RecordOf {
 				tmp = getParamName(fun.Name(), vn+"."+k)
-				if arg.IsInput() {
-					pre = append(pre, vn+"."+k+" := :"+tmp+"."+k+";")
-				}
+				name := aname + "." + capitalize(goName(k))
 				if arg.IsOutput() {
 					post = append(post, ":"+tmp+"."+k+" := "+vn+"."+k+";")
+
+					conv = append(conv,
+						fmt.Sprintf("if v, err = cur.NewVariable(0, %s, %d); err != nil { return }",
+							oracleVarTypeName(v.Type), v.Charlength))
+					if arg.IsInput() {
+						conv = append(conv,
+							fmt.Sprintf("if err = v.SetValue(0, input.%s); err != nil { return }",
+								name))
+					}
+				} else { // just and only input
+					conv = append(conv,
+						fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
+							name))
+				}
+				conv = append(conv, fmt.Sprintf(`params["%s"] = v`, tmp))
+
+				if arg.IsInput() {
+					pre = append(pre, vn+"."+k+" := :"+tmp+";")
 				}
 			}
 		case FLAVOR_TABLE:
 			switch arg.TableOf.Flavor {
 			case FLAVOR_SIMPLE:
+				name := capitalize(goName(arg.Name))
+				if arg.IsOutput() {
+					conv = append(conv,
+						fmt.Sprintf("if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }",
+							MaxTableSize, oracleVarTypeName(arg.TableOf.Type), arg.TableOf.Charlength))
+					if arg.IsInput() {
+						conv = append(conv, fmt.Sprintf(`for i, x := range input.%s {
+                            if err = v.SetValue(uint(i), x); err != nil { return }
+                        }`, name))
+					}
+				} else { // just and only input
+					conv = append(conv,
+						fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
+							name))
+				}
+				conv = append(conv, fmt.Sprintf(`params["%s"] = v`, arg.Name))
+
 			case FLAVOR_RECORD:
 				vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
 				callArgs[arg.Name] = vn

@@ -26,6 +26,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const nullable = true
+
 var _ = glog.Infof
 
 func SaveFunctions(dst io.Writer, functions []Function, pkg string) error {
@@ -34,11 +36,17 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string) error {
 		if _, err = io.WriteString(dst,
 			"package "+pkg+`
 import (
-    _ "time"    // for datetimes
-    _ "database/sql"    // for NullXxx
+    "errors"
+    "time"    // for datetimes
+    "database/sql"    // for NullXxx
 
-    _ "github.com/tgulacsi/goracle/oracle"    // Oracle
+    "github.com/tgulacsi/goracle/oracle"    // Oracle
 )
+
+var _ time.Time
+var _ sql.NullBool
+var _ oracle.Cursor
+
 `); err != nil {
 			return err
 		}
@@ -49,24 +57,23 @@ import (
 			if err = fun.SaveStruct(dst, types, dir); err != nil {
 				return err
 			}
-			plsBlock, callFun := fun.PlsqlBlock()
-			if _, err = fmt.Fprintf(dst, "\nconst %s = `",
-				capitalize(fun.Package+"__"+fun.name+"__plsql")); err != nil {
-				return err
-			}
-			if _, err = io.WriteString(dst, plsBlock); err != nil {
-				return err
-			}
-			if _, err = io.WriteString(dst, "`\n"); err != nil {
-				return err
-			}
+		}
+		plsBlock, callFun := fun.PlsqlBlock()
+		if _, err = fmt.Fprintf(dst, "\nconst %s = `", fun.getPlsqlConstName()); err != nil {
+			return err
+		}
+		if _, err = io.WriteString(dst, plsBlock); err != nil {
+			return err
+		}
+		if _, err = io.WriteString(dst, "`\n"); err != nil {
+			return err
+		}
 
-			if _, err = io.WriteString(dst, "\n"); err != nil {
-				return err
-			}
-			if _, err = io.WriteString(dst, callFun); err != nil {
-				return err
-			}
+		if _, err = io.WriteString(dst, "\n"); err != nil {
+			return err
+		}
+		if _, err = io.WriteString(dst, callFun); err != nil {
+			return err
 		}
 	}
 	for _, text := range types {
@@ -76,6 +83,10 @@ import (
 	}
 
 	return nil
+}
+
+func (f Function) getPlsqlConstName() string {
+	return capitalize(f.Package + "__" + f.name + "__plsql")
 }
 
 func (f Function) getStructName(out bool) string {
@@ -106,12 +117,8 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 	}
 	//glog.Infof("args[%d]: %s", dirmap, args)
 
-	if len(args) == 0 { // no args
-		return nil
-	}
-
 	if dirmap == uint8(DIR_IN) {
-		checks = make([]string, 0, len(args))
+		checks = make([]string, 0, len(args)+1)
 	}
 	structName = f.getStructName(out)
 	if _, err = io.WriteString(dst,
@@ -121,8 +128,8 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 
 	for _, arg := range args {
 		aName = capitalize(goName(arg.Name))
-		got = arg.goType(true, types)
-		if strings.Index(got, "__") > 0 {
+		got = arg.goType(types)
+		if !strings.HasPrefix(got, "[]") && strings.Index(got, "__") > 0 {
 			got = "*" + got
 		}
 		if _, err = io.WriteString(dst, "\t"+aName+" "+got+"\n"); err != nil {
@@ -155,7 +162,7 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 
 func genChecks(checks []string, arg Argument, types map[string]string, base string) []string {
 	aName := capitalize(goName(arg.Name))
-	got := arg.goType(true, types)
+	got := arg.goType(types)
 	var name string
 	if aName == "" {
 		name = base
@@ -204,12 +211,14 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 	case FLAVOR_RECORD:
 		for k, sub := range arg.RecordOf {
 			_ = k
-			checks = genChecks(checks, sub, types, base)
+			checks = genChecks(checks, sub, types, name)
 		}
 	case FLAVOR_TABLE:
 		plus := strings.Join(genChecks(nil, *arg.TableOf, types, "v"), "\n\t")
-		checks = append(checks,
-			fmt.Sprintf("for i, v := range %s.%s {\n\t%s\n}", base, aName, plus))
+		if len(strings.TrimSpace(plus)) > 0 {
+			checks = append(checks,
+				fmt.Sprintf("for _, v := range %s.%s {\n\t%s\n}", base, aName, plus))
+		}
 	default:
 		log.Fatalf("unknown flavor %q", arg.Flavor)
 	}
@@ -232,7 +241,13 @@ func unocap(text string) string {
 }
 
 // returns a go type for the argument's type
-func (arg Argument) goType(nullable bool, typedefs map[string]string) string {
+func (arg *Argument) goType(typedefs map[string]string) (typName string) {
+	if arg.goTypeName != "" {
+		return arg.goTypeName
+	}
+	defer func() {
+		arg.goTypeName = typName
+	}()
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2":
@@ -263,16 +278,14 @@ func (arg Argument) goType(nullable bool, typedefs map[string]string) string {
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
 			return "time.Time"
 		case "REF CURSOR":
-			return "*goracle.Cursor"
-		case "CLOB":
-			return "*goracle.Clob"
-		case "BLOB":
-			return "*goracle.Blob"
+			return "*oracle.Cursor"
+		case "CLOB", "BLOB":
+			return "*oracle.ExternalLobVar"
 		default:
 			log.Fatalf("unknown simple type %s (%s)", arg.Type, arg)
 		}
 	}
-	typName := arg.TypeName
+	typName = arg.TypeName
 	chunks := strings.Split(typName, ".")
 	switch len(chunks) {
 	case 1:
@@ -287,16 +300,17 @@ func (arg Argument) goType(nullable bool, typedefs map[string]string) string {
 	}
 	if arg.Flavor == FLAVOR_TABLE {
 		glog.Infof("arg=%s tof=%s", arg, arg.TableOf)
-		return "[]" + arg.TableOf.goType(true, typedefs)
+		return "[]" + arg.TableOf.goType(typedefs)
 	}
 	buf := bytes.NewBuffer(make([]byte, 0, 256))
 	if arg.TypeName == "" {
-		log.Fatalf("arg has no TypeName: %#v\n%s", arg, arg)
+		glog.Warningf("arg has no TypeName: %#v\n%s", arg, arg)
+		arg.TypeName = strings.ToLower(arg.Name)
 	}
 	buf.WriteString("\n// " + arg.TypeName + "\n")
 	buf.WriteString("type " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
-		buf.WriteString("\t" + capitalize(goName(k)) + " " + v.goType(true, typedefs) + "\n")
+		buf.WriteString("\t" + capitalize(goName(k)) + " " + v.goType(typedefs) + "\n")
 	}
 	buf.WriteString("}\n")
 	typedefs[typName] = buf.String()

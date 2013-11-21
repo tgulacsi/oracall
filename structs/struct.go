@@ -65,6 +65,7 @@ type Argument struct {
 	Charlength              uint
 	TableOf                 *Argument
 	RecordOf                map[string]Argument
+    goTypeName string
 }
 
 func (a Argument) String() string {
@@ -127,6 +128,9 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
 		arg.RecordOf = make(map[string]Argument, 1)
+		if arg.TypeName == "" {
+			arg.TypeName = arg.Name
+		}
 	case "TABLE", "PL/SQL TABLE":
 		arg.Flavor = FLAVOR_TABLE
 	}
