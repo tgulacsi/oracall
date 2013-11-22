@@ -65,7 +65,7 @@ type Argument struct {
 	Charlength              uint
 	TableOf                 *Argument
 	RecordOf                map[string]Argument
-    goTypeName string
+	goTypeName              string
 }
 
 func (a Argument) String() string {

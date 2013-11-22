@@ -19,6 +19,7 @@ package structs
 import (
 	"bytes"
 	"fmt"
+	"go/format"
 	"io"
 	"log"
 	"strings"
@@ -32,6 +33,7 @@ var _ = glog.Infof
 
 func SaveFunctions(dst io.Writer, functions []Function, pkg string) error {
 	var err error
+
 	if pkg != "" {
 		if _, err = io.WriteString(dst,
 			"package "+pkg+`
@@ -52,6 +54,7 @@ var _ oracle.Cursor
 		}
 	}
 	types := make(map[string]string)
+	var b []byte
 	for _, fun := range functions {
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(dst, types, dir); err != nil {
@@ -72,12 +75,19 @@ var _ oracle.Cursor
 		if _, err = io.WriteString(dst, "\n"); err != nil {
 			return err
 		}
-		if _, err = io.WriteString(dst, callFun); err != nil {
+		if b, err = format.Source([]byte(callFun)); err != nil {
+			return err
+		}
+		if _, err = dst.Write(b); err != nil {
 			return err
 		}
 	}
 	for _, text := range types {
-		if _, err = io.WriteString(dst, text); err != nil {
+		if b, err = format.Source([]byte(text)); err != nil {
+			return err
+		}
+		//if _, err = io.WriteString(dst, text); err != nil {
+		if _, err = dst.Write(b); err != nil {
 			return err
 		}
 	}
