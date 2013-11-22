@@ -53,11 +53,12 @@ var _ oracle.Cursor
 			return err
 		}
 	}
-	types := make(map[string]string)
+	types := make(map[string]string, 16)
 	var b []byte
 	for _, fun := range functions {
+		fun.types = types
 		for _, dir := range []bool{false, true} {
-			if err = fun.SaveStruct(dst, types, dir); err != nil {
+			if err = fun.SaveStruct(dst, dir); err != nil {
 				return err
 			}
 		}
@@ -107,7 +108,7 @@ func (f Function) getStructName(out bool) string {
 	return capitalize(f.Package + "__" + f.name + "__" + dirname)
 }
 
-func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) error {
+func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	//glog.Infof("f=%s", f)
 	dirmap, dirname := uint8(DIR_IN), "input"
 	if out {
@@ -131,39 +132,52 @@ func (f Function) SaveStruct(dst io.Writer, types map[string]string, out bool) e
 		checks = make([]string, 0, len(args)+1)
 	}
 	structName = f.getStructName(out)
-	if _, err = io.WriteString(dst,
+	buf := bytes.NewBuffer(make([]byte, 0, 65536))
+	if _, err = io.WriteString(buf,
 		"\n// "+f.Name()+" "+dirname+"\ntype "+structName+" struct {\n"); err != nil {
 		return err
 	}
 
 	for _, arg := range args {
 		aName = capitalize(goName(arg.Name))
-		got = arg.goType(types)
+		got = arg.goType(f.types)
 		if !strings.HasPrefix(got, "[]") && strings.Index(got, "__") > 0 {
 			got = "*" + got
 		}
-		if _, err = io.WriteString(dst, "\t"+aName+" "+got+"\n"); err != nil {
+		if _, err = io.WriteString(buf, "\t"+aName+" "+got+"\n"); err != nil {
 			return err
 		}
 		if checks != nil {
-			checks = genChecks(checks, arg, types, "s")
+			checks = genChecks(checks, arg, f.types, "s")
 		}
 	}
 
-	if _, err = io.WriteString(dst, "}\n"); err != nil {
+	if _, err = io.WriteString(buf, "}\n"); err != nil {
 		return err
 	}
+	var b []byte
+	if b, err = format.Source(buf.Bytes()); err != nil {
+		return err
+	}
+	dst.Write(b)
 
 	if checks != nil {
-		if _, err = fmt.Fprintf(dst, "\n// Check checks input bounds for %s\nfunc (s %s) Check() error {\n", structName, structName); err != nil {
+		buf.Reset()
+		if _, err = fmt.Fprintf(buf, "\n// Check checks input bounds for %s\nfunc (s %s) Check() error {\n", structName, structName); err != nil {
 			return err
 		}
 		for _, line := range checks {
-			if _, err = fmt.Fprintf(dst, line+"\n"); err != nil {
+			if _, err = fmt.Fprintf(buf, line+"\n"); err != nil {
 				return err
 			}
 		}
-		if _, err = io.WriteString(dst, "\n\treturn nil\n}\n"); err != nil {
+		if _, err = io.WriteString(buf, "\n\treturn nil\n}\n"); err != nil {
+			return err
+		}
+		if b, err = format.Source(buf.Bytes()); err != nil {
+			return err
+		}
+		if _, err = dst.Write(b); err != nil {
 			return err
 		}
 	}
@@ -219,15 +233,17 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			}
 		}
 	case FLAVOR_RECORD:
+		checks = append(checks, "if "+name+" != nil {")
 		for k, sub := range arg.RecordOf {
 			_ = k
 			checks = genChecks(checks, sub, types, name)
 		}
+		checks = append(checks, "}")
 	case FLAVOR_TABLE:
 		plus := strings.Join(genChecks(nil, *arg.TableOf, types, "v"), "\n\t")
 		if len(strings.TrimSpace(plus)) > 0 {
 			checks = append(checks,
-				fmt.Sprintf("for _, v := range %s.%s {\n\t%s\n}", base, aName, plus))
+				fmt.Sprintf("\tfor _, v := range %s.%s {\n\t%s\n}", base, aName, plus))
 		}
 	default:
 		log.Fatalf("unknown flavor %q", arg.Flavor)

@@ -25,6 +25,7 @@ type Function struct {
 	Package, name string
 	Returns       *Argument
 	Args          []Argument
+	types         map[string]string
 }
 
 func (f Function) Name() string {

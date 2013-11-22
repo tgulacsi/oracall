@@ -102,7 +102,7 @@ func oracleVarTypeName(typ string) string {
 
 // SavePlsqlBlock saves the plsql block definition into writer
 func (fun Function) PlsqlBlock() (plsql, callFun string) {
-	decls, pre, call, post, conv, err := prepareCall(fun)
+	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
 		log.Fatalf("error preparing %s: %s", fun, err)
 	}
@@ -114,7 +114,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
     }
     params := make(map[string]interface{}, %d)
     `, fn, fun.getStructName(false), fun.getStructName(true), len(fun.Args)+1)
-	for _, line := range conv {
+	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
 	fmt.Fprintf(callBuf, `
@@ -122,6 +122,9 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
         return
     }
     `, fun.getPlsqlConstName())
+	for _, line := range convOut {
+		io.WriteString(callBuf, line+"\n")
+	}
 	callFun = callBuf.String()
 
 	plsBuf := callBuf
@@ -146,7 +149,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	return
 }
 
-func prepareCall(fun Function) (decls, pre []string, call string, post []string, conv []string, err error) {
+func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
 	callArgs := make(map[string]string, 16)
 	//fStructIn, fStructOut := fun.getStructName(false), fun.getStructName(true)
 	var (
@@ -154,7 +157,7 @@ func prepareCall(fun Function) (decls, pre []string, call string, post []string,
 		ok      bool
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
-	conv = append(conv, "var v *oracle.Variable\n _ = v")
+	convIn = append(convIn, "var v *oracle.Variable\n _ = v")
 	for _, arg := range fun.Args {
 		if arg.Flavor != FLAVOR_SIMPLE {
 			if arg.IsInput() {
@@ -167,22 +170,8 @@ func prepareCall(fun Function) (decls, pre []string, call string, post []string,
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
 			name := capitalize(goName(arg.Name))
-			if arg.IsOutput() {
-				conv = append(conv,
-					fmt.Sprintf("if v, err = cur.NewVariable(0, %s, %d); err != nil { return }",
-						oracleVarTypeName(arg.Type), arg.Charlength))
-				if arg.IsInput() {
-					conv = append(conv,
-						fmt.Sprintf("if err = v.SetValue(0, input.%s); err != nil { return }",
-							name))
-				}
-			} else { // just and only input
-				conv = append(conv,
-					fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
-						name))
-			}
-			conv = append(conv,
-				fmt.Sprintf(`   params["%s"] = v`, arg.Name))
+			convIn, convOut = arg.getConv(convIn, convOut, fun.types, name, arg.Name, 0)
+
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
 			callArgs[arg.Name] = vn
@@ -193,21 +182,8 @@ func prepareCall(fun Function) (decls, pre []string, call string, post []string,
 				name := aname + "." + capitalize(goName(k))
 				if arg.IsOutput() {
 					post = append(post, ":"+tmp+"."+k+" := "+vn+"."+k+";")
-
-					conv = append(conv,
-						fmt.Sprintf("if v, err = cur.NewVariable(0, %s, %d); err != nil { return }",
-							oracleVarTypeName(v.Type), v.Charlength))
-					if arg.IsInput() {
-						conv = append(conv,
-							fmt.Sprintf("if err = v.SetValue(0, input.%s); err != nil { return }",
-								name))
-					}
-				} else { // just and only input
-					conv = append(conv,
-						fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
-							name))
 				}
-				conv = append(conv, fmt.Sprintf(`params["%s"] = v`, tmp))
+				convIn, convOut = v.getConv(convIn, convOut, fun.types, name, tmp, 0)
 
 				if arg.IsInput() {
 					pre = append(pre, vn+"."+k+" := :"+tmp+";")
@@ -217,21 +193,7 @@ func prepareCall(fun Function) (decls, pre []string, call string, post []string,
 			switch arg.TableOf.Flavor {
 			case FLAVOR_SIMPLE:
 				name := capitalize(goName(arg.Name))
-				if arg.IsOutput() {
-					conv = append(conv,
-						fmt.Sprintf("if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }",
-							MaxTableSize, oracleVarTypeName(arg.TableOf.Type), arg.TableOf.Charlength))
-					if arg.IsInput() {
-						conv = append(conv, fmt.Sprintf(`for i, x := range input.%s {
-                            if err = v.SetValue(uint(i), x); err != nil { return }
-                        }`, name))
-					}
-				} else { // just and only input
-					conv = append(conv,
-						fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
-							name))
-				}
-				conv = append(conv, fmt.Sprintf(`params["%s"] = v`, arg.Name))
+				convIn, convOut = arg.TableOf.getConv(convIn, convOut, fun.types, name, arg.Name, MaxTableSize)
 
 			case FLAVOR_RECORD:
 				vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
@@ -305,6 +267,111 @@ func prepareCall(fun Function) (decls, pre []string, call string, post []string,
 	callb.WriteString(")")
 	call = callb.String()
 	return
+}
+
+func (arg Argument) getConv(convIn, convOut []string, types map[string]string, name, paramName string, tableSize uint) ([]string, []string) {
+	got := arg.goType(types)
+	nullable := strings.HasPrefix(got, "sql.Null")
+	preconcept, preconcept2 := "", ""
+	if strings.Count(name, ".") >= 1 {
+		preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
+		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
+	}
+	valueName := ""
+	if nullable {
+		valueName = got[8:]
+	}
+	if arg.IsOutput() {
+		convIn = append(convIn,
+			fmt.Sprintf("if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }",
+				tableSize, oracleVarTypeName(arg.Type), arg.Charlength))
+		if arg.IsInput() {
+			if tableSize == 0 {
+				if nullable {
+					convIn = append(convIn,
+						fmt.Sprintf(`if %s input.%s.Valid {
+                            if err = v.SetValue(0, input.%s.%s); err != nil { return }
+                        }`,
+							preconcept, name, name, valueName))
+				} else {
+					if preconcept2 != "" {
+						convIn = append(convIn, preconcept2)
+					}
+					convIn = append(convIn,
+						fmt.Sprintf("if err = v.SetValue(0, input.%s); err != nil { return }",
+							name))
+					if preconcept2 != "" {
+						convIn = append(convIn, "}")
+					}
+				}
+			} else {
+				if preconcept2 != "" {
+					convIn = append(convIn, preconcept2)
+				}
+				if nullable {
+					convIn = append(convIn,
+						fmt.Sprintf(`for i, x := range input.%s {
+                                if x.Valid {
+                                if err = v.SetValue(uint(i), x.%s); err != nil { return }
+                                }
+                            }`, name, valueName))
+				} else {
+					convIn = append(convIn,
+						fmt.Sprintf(`for i, x := range input.%s {
+                                if err = v.SetValue(uint(i), x); err != nil { return }
+                            }`, name))
+				}
+				if preconcept2 != "" {
+					convIn = append(convIn, "}")
+				}
+			}
+		}
+	} else { // just and only input
+		if tableSize == 0 {
+			if preconcept2 != "" {
+				convIn = append(convIn, preconcept2)
+			}
+			if nullable {
+				convIn = append(convIn,
+					fmt.Sprintf(`if input.%s.Valid {
+                    if v, err = cur.NewVar(input.%s.%s); err != nil {return }
+                    }`,
+						name, name, valueName))
+			} else {
+				convIn = append(convIn,
+					fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
+						name))
+			}
+			if preconcept2 != "" {
+				convIn = append(convIn, "} else { v = nil }")
+			}
+		} else {
+			if preconcept2 != "" {
+				convIn = append(convIn, preconcept2)
+			}
+			if nullable {
+				subGoType := strings.ToLower(got[8:])
+				convIn = append(convIn,
+					fmt.Sprintf(`a := make([]%s, len(input.%s))
+                    for i, x := range input.%s {
+                        if x.Valid { a[i] = x.%s }
+                    }
+                    if v, err = cur.NewVar(a); err != nil {return }
+                    `,
+						subGoType, name, name, valueName))
+			} else {
+				convIn = append(convIn,
+					fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
+						name))
+			}
+			if preconcept2 != "" {
+				convIn = append(convIn, "}")
+			}
+		}
+	}
+	convIn = append(convIn,
+		fmt.Sprintf("params[\"%s\"] = v\n", paramName))
+	return convIn, convOut
 }
 
 var varNames = make(map[string]map[string]string, 4)
