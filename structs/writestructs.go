@@ -31,7 +31,7 @@ const nullable = true
 
 var _ = glog.Infof
 
-func SaveFunctions(dst io.Writer, functions []Function, pkg string) error {
+func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatting bool) error {
 	var err error
 
 	if pkg != "" {
@@ -77,15 +77,19 @@ var _ oracle.Cursor
 			return err
 		}
 		if b, err = format.Source([]byte(callFun)); err != nil {
-			return err
+			if !skipFormatting {
+				return fmt.Errorf("error saving function %s: %s\n%s", fun.Name(), err, callFun)
+			}
+			log.Printf("error saving function %s: %s", fun.Name(), err)
+			b = []byte(callFun)
 		}
 		if _, err = dst.Write(b); err != nil {
 			return err
 		}
 	}
-	for _, text := range types {
+	for tn, text := range types {
 		if b, err = format.Source([]byte(text)); err != nil {
-			return err
+			return fmt.Errorf("error saving type %s: %s\n%s", tn, err, text)
 		}
 		//if _, err = io.WriteString(dst, text); err != nil {
 		if _, err = dst.Write(b); err != nil {
@@ -159,7 +163,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	}
 	var b []byte
 	if b, err = format.Source(buf.Bytes()); err != nil {
-		return err
+		return fmt.Errorf("error saving struct %q: %s\n%s", structName, err, buf.String())
 	}
 	dst.Write(b)
 
@@ -177,7 +181,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 			return err
 		}
 		if b, err = format.Source(buf.Bytes()); err != nil {
-			return err
+			return fmt.Errorf("error writing check of %s: %s\n%s", structName, err, buf.String())
 		}
 		if _, err = dst.Write(b); err != nil {
 			return err

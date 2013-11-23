@@ -119,12 +119,13 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	}
 	fmt.Fprintf(callBuf, `
     if err = cur.Execute(%s, nil, params); err != nil { return }
-        return
-    }
     `, fun.getPlsqlConstName())
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
+	fmt.Fprintf(callBuf, `
+        return
+    }`)
 	callFun = callBuf.String()
 
 	plsBuf := callBuf
@@ -157,7 +158,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		ok      bool
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
-	convIn = append(convIn, "var v *oracle.Variable\n _ = v")
+	convIn = append(convIn, "var v *oracle.Variable\nvar x interface{}\n _, _ = v, x")
 	for _, arg := range fun.Args {
 		if arg.Flavor != FLAVOR_SIMPLE {
 			if arg.IsInput() {
@@ -274,7 +275,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 	nullable := strings.HasPrefix(got, "sql.Null")
 	preconcept, preconcept2 := "", ""
 	if strings.Count(name, ".") >= 1 {
-		preconcept = "input." + name[:strings.LastIndex(name, ".")] + MarkValid+" &&"
+		preconcept = "input." + name[:strings.LastIndex(name, ".")] + MarkValid + " &&"
 		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
 	}
 	valueName := ""
@@ -285,6 +286,35 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 		convIn = append(convIn,
 			fmt.Sprintf("if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }",
 				tableSize, oracleVarTypeName(arg.Type), arg.Charlength))
+		if nullable {
+			convOut = append(convOut,
+				fmt.Sprintf(`if params["%s"] != nil {
+                v = params["%s"].(*oracle.Variable)
+                if err = v.GetValueInto(&x, 0); err != nil {
+                    return
+                } else if x != nil {
+                    output.%s.%s = x.(%s)
+                    output.%s.Valid = true
+                }}
+            `, paramName, paramName, name, valueName, strings.ToLower(valueName), name))
+		} else if got == "time.Time" {
+			convOut = append(convOut,
+				fmt.Sprintf(`if params["%s"] != nil {
+                v = params["%s"].(*oracle.Variable)
+                if err = v.GetValueInto(&x, 0); err != nil {
+                    return
+                } else if x != nil {
+                    output.%s = x.(time.Time)
+                }}
+            `, paramName, paramName, name))
+		} else {
+			convOut = append(convOut,
+				fmt.Sprintf(`if params["%s"] != nil {
+                v = params["%s"].(*oracle.Variable)
+                if err = v.GetValueInto(&output.%s, 0); err != nil { return }
+                }
+            `, paramName, paramName, name))
+		}
 		if arg.IsInput() {
 			if tableSize == 0 {
 				if nullable {

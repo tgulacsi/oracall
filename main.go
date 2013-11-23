@@ -24,6 +24,8 @@ import (
 	"github.com/tgulacsi/oracall/structs"
 )
 
+var flagSkipFormat = flag.Bool("F", false, "skip formatting")
+
 func main() {
 	flag.Parse()
 	functions, err := structs.ReadCsv(flag.Arg(0))
@@ -33,7 +35,7 @@ func main() {
 	}
 
 	defer os.Stdout.Sync()
-	if err = structs.SaveFunctions(os.Stdout, functions, "main"); err != nil {
+	if err = structs.SaveFunctions(os.Stdout, functions, "main", *flagSkipFormat); err != nil {
 		log.Printf("error saving functions: %s", err)
 		os.Exit(1)
 	}
