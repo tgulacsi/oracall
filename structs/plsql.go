@@ -274,7 +274,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 	nullable := strings.HasPrefix(got, "sql.Null")
 	preconcept, preconcept2 := "", ""
 	if strings.Count(name, ".") >= 1 {
-		preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
+		preconcept = "input." + name[:strings.LastIndex(name, ".")] + MarkValid+" &&"
 		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
 	}
 	valueName := ""

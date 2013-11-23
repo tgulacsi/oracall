@@ -142,7 +142,9 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types)
 		if !strings.HasPrefix(got, "[]") && strings.Index(got, "__") > 0 {
-			got = "*" + got
+			if _, err = io.WriteString(buf, "\t"+aName+MarkValid+" bool\n"); err != nil {
+				return err
+			}
 		}
 		if _, err = io.WriteString(buf, "\t"+aName+" "+got+"\n"); err != nil {
 			return err
@@ -233,7 +235,7 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			}
 		}
 	case FLAVOR_RECORD:
-		checks = append(checks, "if "+name+" != nil {")
+		checks = append(checks, "if "+name+MarkValid+" {")
 		for k, sub := range arg.RecordOf {
 			_ = k
 			checks = genChecks(checks, sub, types, name)
@@ -348,7 +350,7 @@ func goName(text string) string {
 		return text
 	}
 	if text[len(text)-1] == '#' {
-		return text[:len(text)-1] + "匿" // 0x533f = hide
+		return text[:len(text)-1] + MarkHidden
 	}
 	return text
 }

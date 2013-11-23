@@ -21,6 +21,13 @@ import (
 	"strings"
 )
 
+const (
+	MarkNull   = "␀" // 0x2400 = nul
+	//MarkValid  = "滿" // 0x6eff = fill; full, satisfied
+	MarkValid  = "Valid" // 0x6eff = fill; full, satisfied
+	MarkHidden = "匿" // 0x533f = hide
+)
+
 type Function struct {
 	Package, name string
 	Returns       *Argument
