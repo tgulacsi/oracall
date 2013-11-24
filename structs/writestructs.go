@@ -35,10 +35,11 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 	var err error
 
 	if pkg != "" {
-		if _, err = io.WriteString(dst,
+		if _, err = fmt.Fprintf(dst,
 			"package "+pkg+`
 import (
     "errors"
+    "fmt"
     "time"    // for datetimes
     "database/sql"    // for NullXxx
 
@@ -49,11 +50,18 @@ var _ time.Time
 var _ sql.NullBool
 var _ oracle.Cursor
 
-`); err != nil {
+// FunctionCaller is a function which calls the stored procedure with
+// the input struct, and returns the output struct as an interface{}
+type FunctionCaller func(*oracle.Cursor, interface{}) (interface{}, error)
+
+// Functions is the map of function name -> function
+var Functions = make(map[string]FunctionCaller, %d)
+`, len(functions)); err != nil {
 			return err
 		}
 	}
 	types := make(map[string]string, 16)
+	inits := make([]string, 0, len(functions))
 	var b []byte
 	for _, fun := range functions {
 		fun.types = types
@@ -86,6 +94,16 @@ var _ oracle.Cursor
 		if _, err = dst.Write(b); err != nil {
 			return err
 		}
+		inits = append(inits,
+			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *oracle.Cursor, input interface{}) (interface{}, error) {
+                inp, ok := input.(%s)
+                if !ok {
+                    return nil, fmt.Errorf("to call %s, the input must be %s, not %%T", input)
+                }
+                return Call_%s(cur, inp)
+            }`,
+				fun.Name(), fun.getStructName(false), fun.Name(), fun.getStructName(false),
+				strings.Replace(fun.Name(), ".", "__", -1)))
 	}
 	for tn, text := range types {
 		if b, err = format.Source([]byte(text)); err != nil {
@@ -95,6 +113,21 @@ var _ oracle.Cursor
 		if _, err = dst.Write(b); err != nil {
 			return err
 		}
+	}
+
+	if _, err = io.WriteString(dst, "func init() {\n"); err != nil {
+		return err
+	}
+	for _, text := range inits {
+		if _, err = io.WriteString(dst, text); err != nil {
+			return err
+		}
+		if _, err = dst.Write([]byte{'\n'}); err != nil {
+			return err
+		}
+	}
+	if _, err = io.WriteString(dst, "}\n"); err != nil {
+		return err
 	}
 
 	return nil
