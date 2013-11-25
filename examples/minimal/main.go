@@ -25,6 +25,7 @@ Package main for minimal is a minimal example for oracall usage
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 )
@@ -43,4 +44,9 @@ func main() {
 	// [TODO]: parse stdin as json into the proper input struct
 	// [TODO]: call the function
 	// [TODO]: present the output as json
+	b, err := json.Marshal(Db_web__sendpreoffer_31101__input{})
+	if err != nil {
+		log.Fatalf("error marshaling input: %s", err)
+	}
+	log.Printf("%s", b)
 }

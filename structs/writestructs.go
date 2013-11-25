@@ -38,6 +38,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 		if _, err = fmt.Fprintf(dst,
 			"package "+pkg+`
 import (
+    "encoding/json"
     "errors"
     "fmt"
     "time"    // for datetimes
@@ -47,8 +48,38 @@ import (
 )
 
 var _ time.Time
-var _ sql.NullBool
+//var _ sql.NullBool
 var _ oracle.Cursor
+
+type NullBool sql.NullBool
+func (n NullBool) MarshalJSON() ([]byte, error) {
+    if !n.Valid { return []byte("null"), nil }
+    if n.Bool {
+        return []byte("true"), nil
+    }
+    return []byte("false"), nil
+}
+
+type NullString sql.NullString
+func (n NullString) MarshalJSON() ([]byte, error) {
+    if !n.Valid { return []byte("null"), nil }
+    if n.String == "" { return []byte("\"\""), nil }
+    return json.Marshal(n.String)
+}
+
+type NullInt64 sql.NullInt64
+func (n NullInt64) MarshalJSON() ([]byte, error) {
+    if !n.Valid { return []byte("null"), nil }
+    if n.Int64 == 0 { return []byte{'0'}, nil }
+    return json.Marshal(n.Int64)
+}
+
+type NullFloat64 sql.NullFloat64
+func (n NullFloat64) MarshalJSON() ([]byte, error) {
+    if !n.Valid { return []byte("null"), nil }
+    if n.Float64 == 0 { return []byte{'0'}, nil }
+    return json.Marshal(n.Float64)
+}
 
 // FunctionCaller is a function which calls the stored procedure with
 // the input struct, and returns the output struct as an interface{}
@@ -242,7 +273,7 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
     }`,
 					name, arg.Charlength,
 					name, arg.Charlength))
-		case "sql.NullString":
+		case "NullString", "sql.NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
         return errors.New("%s is longer then accepted (%d)")
@@ -259,9 +290,9 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 						name, cons, name, cons,
 						name, cons, cons))
 			}
-		case "sql.NullInt64", "sql.NullFloat64":
+		case "NullInt64", "NullFloat64", "sql.NullInt64", "sql.NullFloat64":
 			if arg.Precision > 0 {
-				vn := got[8:]
+				vn := got[strings.Index(got, "Null")+4:]
 				cons := strings.Repeat("9", int(arg.Precision))
 				checks = append(checks,
 					fmt.Sprintf(`if %s.Valid && (%s.%s <= -%s || %s.%s > %s) {
@@ -317,27 +348,27 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2":
 			if nullable {
-				return "sql.NullString"
+				return "NullString"
 			}
 			return "string"
 		case "NUMBER":
 			if nullable {
-				return "sql.NullFloat64"
+				return "NullFloat64"
 			}
 			return "float64"
 		case "INTEGER":
 			if nullable {
-				return "sql.NullInt64"
+				return "NullInt64"
 			}
 			return "int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
 			if nullable {
-				return "sql.NullInt64"
+				return "NullInt64"
 			}
 			return "int32"
 		case "BOOLEAN", "PL/SQL BOOLEAN":
 			if nullable {
-				return "sql.NullBool"
+				return "NullBool"
 			}
 			return "bool"
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
@@ -373,13 +404,14 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
 	buf.WriteString("\n// " + arg.TypeName + "\n")
+	buf.WriteString("type Null" + typName + " struct {\n\tValid bool\n\tStruct " + typName + "\n}\n")
 	buf.WriteString("type " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
 		buf.WriteString("\t" + capitalize(goName(k)) + " " + v.goType(typedefs) + "\n")
 	}
 	buf.WriteString("}\n")
 	typedefs[typName] = buf.String()
-	return typName
+	return "Null"+typName
 }
 
 func goName(text string) string {

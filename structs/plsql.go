@@ -272,7 +272,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 func (arg Argument) getConv(convIn, convOut []string, types map[string]string, name, paramName string, tableSize uint) ([]string, []string) {
 	got := arg.goType(types)
-	nullable := strings.HasPrefix(got, "sql.Null")
+	nullable := strings.HasPrefix(got, "Null") || strings.HasPrefix(got, "sql.Null")
 	preconcept, preconcept2 := "", ""
 	if strings.Count(name, ".") >= 1 {
 		preconcept = "input." + name[:strings.LastIndex(name, ".")] + MarkValid + " &&"
@@ -280,7 +280,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 	}
 	valueName := ""
 	if nullable {
-		valueName = got[8:]
+		valueName = got[strings.Index(got, "Null")+4:]
 	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
