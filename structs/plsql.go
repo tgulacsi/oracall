@@ -28,6 +28,8 @@ import (
 
 // MaxTableSize is the maximum size of the array arguments
 const MaxTableSize = 1000
+const nullable = true
+const useNil = true
 
 //
 // OracleArgument
@@ -275,11 +277,15 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 	nullable := strings.HasPrefix(got, "Null") || strings.HasPrefix(got, "sql.Null")
 	preconcept, preconcept2 := "", ""
 	if strings.Count(name, ".") >= 1 {
-		//preconcept = "input." + name[:strings.LastIndex(name, ".")] + MarkValid + " &&"
-		i := strings.LastIndex(name, ".")
-		preconcept = "input." + name[:i] + ".Valid &&"
-		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
-		name = name[:i] + ".Struct" + name[i:]
+		if useNil {
+			preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
+			preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
+		} else {
+			i := strings.LastIndex(name, ".")
+			preconcept = "input." + name[:i] + "Valid &&"
+			preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
+			name = name[:i] + ".Struct" + name[i:]
+		}
 	}
 	valueName := ""
 	if nullable {
@@ -289,7 +295,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 		convIn = append(convIn,
 			fmt.Sprintf("if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }",
 				tableSize, oracleVarTypeName(arg.Type), arg.Charlength))
-		if nullable {
+		if !useNil && nullable {
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
@@ -300,16 +306,16 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     output.%s.Valid = true
                 }}
             `, paramName, paramName, name, valueName, strings.ToLower(valueName), name))
-		} else if got == "time.Time" {
+		} else if useNil { //got == "time.Time" {
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
                 if err = v.GetValueInto(&x, 0); err != nil {
                     return
                 } else if x != nil {
-                    output.%s = x.(time.Time)
+                    output.%s = x.(%s)
                 }}
-            `, paramName, paramName, name))
+            `, paramName, paramName, name, got))
 		} else {
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
@@ -320,7 +326,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 		}
 		if arg.IsInput() {
 			if tableSize == 0 {
-				if nullable {
+				if !useNil && nullable {
 					convIn = append(convIn,
 						fmt.Sprintf(`if %s input.%s.Valid {
                             if err = v.SetValue(0, input.%s.%s); err != nil { return }
@@ -341,7 +347,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				if preconcept2 != "" {
 					convIn = append(convIn, preconcept2)
 				}
-				if nullable {
+				if !useNil && nullable {
 					convIn = append(convIn,
 						fmt.Sprintf(`for i, x := range input.%s {
                                 if x.Valid {
@@ -364,7 +370,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 			if preconcept2 != "" {
 				convIn = append(convIn, preconcept2)
 			}
-			if nullable {
+			if !useNil && nullable {
 				convIn = append(convIn,
 					fmt.Sprintf(`if input.%s.Valid {
                     if v, err = cur.NewVar(input.%s.%s); err != nil { return }
@@ -382,7 +388,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 			if preconcept2 != "" {
 				convIn = append(convIn, preconcept2)
 			}
-			if nullable {
+			if !useNil && nullable {
 				subGoType := strings.ToLower(got[strings.Index(got, "Null")+4:])
 				convIn = append(convIn,
 					fmt.Sprintf(`a := make([]%s, len(input.%s))

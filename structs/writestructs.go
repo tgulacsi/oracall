@@ -27,22 +27,41 @@ import (
 	"github.com/golang/glog"
 )
 
-const nullable = true
-
 var _ = glog.Infof
 
 func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatting bool) error {
 	var err error
 
 	if pkg != "" {
-		if _, err = fmt.Fprintf(dst,
-			"package "+pkg+`
+		if useNil || !nullable {
+			if _, err = fmt.Fprintf(dst,
+				"package "+pkg+`
 import (
-    "encoding/json"
+    "fmt"
+    "time"    // for datetimes
+
+    "github.com/tgulacsi/goracle/oracle"    // Oracle
+)
+
+var _ time.Time
+var _ oracle.Cursor
+
+// FunctionCaller is a function which calls the stored procedure with
+// the input struct, and returns the output struct as an interface{}
+type FunctionCaller func(*oracle.Cursor, interface{}) (interface{}, error)
+
+// Functions is the map of function name -> function
+var Functions = make(map[string]FunctionCaller, %d)
+`, len(functions)); err != nil {
+				return err
+			}
+		} else {
+			if _, err = fmt.Fprintf(dst,
+				"package "+pkg+`
+import (
     "errors"
     "fmt"
     "time"    // for datetimes
-    "database/sql"    // for NullXxx
 
     "github.com/tgulacsi/goracle/oracle"    // Oracle
 )
@@ -50,6 +69,7 @@ import (
 var _ time.Time
 //var _ sql.NullBool
 var _ oracle.Cursor
+var _ errors.New
 
 type NullBool sql.NullBool
 func (n NullBool) MarshalJSON() ([]byte, error) {
@@ -88,7 +108,8 @@ type FunctionCaller func(*oracle.Cursor, interface{}) (interface{}, error)
 // Functions is the map of function name -> function
 var Functions = make(map[string]FunctionCaller, %d)
 `, len(functions)); err != nil {
-			return err
+				return err
+			}
 		}
 	}
 	types := make(map[string]string, 16)
@@ -213,8 +234,10 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 			//if _, err = io.WriteString(buf, "\t"+aName+MarkValid+" bool\n"); err != nil {
 			//	return err
 			//}
-			if !strings.HasPrefix(got, "Null") {
-				got = "Null" + got
+			if nullable && !useNil {
+				if !strings.HasPrefix(got, "Null") {
+					got = "Null" + got
+				}
 			}
 		}
 		if _, err = io.WriteString(buf, "\t"+aName+" "+got+"\n"); err != nil {
@@ -307,10 +330,18 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 		}
 	case FLAVOR_RECORD:
 		//checks = append(checks, "if "+name+MarkValid+" {")
-		checks = append(checks, "if "+name+".Valid {")
-		for k, sub := range arg.RecordOf {
-			_ = k
-			checks = genChecks(checks, sub, types, name+".Struct")
+		if useNil {
+			checks = append(checks, "if "+name+" != nil {")
+			for k, sub := range arg.RecordOf {
+				_ = k
+				checks = genChecks(checks, sub, types, name)
+			}
+		} else {
+			checks = append(checks, "if "+name+".Valid {")
+			for k, sub := range arg.RecordOf {
+				_ = k
+				checks = genChecks(checks, sub, types, name+".Struct")
+			}
 		}
 		checks = append(checks, "}")
 	case FLAVOR_TABLE:
@@ -344,7 +375,12 @@ func unocap(text string) string {
 func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if arg.goTypeName != "" {
 		if strings.Index(arg.goTypeName, "__") > 0 {
-			return "Null" + arg.goTypeName
+			if nullable {
+				if useNil {
+					return "*" + arg.goTypeName
+				}
+				return "Null" + arg.goTypeName
+			}
 		}
 		return arg.goTypeName
 	}
@@ -355,30 +391,48 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2":
 			if nullable {
+				if useNil {
+					return "*string"
+				}
 				return "NullString"
 			}
 			return "string"
 		case "NUMBER":
 			if nullable {
+				if useNil {
+					return "*float64"
+				}
 				return "NullFloat64"
 			}
 			return "float64"
 		case "INTEGER":
 			if nullable {
+				if useNil {
+					return "*int64"
+				}
 				return "NullInt64"
 			}
 			return "int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
 			if nullable {
+				if useNil {
+					return "*int32"
+				}
 				return "NullInt64"
 			}
 			return "int32"
 		case "BOOLEAN", "PL/SQL BOOLEAN":
 			if nullable {
+				if useNil {
+					return "*bool"
+				}
 				return "NullBool"
 			}
 			return "bool"
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
+			if nullable && useNil {
+				return "*time.Time"
+			}
 			return "time.Time"
 		case "REF CURSOR":
 			return "*oracle.Cursor"
@@ -399,6 +453,12 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	}
 	typName = capitalize(typName)
 	if _, ok := typedefs[typName]; ok {
+		if nullable {
+			if useNil {
+				return "*" + typName
+			}
+			return "Null" + typName
+		}
 		return typName
 	}
 	if arg.Flavor == FLAVOR_TABLE {
@@ -410,16 +470,24 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		glog.Warningf("arg has no TypeName: %#v\n%s", arg, arg)
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
-	buf.WriteString("\n// " + arg.TypeName + "\n")
-	buf.WriteString("type Null" + typName +
-		" struct {\n\tValid bool\n\tStruct " + typName + "\n}")
+	if nullable && !useNil {
+		buf.WriteString("\n// " + arg.TypeName + "\n")
+		buf.WriteString("type Null" + typName +
+			" struct {\n\tValid bool\n\tStruct " + typName + "\n}")
+	}
 	buf.WriteString("\ntype " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
 		buf.WriteString("\t" + capitalize(goName(k)) + " " + v.goType(typedefs) + "\n")
 	}
 	buf.WriteString("}\n")
 	typedefs[typName] = buf.String()
-	return "Null" + typName
+	if nullable {
+		if useNil {
+			return "*" + typName
+		}
+		return "Null" + typName
+	}
+	return typName
 }
 
 func goName(text string) string {
