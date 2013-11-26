@@ -210,8 +210,11 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types)
 		if !strings.HasPrefix(got, "[]") && strings.Index(got, "__") > 0 {
-			if _, err = io.WriteString(buf, "\t"+aName+MarkValid+" bool\n"); err != nil {
-				return err
+			//if _, err = io.WriteString(buf, "\t"+aName+MarkValid+" bool\n"); err != nil {
+			//	return err
+			//}
+			if !strings.HasPrefix(got, "Null") {
+				got = "Null" + got
 			}
 		}
 		if _, err = io.WriteString(buf, "\t"+aName+" "+got+"\n"); err != nil {
@@ -303,10 +306,11 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			}
 		}
 	case FLAVOR_RECORD:
-		checks = append(checks, "if "+name+MarkValid+" {")
+		//checks = append(checks, "if "+name+MarkValid+" {")
+		checks = append(checks, "if "+name+".Valid {")
 		for k, sub := range arg.RecordOf {
 			_ = k
-			checks = genChecks(checks, sub, types, name)
+			checks = genChecks(checks, sub, types, name+".Struct")
 		}
 		checks = append(checks, "}")
 	case FLAVOR_TABLE:
@@ -339,6 +343,9 @@ func unocap(text string) string {
 // returns a go type for the argument's type
 func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if arg.goTypeName != "" {
+		if strings.Index(arg.goTypeName, "__") > 0 {
+			return "Null" + arg.goTypeName
+		}
 		return arg.goTypeName
 	}
 	defer func() {
@@ -404,14 +411,15 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
 	buf.WriteString("\n// " + arg.TypeName + "\n")
-	buf.WriteString("type Null" + typName + " struct {\n\tValid bool\n\tStruct " + typName + "\n}\n")
-	buf.WriteString("type " + typName + " struct {\n")
+	buf.WriteString("type Null" + typName +
+		" struct {\n\tValid bool\n\tStruct " + typName + "\n}")
+	buf.WriteString("\ntype " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
 		buf.WriteString("\t" + capitalize(goName(k)) + " " + v.goType(typedefs) + "\n")
 	}
 	buf.WriteString("}\n")
 	typedefs[typName] = buf.String()
-	return "Null"+typName
+	return "Null" + typName
 }
 
 func goName(text string) string {

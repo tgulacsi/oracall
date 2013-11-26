@@ -275,8 +275,11 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 	nullable := strings.HasPrefix(got, "Null") || strings.HasPrefix(got, "sql.Null")
 	preconcept, preconcept2 := "", ""
 	if strings.Count(name, ".") >= 1 {
-		preconcept = "input." + name[:strings.LastIndex(name, ".")] + MarkValid + " &&"
+		//preconcept = "input." + name[:strings.LastIndex(name, ".")] + MarkValid + " &&"
+		i := strings.LastIndex(name, ".")
+		preconcept = "input." + name[:i] + ".Valid &&"
 		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
+		name = name[:i] + ".Struct" + name[i:]
 	}
 	valueName := ""
 	if nullable {
@@ -364,7 +367,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 			if nullable {
 				convIn = append(convIn,
 					fmt.Sprintf(`if input.%s.Valid {
-                    if v, err = cur.NewVar(input.%s.%s); err != nil {return }
+                    if v, err = cur.NewVar(input.%s.%s); err != nil { return }
                     }`,
 						name, name, valueName))
 			} else {
@@ -380,7 +383,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				convIn = append(convIn, preconcept2)
 			}
 			if nullable {
-				subGoType := strings.ToLower(got[8:])
+				subGoType := strings.ToLower(got[strings.Index(got, "Null")+4:])
 				convIn = append(convIn,
 					fmt.Sprintf(`a := make([]%s, len(input.%s))
                     for i, x := range input.%s {
