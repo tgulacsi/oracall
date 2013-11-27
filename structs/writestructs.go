@@ -37,6 +37,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 			if _, err = fmt.Fprintf(dst,
 				"package "+pkg+`
 import (
+    "encoding/json"
     "fmt"
     "time"    // for datetimes
 
@@ -52,7 +53,14 @@ type FunctionCaller func(*oracle.Cursor, interface{}) (interface{}, error)
 
 // Functions is the map of function name -> function
 var Functions = make(map[string]FunctionCaller, %d)
-`, len(functions)); err != nil {
+
+type Unmarshaler interface {
+    FromJSON([]byte) error
+}
+
+// Inputs is the map of function name -> input
+var Inputs = make(map[string]Unmarshaler, %d)
+`, len(functions), len(functions)); err != nil {
 				return err
 			}
 		} else {
@@ -148,14 +156,17 @@ var Functions = make(map[string]FunctionCaller, %d)
 		}
 		inits = append(inits,
 			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *oracle.Cursor, input interface{}) (interface{}, error) {
-                inp, ok := input.(%s)
-                if !ok {
-                    return nil, fmt.Errorf("to call %s, the input must be %s, not %%T", input)
-                }
-                return Call_%s(cur, inp)
-            }`,
+        inp, ok := input.(%s)
+        if !ok {
+            return nil, fmt.Errorf("to call %s, the input must be %s, not %%T", input)
+        }
+        return Call_%s(cur, inp)
+    }
+    Inputs["%s"] = %s{}
+            `,
 				fun.Name(), fun.getStructName(false), fun.Name(), fun.getStructName(false),
-				strings.Replace(fun.Name(), ".", "__", -1)))
+				strings.Replace(fun.Name(), ".", "__", -1),
+				fun.Name(), fun.getStructName(false)))
 	}
 	for tn, text := range types {
 		if b, err = format.Source([]byte(text)); err != nil {
@@ -240,7 +251,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 				}
 			}
 		}
-		if _, err = io.WriteString(buf, "\t"+aName+" "+got+"\n"); err != nil {
+		if _, err = io.WriteString(buf, "\t"+aName+" "+got+
+			"\t`json:\""+strings.ToLower(aName)+",omitempty\"`\n"); err != nil {
 			return err
 		}
 		if checks != nil {
@@ -251,6 +263,15 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	if _, err = io.WriteString(buf, "}\n"); err != nil {
 		return err
 	}
+
+	if !out {
+		if _, err = fmt.Fprintf(buf, `func (s %s) FromJSON(data []byte) error {
+    return json.Unmarshal(data, &s)
+}`, structName); err != nil {
+			return err
+		}
+	}
+
 	var b []byte
 	if b, err = format.Source(buf.Bytes()); err != nil {
 		return fmt.Errorf("error saving struct %q: %s\n%s", structName, err, buf.String())
@@ -477,7 +498,9 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	}
 	buf.WriteString("\ntype " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
-		buf.WriteString("\t" + capitalize(goName(k)) + " " + v.goType(typedefs) + "\n")
+		buf.WriteString("\t" + capitalize(goName(k)) + " " +
+			v.goType(typedefs) + "\t" +
+			"`json:\"" + strings.ToLower(goName(k)) + ",omitempty\"`\t\n")
 	}
 	buf.WriteString("}\n")
 	typedefs[typName] = buf.String()

@@ -377,9 +377,17 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     }`,
 						name, name, valueName))
 			} else {
-				convIn = append(convIn,
-					fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
-						name))
+				if useNil {
+					convIn = append(convIn,
+						fmt.Sprintf(`if input.%s != nil {
+                        if v, err = cur.NewVar(*input.%s); err != nil { return }
+                        }`,
+							name, name))
+				} else {
+					convIn = append(convIn,
+						fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil { return }",
+							name))
+				}
 			}
 			if preconcept2 != "" {
 				convIn = append(convIn, "} else { v = nil }")

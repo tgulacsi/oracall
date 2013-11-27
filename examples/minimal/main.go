@@ -27,26 +27,71 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"io/ioutil"
 	"log"
+	"os"
+
+	"github.com/tgulacsi/goracle/oracle"
 )
+
+var flagConnect = flag.String("connect", "", "Oracle database connection string")
 
 func main() {
 	flag.Parse()
 	if flag.NArg() < 1 {
 		log.Fatalf("at least one argument is needed: the function's name to be called")
 	}
-	fun, ok := Functions[flag.Arg(0)]
+	if *flagConnect == "" {
+		log.Fatalf("connect string is needed")
+	}
+	funName := flag.Arg(0)
+	fun, ok := Functions[funName]
 	if !ok {
-		log.Fatalf("cannot find function named %q", flag.Arg(0))
+		log.Fatalf("cannot find function named %q", funName)
 	}
 	log.Printf("fun to be called is %s", fun)
 
-	// [TODO]: parse stdin as json into the proper input struct
-	// [TODO]: call the function
-	// [TODO]: present the output as json
-	b, err := json.Marshal(Db_web__sendpreoffer_31101__input{})
+	// parse stdin as json into the proper input struct
+	var (
+		input []byte
+		err   error
+	)
+	if flag.NArg() < 2 {
+		if input, err = ioutil.ReadAll(os.Stdin); err != nil {
+			log.Fatalf("error reading from stdin: %s", err)
+		}
+	} else {
+		input = []byte(flag.Arg(1))
+	}
+	inp := Inputs[funName]
+	if err = inp.FromJSON(input); err != nil {
+		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
+	}
+	log.Printf("calling %s(%#v)", funName, inp)
+
+	// get cursor
+	user, passw, sid := oracle.SplitDSN(*flagConnect)
+	conn, err := oracle.NewConnection(user, passw, sid, false)
 	if err != nil {
-		log.Fatalf("error marshaling input: %s", err)
+		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
+	}
+	if err = conn.Connect(0, false); err != nil {
+		log.Fatalf("error connecting: %s", err)
+	}
+	defer conn.Close()
+	cur := oracle.NewCursor(&conn)
+	defer cur.Close()
+
+	// call the function
+	out, err := fun(cur, inp)
+	if err != nil {
+		log.Fatalf("error calling %s(%s): %s", funName, inp, err)
+	}
+
+	// present the output as json
+	b, err := json.Marshal(out)
+	if err != nil {
+		log.Fatalf("error marshaling output: %s", err)
 	}
 	log.Printf("%s", b)
 }
