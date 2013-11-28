@@ -33,9 +33,8 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 	var err error
 
 	if pkg != "" {
-		if useNil || !nullable {
-			if _, err = fmt.Fprintf(dst,
-				"package "+pkg+`
+		if _, err = fmt.Fprintf(dst,
+			"package "+pkg+`
 import (
     "encoding/json"
     "fmt"
@@ -58,66 +57,10 @@ type Unmarshaler interface {
     FromJSON([]byte) error
 }
 
-// Inputs is the map of function name -> input
-var Inputs = make(map[string]Unmarshaler, %d)
+// InputFactories is the map of function name -> input factory
+var InputFactories = make(map[string](func() Unmarshaler), %d)
 `, len(functions), len(functions)); err != nil {
-				return err
-			}
-		} else {
-			if _, err = fmt.Fprintf(dst,
-				"package "+pkg+`
-import (
-    "errors"
-    "fmt"
-    "time"    // for datetimes
-
-    "github.com/tgulacsi/goracle/oracle"    // Oracle
-)
-
-var _ time.Time
-//var _ sql.NullBool
-var _ oracle.Cursor
-var _ errors.New
-
-type NullBool sql.NullBool
-func (n NullBool) MarshalJSON() ([]byte, error) {
-    if !n.Valid { return []byte("null"), nil }
-    if n.Bool {
-        return []byte("true"), nil
-    }
-    return []byte("false"), nil
-}
-
-type NullString sql.NullString
-func (n NullString) MarshalJSON() ([]byte, error) {
-    if !n.Valid { return []byte("null"), nil }
-    if n.String == "" { return []byte("\"\""), nil }
-    return json.Marshal(n.String)
-}
-
-type NullInt64 sql.NullInt64
-func (n NullInt64) MarshalJSON() ([]byte, error) {
-    if !n.Valid { return []byte("null"), nil }
-    if n.Int64 == 0 { return []byte{'0'}, nil }
-    return json.Marshal(n.Int64)
-}
-
-type NullFloat64 sql.NullFloat64
-func (n NullFloat64) MarshalJSON() ([]byte, error) {
-    if !n.Valid { return []byte("null"), nil }
-    if n.Float64 == 0 { return []byte{'0'}, nil }
-    return json.Marshal(n.Float64)
-}
-
-// FunctionCaller is a function which calls the stored procedure with
-// the input struct, and returns the output struct as an interface{}
-type FunctionCaller func(*oracle.Cursor, interface{}) (interface{}, error)
-
-// Functions is the map of function name -> function
-var Functions = make(map[string]FunctionCaller, %d)
-`, len(functions)); err != nil {
-				return err
-			}
+			return err
 		}
 	}
 	types := make(map[string]string, 16)
@@ -154,19 +97,23 @@ var Functions = make(map[string]FunctionCaller, %d)
 		if _, err = dst.Write(b); err != nil {
 			return err
 		}
+		inpstruct := fun.getStructName(false)
 		inits = append(inits,
 			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *oracle.Cursor, input interface{}) (interface{}, error) {
-        inp, ok := input.(%s)
-        if !ok {
+        var inp %s
+        switch x := input.(type) {
+        case *%s: input = *x
+        case %s: input = x
+        default:
             return nil, fmt.Errorf("to call %s, the input must be %s, not %%T", input)
         }
         return Call_%s(cur, inp)
     }
-    Inputs["%s"] = %s{}
+    InputFactories["%s"] = func() Unmarshaler { return new(%s) }
             `,
-				fun.Name(), fun.getStructName(false), fun.Name(), fun.getStructName(false),
+				fun.Name(), inpstruct, inpstruct, inpstruct, fun.Name(), inpstruct,
 				strings.Replace(fun.Name(), ".", "__", -1),
-				fun.Name(), fun.getStructName(false)))
+				fun.Name(), inpstruct))
 	}
 	for tn, text := range types {
 		if b, err = format.Source([]byte(text)); err != nil {
@@ -241,16 +188,6 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	for _, arg := range args {
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types)
-		if !strings.HasPrefix(got, "[]") && strings.Index(got, "__") > 0 {
-			//if _, err = io.WriteString(buf, "\t"+aName+MarkValid+" bool\n"); err != nil {
-			//	return err
-			//}
-			if nullable && !useNil {
-				if !strings.HasPrefix(got, "Null") {
-					got = "Null" + got
-				}
-			}
-		}
 		if _, err = io.WriteString(buf, "\t"+aName+" "+got+
 			"\t`json:\""+strings.ToLower(aName)+",omitempty\"`\n"); err != nil {
 			return err
@@ -265,8 +202,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	}
 
 	if !out {
-		if _, err = fmt.Fprintf(buf, `func (s %s) FromJSON(data []byte) error {
-    return json.Unmarshal(data, &s)
+		if _, err = fmt.Fprintf(buf, `func (s *%s) FromJSON(data []byte) error {
+    return json.Unmarshal(data, s)
 }`, structName); err != nil {
 			return err
 		}
@@ -351,18 +288,10 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 		}
 	case FLAVOR_RECORD:
 		//checks = append(checks, "if "+name+MarkValid+" {")
-		if useNil {
-			checks = append(checks, "if "+name+" != nil {")
-			for k, sub := range arg.RecordOf {
-				_ = k
-				checks = genChecks(checks, sub, types, name)
-			}
-		} else {
-			checks = append(checks, "if "+name+".Valid {")
-			for k, sub := range arg.RecordOf {
-				_ = k
-				checks = genChecks(checks, sub, types, name+".Struct")
-			}
+		checks = append(checks, "if "+name+" != nil {")
+		for k, sub := range arg.RecordOf {
+			_ = k
+			checks = genChecks(checks, sub, types, name)
 		}
 		checks = append(checks, "}")
 	case FLAVOR_TABLE:
@@ -396,12 +325,7 @@ func unocap(text string) string {
 func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if arg.goTypeName != "" {
 		if strings.Index(arg.goTypeName, "__") > 0 {
-			if nullable {
-				if useNil {
-					return "*" + arg.goTypeName
-				}
-				return "Null" + arg.goTypeName
-			}
+			return "*" + arg.goTypeName
 		}
 		return arg.goTypeName
 	}
@@ -411,50 +335,17 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2":
-			if nullable {
-				if useNil {
-					return "*string"
-				}
-				return "NullString"
-			}
-			return "string"
+			return "*string"
 		case "NUMBER":
-			if nullable {
-				if useNil {
-					return "*float64"
-				}
-				return "NullFloat64"
-			}
-			return "float64"
+			return "*float64"
 		case "INTEGER":
-			if nullable {
-				if useNil {
-					return "*int64"
-				}
-				return "NullInt64"
-			}
-			return "int64"
+			return "*int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
-			if nullable {
-				if useNil {
-					return "*int32"
-				}
-				return "NullInt64"
-			}
-			return "int32"
+			return "*int32"
 		case "BOOLEAN", "PL/SQL BOOLEAN":
-			if nullable {
-				if useNil {
-					return "*bool"
-				}
-				return "NullBool"
-			}
-			return "bool"
+			return "*bool"
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
-			if nullable && useNil {
-				return "*time.Time"
-			}
-			return "time.Time"
+			return "*time.Time"
 		case "REF CURSOR":
 			return "*oracle.Cursor"
 		case "CLOB", "BLOB":
@@ -474,13 +365,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	}
 	typName = capitalize(typName)
 	if _, ok := typedefs[typName]; ok {
-		if nullable {
-			if useNil {
-				return "*" + typName
-			}
-			return "Null" + typName
-		}
-		return typName
+		return "*" + typName
 	}
 	if arg.Flavor == FLAVOR_TABLE {
 		glog.Infof("arg=%s tof=%s", arg, arg.TableOf)
@@ -491,11 +376,6 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		glog.Warningf("arg has no TypeName: %#v\n%s", arg, arg)
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
-	if nullable && !useNil {
-		buf.WriteString("\n// " + arg.TypeName + "\n")
-		buf.WriteString("type Null" + typName +
-			" struct {\n\tValid bool\n\tStruct " + typName + "\n}")
-	}
 	buf.WriteString("\ntype " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
 		buf.WriteString("\t" + capitalize(goName(k)) + " " +
@@ -504,13 +384,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	}
 	buf.WriteString("}\n")
 	typedefs[typName] = buf.String()
-	if nullable {
-		if useNil {
-			return "*" + typName
-		}
-		return "Null" + typName
-	}
-	return typName
+	return "*" + typName
 }
 
 func goName(text string) string {

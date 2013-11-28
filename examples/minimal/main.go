@@ -63,7 +63,7 @@ func main() {
 	} else {
 		input = []byte(flag.Arg(1))
 	}
-	inp := Inputs[funName]
+	inp := InputFactories[funName]()
 	if err = inp.FromJSON(input); err != nil {
 		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
 	}

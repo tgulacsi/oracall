@@ -28,8 +28,6 @@ import (
 
 // MaxTableSize is the maximum size of the array arguments
 const MaxTableSize = 1000
-const nullable = true
-const useNil = true
 
 //
 // OracleArgument
@@ -274,41 +272,17 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 func (arg Argument) getConv(convIn, convOut []string, types map[string]string, name, paramName string, tableSize uint) ([]string, []string) {
 	got := arg.goType(types)
-	nullable := strings.HasPrefix(got, "Null") || strings.HasPrefix(got, "sql.Null")
 	preconcept, preconcept2 := "", ""
 	if strings.Count(name, ".") >= 1 {
-		if useNil {
-			preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
-			preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
-		} else {
-			i := strings.LastIndex(name, ".")
-			preconcept = "input." + name[:i] + "Valid &&"
-			preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
-			name = name[:i] + ".Struct" + name[i:]
-		}
-	}
-	valueName := ""
-	if nullable {
-		valueName = got[strings.Index(got, "Null")+4:]
+		preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
+		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
 	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
 			fmt.Sprintf("if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }",
 				tableSize, oracleVarTypeName(arg.Type), arg.Charlength))
-		if !useNil && nullable {
-			convOut = append(convOut,
-				fmt.Sprintf(`if params["%s"] != nil {
-                v = params["%s"].(*oracle.Variable)
-                if err = v.GetValueInto(&x, 0); err != nil {
-                    return
-                } else if x != nil {
-                    output.%s.%s = x.(%s)
-                    output.%s.Valid = true
-                }}
-            `, paramName, paramName, name, valueName, strings.ToLower(valueName), name))
-		} else if useNil { //got == "time.Time" {
-			convOut = append(convOut,
-				fmt.Sprintf(`if params["%s"] != nil {
+		convOut = append(convOut,
+			fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
                 if err = v.GetValueInto(&x, 0); err != nil {
                     return
@@ -316,50 +290,27 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     output.%s = x.(%s)
                 }}
             `, paramName, paramName, name, got))
-		} else {
-			convOut = append(convOut,
-				fmt.Sprintf(`if params["%s"] != nil {
-                v = params["%s"].(*oracle.Variable)
-                if err = v.GetValueInto(&output.%s, 0); err != nil { return }
-                }
-            `, paramName, paramName, name))
-		}
 		if arg.IsInput() {
 			if tableSize == 0 {
-				if !useNil && nullable {
-					convIn = append(convIn,
-						fmt.Sprintf(`if %s input.%s.Valid {
-                            if err = v.SetValue(0, input.%s.%s); err != nil { return }
-                        }`,
-							preconcept, name, name, valueName))
-				} else {
-					if preconcept2 != "" {
-						convIn = append(convIn, preconcept2)
-					}
-					convIn = append(convIn,
-						fmt.Sprintf("if err = v.SetValue(0, input.%s); err != nil { return }",
-							name))
-					if preconcept2 != "" {
-						convIn = append(convIn, "}")
-					}
+				if preconcept2 != "" {
+					convIn = append(convIn, preconcept2)
+				}
+				convIn = append(convIn,
+					fmt.Sprintf(`if input.%s != nil {
+                                if err = v.SetValue(0, *input.%s); err != nil { return }
+                                }`,
+						name, name))
+				if preconcept2 != "" {
+					convIn = append(convIn, "}")
 				}
 			} else {
 				if preconcept2 != "" {
 					convIn = append(convIn, preconcept2)
 				}
-				if !useNil && nullable {
-					convIn = append(convIn,
-						fmt.Sprintf(`for i, x := range input.%s {
-                                if x.Valid {
-                                if err = v.SetValue(uint(i), x.%s); err != nil { return }
-                                }
-                            }`, name, valueName))
-				} else {
-					convIn = append(convIn,
-						fmt.Sprintf(`for i, x := range input.%s {
+				convIn = append(convIn,
+					fmt.Sprintf(`for i, x := range input.%s {
                                 if err = v.SetValue(uint(i), x); err != nil { return }
                             }`, name))
-				}
 				if preconcept2 != "" {
 					convIn = append(convIn, "}")
 				}
@@ -370,25 +321,11 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 			if preconcept2 != "" {
 				convIn = append(convIn, preconcept2)
 			}
-			if !useNil && nullable {
-				convIn = append(convIn,
-					fmt.Sprintf(`if input.%s.Valid {
-                    if v, err = cur.NewVar(input.%s.%s); err != nil { return }
-                    }`,
-						name, name, valueName))
-			} else {
-				if useNil {
-					convIn = append(convIn,
-						fmt.Sprintf(`if input.%s != nil {
+			convIn = append(convIn,
+				fmt.Sprintf(`if input.%s != nil {
                         if v, err = cur.NewVar(*input.%s); err != nil { return }
                         }`,
-							name, name))
-				} else {
-					convIn = append(convIn,
-						fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil { return }",
-							name))
-				}
-			}
+					name, name))
 			if preconcept2 != "" {
 				convIn = append(convIn, "} else { v = nil }")
 			}
@@ -396,21 +333,18 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 			if preconcept2 != "" {
 				convIn = append(convIn, preconcept2)
 			}
-			if !useNil && nullable {
-				subGoType := strings.ToLower(got[strings.Index(got, "Null")+4:])
-				convIn = append(convIn,
-					fmt.Sprintf(`a := make([]%s, len(input.%s))
-                    for i, x := range input.%s {
-                        if x.Valid { a[i] = x.%s }
-                    }
-                    if v, err = cur.NewVar(a); err != nil {return }
-                    `,
-						subGoType, name, name, valueName))
-			} else {
-				convIn = append(convIn,
-					fmt.Sprintf("if v, err = cur.NewVar(input.%s); err != nil {return }",
-						name))
+			subGoType := got
+			if subGoType[0] == '*' {
+				subGoType = subGoType[1:]
 			}
+			convIn = append(convIn,
+				fmt.Sprintf(`a := make([]%s, len(input.%s))
+                    for i, x := range input.%s {
+                        if x != nil { a[i] = *x }
+                    }
+                    if v, err = cur.NewVar(a); err != nil { return }
+                    `,
+					subGoType, name, name))
 			if preconcept2 != "" {
 				convIn = append(convIn, "}")
 			}
