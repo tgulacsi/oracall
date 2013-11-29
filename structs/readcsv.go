@@ -29,7 +29,34 @@ import (
 	"github.com/golang/glog"
 )
 
-// ReadCsv reads the given csv file as user_arguments
+// UserArgument represents the required info from the user_arguments view
+type UserArgument struct {
+	ObjectID     uint `sql:"OBJECT_ID"`
+	SubprogramID uint `sql:"SUBPROGRAM_ID"`
+
+	PackageName string `sql:"PACKAGE_NAME"`
+	ObjectName  string `sql:"OBJECT_NAME"`
+
+	DataLevel    uint8  `sql:"DATA_LEVEL"`
+	Position     uint8  `sql:"POSITION"`
+	ArgumentName string `sql:"ARGUMENT_NAME"`
+	InOut        string `sql:"IN_OUT"`
+
+	DataType      string `sql:"DATA_TYPE"`
+	DataPrecision uint8  `sql:"DATA_PRECISION"`
+	DataScale     uint8  `sql:"DATA_SCALE"`
+
+	CharacterSetName string `sql:"CHARACTER_SET_NAME"`
+	CharLength       uint   `sql:"CHAR_LENGTH"`
+
+	PlsType     string `sql:"PLS_TYPE"`
+	TypeLink    string `sql:"TYPE_LINK"`
+	TypeOwner   string `sql:"TYPE_OWNER"`
+	TypeName    string `sql:"TYPE_NAME"`
+	TypeSubname string `sql:"TYPE_SUBNAME"`
+}
+
+// ParseCsv reads the given csv file as user_arguments
 // The csv should be an export of
 /*
    SELECT object_id, subprogram_id, package_name, object_name,
@@ -39,22 +66,48 @@ import (
      FROM user_arguments
      ORDER BY object_id, subprogram_id, SEQUENCE;
 */
-func ReadCsv(filename string) (functions []Function, err error) {
-	var fh *os.File
+func ParseCsv(filename string) (functions []Function, err error) {
+	userArgs := make(chan UserArgument, 16)
+	errch := make(chan error, 2)
+	defer close(errch)
+	go func() {
+		for lastErr := range errch {
+			if lastErr != nil && err == nil {
+				err = lastErr
+			}
+		}
+	}()
+	go func() { errch <- ReadCsv(filename, userArgs) }()
+	functions, err = ParseArguments(userArgs)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
+// ReadCsv reads the given csv file, and sends the arguments to the given channel
+func ReadCsv(filename string, userArgs chan<- UserArgument) error {
+	defer close(userArgs)
+
+	var (
+		err error
+		fh  *os.File
+	)
 	if filename == "" || filename == "-" {
 		fh = os.Stdin
 	} else {
 		fh, err = os.Open(filename)
 		if err != nil {
-			return nil, fmt.Errorf("cannot open %q: %s", filename, err)
+			return fmt.Errorf("cannot open %q: %s", filename, err)
 		}
 	}
 	defer fh.Close()
+
 	br := bufio.NewReader(fh)
 	r := csv.NewReader(br)
 	b, err := br.Peek(100)
 	if err != nil {
-		return nil, fmt.Errorf("error peeking into file: %s", err)
+		return fmt.Errorf("error peeking into file: %s", err)
 	}
 	if bytes.IndexByte(b, ';') >= 0 {
 		r.Comma = ';'
@@ -73,29 +126,16 @@ func ReadCsv(filename string) (functions []Function, err error) {
 	}
 	// get head
 	if rec, err = r.Read(); err != nil {
-		return nil, fmt.Errorf("cannot read head: %s", err)
+		return fmt.Errorf("cannot read head: %s", err)
 	}
-	var (
-		level        uint8
-		j            int
-		ok           bool
-		funName      string
-		fun, nameFun Function
-		args         = make([]Argument, 0, 16)
-		lastArgs     = make([]*Argument, 0, 3)
-		row          int
-	)
 	for i, h := range rec {
 		h = strings.ToUpper(h)
-		j, ok = csvFields[h]
-		//glog.Infof("%d. %q", i, h)
-		if ok && j < 0 {
+		if j, ok := csvFields[h]; ok && j < 0 {
 			csvFields[h] = i
 		}
 	}
-	functions = make([]Function, 0, 8)
-	seen := make(map[string]uint8, 64)
 	glog.Infof("field order: %v", csvFields)
+
 	for {
 		if rec, err = r.Read(); err != nil {
 			if err == io.EOF {
@@ -103,12 +143,52 @@ func ReadCsv(filename string) (functions []Function, err error) {
 			}
 			break
 		}
+		userArgs <- UserArgument{
+			ObjectID:     mustBeUint(rec[csvFields["OBJECT_ID"]]),
+			SubprogramID: mustBeUint(rec[csvFields["SUBPROGRAM_ID"]]),
+
+			PackageName: rec[csvFields["PACKAGE_NAME"]],
+			ObjectName:  rec[csvFields["OBJECT_NAME"]],
+
+			DataLevel:    mustBeUint8(rec[csvFields["DATA_LEVEL"]]),
+			Position:     mustBeUint8(rec[csvFields["POSITION"]]),
+			ArgumentName: rec[csvFields["ARGUMENT_NAME"]],
+			InOut:        rec[csvFields["IN_OUT"]],
+
+			DataType:      rec[csvFields["DATA_TYPE"]],
+			DataPrecision: mustBeUint8(rec[csvFields["DATA_PRECISION"]]),
+			DataScale:     mustBeUint8(rec[csvFields["DATA_SCALE"]]),
+
+			CharacterSetName: rec[csvFields["CHARACTER_SET_NAME"]],
+			CharLength:       mustBeUint(rec[csvFields["CHAR_LENGTH"]]),
+
+			PlsType:     rec[csvFields["PLS_TYPE"]],
+			TypeLink:    rec[csvFields["TYPE_LINK"]],
+			TypeOwner:   rec[csvFields["TYPE_OWNER"]],
+			TypeName:    rec[csvFields["TYPE_NAME"]],
+			TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
+		}
+	}
+	return nil
+}
+
+func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err error) {
+	var (
+		level    uint8
+		fun      Function
+		args     = make([]Argument, 0, 16)
+		lastArgs = make([]*Argument, 0, 3)
+		row      int
+	)
+	functions = make([]Function, 0, 8)
+	seen := make(map[string]uint8, 64)
+	for ua := range userArgs {
 		row++
-		funName = rec[csvFields["OBJECT_NAME"]]
+		funName := ua.ObjectName
 		if funName[len(funName)-1] == '#' { //hidden
 			continue
 		}
-		nameFun.Package, nameFun.name = rec[csvFields["PACKAGE_NAME"]], rec[csvFields["OBJECT_NAME"]]
+		nameFun := Function{Package: ua.PackageName, name: ua.ObjectName}
 		funName = nameFun.Name()
 		if seen[funName] > 1 {
 			glog.Warningf("function %s already seen! skipping...", funName)
@@ -127,25 +207,21 @@ func ReadCsv(filename string) (functions []Function, err error) {
 			if seen[funName] > 1 {
 				continue
 			}
-			fun = Function{Package: rec[csvFields["PACKAGE_NAME"]],
-				name: rec[csvFields["OBJECT_NAME"]]}
+			fun = Function{Package: ua.PackageName, name: ua.ObjectName}
 			args = args[:0]
 			lastArgs = lastArgs[:0]
 		}
-		level = mustBeUint8(rec[csvFields["DATA_LEVEL"]])
-		arg := NewArgument(rec[csvFields["ARGUMENT_NAME"]],
-			rec[csvFields["DATA_TYPE"]],
-			rec[csvFields["PLS_TYPE"]],
-			rec[csvFields["TYPE_OWNER"]]+"."+
-				rec[csvFields["TYPE_NAME"]]+"."+
-				rec[csvFields["TYPE_SUBNAME"]]+"@"+
-				rec[csvFields["TYPE_LINK"]],
-			rec[csvFields["IN_OUT"]],
+		level = ua.DataLevel
+		arg := NewArgument(ua.ArgumentName,
+			ua.DataType,
+			ua.PlsType,
+			ua.TypeOwner+"."+ua.TypeName+"."+ua.TypeSubname+"@"+ua.TypeLink,
+			ua.InOut,
 			0,
-			rec[csvFields["CHARACTER_SET_NAME"]],
-			mustBeUint8(rec[csvFields["DATA_PRECISION"]]),
-			mustBeUint8(rec[csvFields["DATA_SCALE"]]),
-			mustBeUint(rec[csvFields["CHAR_LENGTH"]]),
+			ua.CharacterSetName,
+			ua.DataPrecision,
+			ua.DataScale,
+			ua.CharLength,
 		)
 		// Possibilities:
 		// 1. SIMPLE
