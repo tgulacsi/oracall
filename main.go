@@ -54,7 +54,7 @@ func main() {
            data_type, data_precision, data_scale, character_set_name,
            pls_type, char_length, type_owner, type_name, type_subname, type_link
       FROM user_arguments
-      WHERE package_name||'.'||object_name LIKE ?
+      WHERE package_name||'.'||object_name LIKE UPPER(?)
       ORDER BY object_id, subprogram_id, SEQUENCE`
 		rows, err := cx.Query(qry, pattern)
 		if err != nil {
@@ -66,15 +66,39 @@ func main() {
 		var readErr error
 		go func() {
 			defer close(userArgs)
+			var oid, subid, level, pos, prec, scale, length sql.NullInt64
 			ua := structs.UserArgument{}
 			for rows.Next() {
-				err = rows.Scan(&ua.ObjectID, &ua.SubprogramID, &ua.PackageName, &ua.ObjectName,
-					&ua.DataLevel, &ua.Position, &ua.ArgumentName, &ua.InOut,
-					&ua.DataType, &ua.DataPrecision, &ua.DataScale, &ua.CharacterSetName,
-					&ua.PlsType, &ua.CharLength, &ua.TypeOwner, &ua.TypeName, &ua.TypeSubname, &ua.TypeLink)
+				err = rows.Scan(&oid, &subid, &ua.PackageName, &ua.ObjectName,
+					&level, &pos, &ua.ArgumentName, &ua.InOut,
+					&ua.DataType, &prec, &scale, &ua.CharacterSetName,
+					&ua.PlsType, &length, &ua.TypeOwner, &ua.TypeName, &ua.TypeSubname, &ua.TypeLink)
 				if err != nil {
 					readErr = err
 					log.Fatalf("error reading row %q: %s", rows, err)
+				}
+				ua.ObjectID, ua.SubprogramID, ua.DataLevel = 0, 0, 0
+				ua.Position, ua.DataPrecision, ua.DataScale, ua.CharLength = 0, 0, 0, 0
+				if oid.Valid {
+					ua.ObjectID = uint(oid.Int64)
+				}
+				if subid.Valid {
+					ua.SubprogramID = uint(subid.Int64)
+				}
+				if level.Valid {
+					ua.DataLevel = uint8(level.Int64)
+				}
+				if pos.Valid {
+					ua.Position = uint8(pos.Int64)
+				}
+				if prec.Valid {
+					ua.DataPrecision = uint8(prec.Int64)
+				}
+				if scale.Valid {
+					ua.DataScale = uint8(scale.Int64)
+				}
+				if length.Valid {
+					ua.CharLength = uint(length.Int64)
 				}
 				userArgs <- ua
 			}
