@@ -34,9 +34,6 @@ func main() {
 	var functions []structs.Function
 	var err error
 	if *flagConnect == "" {
-		if flag.NArg() < 1 {
-			log.Fatalf("please specify the csv to read function argument data from!")
-		}
 		functions, err = structs.ParseCsv(flag.Arg(0))
 	} else {
 		pattern := "%"

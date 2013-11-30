@@ -37,6 +37,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 			"package "+pkg+`
 import (
     "encoding/json"
+    "errors"
     "fmt"
     "time"    // for datetimes
 
@@ -45,6 +46,7 @@ import (
 
 var _ time.Time
 var _ oracle.Cursor
+var _ = errors.New
 
 // FunctionCaller is a function which calls the stored procedure with
 // the input struct, and returns the output struct as an interface{}
@@ -257,6 +259,13 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
     }`,
 					name, arg.Charlength,
 					name, arg.Charlength))
+		case "*string":
+			checks = append(checks,
+				fmt.Sprintf(`if %s != nil && len(*%s) > %d {
+        return errors.New("%s is longer then accepted (%d)")
+    }`,
+					name, name, arg.Charlength,
+					name, arg.Charlength))
 		case "NullString", "sql.NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
@@ -264,6 +273,16 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
+		case "*int32", "*int64", "*float32", "*float64":
+			if arg.Precision > 0 {
+				cons := strings.Repeat("9", int(arg.Precision))
+				checks = append(checks,
+					fmt.Sprintf(`if %s != nil && (*%s <= -%s || *%s > %s) {
+        return errors.New("%s is out of bounds (-%s..%s)")
+    }`,
+						name, name, cons, name, cons,
+						name, cons, cons))
+			}
 		case "int64", "float64":
 			if arg.Precision > 0 {
 				cons := strings.Repeat("9", int(arg.Precision))
