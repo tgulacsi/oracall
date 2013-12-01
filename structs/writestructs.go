@@ -190,8 +190,10 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	for _, arg := range args {
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types)
+		lName := strings.ToLower(arg.Name)
 		if _, err = io.WriteString(buf, "\t"+aName+" "+got+
-			"\t`json:\""+strings.ToLower(aName)+",omitempty\"`\n"); err != nil {
+			"\t`json:\""+lName+",omitempty\""+
+			" xml:\""+lName+",omitempty\"`\n"); err != nil {
 			return err
 		}
 		if checks != nil {
@@ -397,9 +399,11 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	}
 	buf.WriteString("\ntype " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
+		lName := strings.ToLower(k)
 		buf.WriteString("\t" + capitalize(goName(k)) + " " +
 			v.goType(typedefs) + "\t" +
-			"`json:\"" + strings.ToLower(goName(k)) + ",omitempty\"`\t\n")
+			"`json:\"" + lName + ",omitempty\"" +
+			" xml:\"" + lName + ",omitempty\"`\t\n")
 	}
 	buf.WriteString("}\n")
 	typedefs[typName] = buf.String()
