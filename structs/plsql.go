@@ -174,7 +174,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
 			name := capitalize(goName(arg.Name))
-			convIn, convOut = arg.getConv(convIn, convOut, fun.types, name, arg.Name, 0)
+			convIn, convOut = arg.getConv(convIn, convOut, fun.types, name, arg.Name, 0, "")
 
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
@@ -187,7 +187,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				if arg.IsOutput() {
 					post = append(post, ":"+tmp+"."+k+" := "+vn+"."+k+";")
 				}
-				convIn, convOut = v.getConv(convIn, convOut, fun.types, name, tmp, 0)
+				convIn, convOut = v.getConv(convIn, convOut, fun.types, name, tmp, 0, "")
 
 				if arg.IsInput() {
 					pre = append(pre, vn+"."+k+" := :"+tmp+";")
@@ -197,7 +197,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			switch arg.TableOf.Flavor {
 			case FLAVOR_SIMPLE:
 				name := capitalize(goName(arg.Name))
-				convIn, convOut = arg.TableOf.getConv(convIn, convOut, fun.types, name, arg.Name, MaxTableSize)
+				convIn, convOut = arg.TableOf.getConv(convIn, convOut, fun.types,
+					name, arg.Name, MaxTableSize, "")
 
 			case FLAVOR_RECORD:
 				vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
@@ -234,7 +235,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					name := aname + "." + capitalize(goName(k))
 
 					convIn, convOut = arg.TableOf.RecordOf[k].getConv(
-						convIn, convOut, fun.types, name, tmp, MaxTableSize)
+						convIn, convOut, fun.types, name, vn, MaxTableSize,
+						"."+k)
 
 					if arg.IsInput() {
 						pre = append(pre,
@@ -282,7 +284,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
-func (arg Argument) getConv(convIn, convOut []string, types map[string]string, name, paramName string, tableSize uint) ([]string, []string) {
+func (arg Argument) getConv(convIn, convOut []string, types map[string]string, name, paramName string, tableSize uint, postfix string) ([]string, []string) {
 	got := arg.goType(types)
 	preconcept, preconcept2 := "", ""
 	if strings.Count(name, ".") >= 1 {
@@ -314,10 +316,11 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     if err = v.GetValueInto(&x, uint(i)); err != nil {
                         return
                     }
-                    output.%s[i] = x.(%s)
+                    output.%s[i]%s = x.(%s)
                 }
             }
-            `, paramName, paramName, name, name, got, tableSize, tableSize, name, got))
+            `, paramName, paramName, name, name, got, tableSize, tableSize, name,
+					postfix, got))
 		}
 		if arg.IsInput() {
 			if tableSize == 0 {
