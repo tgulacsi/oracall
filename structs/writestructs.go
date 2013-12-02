@@ -38,11 +38,14 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 import (
     "encoding/json"
     "errors"
+    "log"
     "fmt"
     "time"    // for datetimes
 
     "github.com/tgulacsi/goracle/oracle"    // Oracle
 )
+
+var DebugLevel = uint(0)
 
 var _ time.Time
 var _ oracle.Cursor

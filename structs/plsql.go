@@ -117,9 +117,12 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
-	fmt.Fprintf(callBuf, `
+	i := strings.Index(call, fun.Name())
+	j := i + strings.Index(call[i:], ")") + 1
+	log.Printf("i=%d j=%d call=\n%s", i, j, call)
+	fmt.Fprintf(callBuf, "\nif DebugLevel > 0 { log.Printf(`calling %s\nwith %%#v`, params) }"+`
     if err = cur.Execute(%s, nil, params); err != nil { return }
-    `, fun.getPlsqlConstName())
+    `, call[i:j], fun.getPlsqlConstName())
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -201,6 +204,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				callArgs[arg.Name] = vn
 				decls = append(decls, vn+" "+arg.TableOf.TypeName+";")
 
+				/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
 				if arg.IsOutput() {
 					// DELETE out tables
 					for k := range arg.TableOf.RecordOf {
@@ -208,6 +212,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							":"+getParamName(fun.Name(), vn+"."+k)+".DELETE;")
 					}
 				}
+				*/
 
 				var idxvar string
 				for k := range arg.TableOf.RecordOf {
@@ -281,8 +286,9 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 		convIn = append(convIn,
 			fmt.Sprintf("if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }",
 				tableSize, oracleVarTypeName(arg.Type), arg.Charlength))
-		convOut = append(convOut,
-			fmt.Sprintf(`if params["%s"] != nil {
+		if tableSize == 0 {
+			convOut = append(convOut,
+				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
                 if err = v.GetValueInto(&x, 0); err != nil {
                     return
@@ -290,6 +296,22 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     output.%s = x.(%s)
                 }}
             `, paramName, paramName, name, got))
+		} else {
+			convOut = append(convOut,
+				fmt.Sprintf(`if params["%s"] != nil {
+                v = params["%s"].(*oracle.Variable)
+                if output.%s == nil {
+                    output.%s = make([]%s, 0, %d)
+                }
+                for i := 0; i < %d; i++ {
+                    if err = v.GetValueInto(&x, uint(i)); err != nil {
+                        return
+                    }
+                    output.%s[i] = x.(%s)
+                }
+            }
+            `, paramName, paramName, name, name, got, tableSize, tableSize, name, got))
+		}
 		if arg.IsInput() {
 			if tableSize == 0 {
 				if preconcept2 != "" {
@@ -324,8 +346,10 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 			convIn = append(convIn,
 				fmt.Sprintf(`if input.%s != nil {
                         if v, err = cur.NewVar(*input.%s); err != nil { return }
-                        }`,
-					name, name))
+                    } else {
+                        if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }
+                    }`,
+					name, name, tableSize, oracleVarTypeName(arg.Type), 0))
 			if preconcept2 != "" {
 				convIn = append(convIn, "} else { v = nil }")
 			}

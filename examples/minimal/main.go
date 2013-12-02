@@ -74,6 +74,7 @@ func main() {
 	}
 	log.Printf("input marshaled to xml: %s", b)
 
+	DebugLevel = 1
 	log.Printf("calling %s(%#v)", funName, inp)
 
 	// get cursor
