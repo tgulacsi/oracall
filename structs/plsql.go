@@ -204,6 +204,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				callArgs[arg.Name] = vn
 				decls = append(decls, vn+" "+arg.TableOf.TypeName+";")
 
+				aname := capitalize(goName(arg.Name))
 				/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
 				if arg.IsOutput() {
 					// DELETE out tables
@@ -230,6 +231,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						}
 					}
 					tmp = getParamName(fun.Name(), vn+"."+k)
+					name := aname + "." + capitalize(goName(k))
+
+					convIn, convOut = arg.TableOf.RecordOf[k].getConv(
+						convIn, convOut, fun.types, name, tmp, MaxTableSize)
+
 					if arg.IsInput() {
 						pre = append(pre,
 							"  "+vn+"(i1)."+k+" := :"+tmp+"(i1);")
@@ -260,6 +266,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
 	}
+	log.Printf("callArgs=%s", callArgs)
 	callb.WriteString(fun.Name() + "(")
 	for i, arg := range fun.Args {
 		if i > 0 {
