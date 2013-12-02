@@ -347,6 +347,11 @@ func unocap(text string) string {
 
 // returns a go type for the argument's type
 func (arg *Argument) goType(typedefs map[string]string) (typName string) {
+	defer func() {
+		if strings.HasPrefix(typName, "**") {
+			typName = typName[1:]
+		}
+	}()
 	if arg.goTypeName != "" {
 		if strings.Index(arg.goTypeName, "__") > 0 {
 			return "*" + arg.goTypeName

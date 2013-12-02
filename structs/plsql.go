@@ -232,11 +232,15 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						}
 					}
 					tmp = getParamName(fun.Name(), vn+"."+k)
-					name := aname + "." + capitalize(goName(k))
+					//name := aname + "." + capitalize(goName(k))
 
+					convOut = append(convOut, fmt.Sprintf(`
+                if output.%s == nil {
+                    output.%s = make([]%s, 0, %d)
+                }`, aname, aname, arg.TableOf.goType(fun.types), MaxTableSize))
 					convIn, convOut = arg.TableOf.RecordOf[k].getConv(
-						convIn, convOut, fun.types, name, vn, MaxTableSize,
-						"."+k)
+						convIn, convOut, fun.types, aname, vn, MaxTableSize,
+						"."+capitalize(k))
 
 					if arg.IsInput() {
 						pre = append(pre,
@@ -309,9 +313,6 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
-                if output.%s == nil {
-                    output.%s = make([]%s, 0, %d)
-                }
                 for i := 0; i < %d; i++ {
                     if err = v.GetValueInto(&x, uint(i)); err != nil {
                         return
@@ -319,8 +320,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     output.%s[i]%s = x.(%s)
                 }
             }
-            `, paramName, paramName, name, name, got, tableSize, tableSize, name,
-					postfix, got))
+            `, paramName, paramName, tableSize, name, postfix, got))
 		}
 		if arg.IsInput() {
 			if tableSize == 0 {
@@ -339,10 +339,17 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				if preconcept2 != "" {
 					convIn = append(convIn, preconcept2)
 				}
-				convIn = append(convIn,
-					fmt.Sprintf(`for i, x := range input.%s {
+				if postfix == "" {
+					convIn = append(convIn,
+						fmt.Sprintf(`for i, x := range input.%s {
                                 if err = v.SetValue(uint(i), x); err != nil { return }
                             }`, name))
+				} else {
+					convIn = append(convIn,
+						fmt.Sprintf(`for i, x := range input.%s {
+                                if err = v.SetValue(uint(i), x%s); err != nil { return }
+                            }`, name, postfix))
+				}
 				if preconcept2 != "" {
 					convIn = append(convIn, "}")
 				}
