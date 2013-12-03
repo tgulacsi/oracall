@@ -239,7 +239,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
                     output.%s = make([]%s, 0, %d)
                 }`, aname, aname, arg.TableOf.goType(fun.types), MaxTableSize))
 					convIn, convOut = arg.TableOf.RecordOf[k].getConv(
-						convIn, convOut, fun.types, aname, vn, MaxTableSize,
+						convIn, convOut, fun.types, aname, tmp, MaxTableSize,
 						"."+capitalize(k))
 
 					if arg.IsInput() {
