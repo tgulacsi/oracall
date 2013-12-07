@@ -120,7 +120,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
 	log.Printf("i=%d j=%d call=\n%s", i, j, call)
-	fmt.Fprintf(callBuf, "\nif DebugLevel > 0 { log.Printf(`calling %s\nwith %%#v`, params) }"+`
+	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%#v`, params) }"+`
     if err = cur.Execute(%s, nil, params); err != nil { return }
     `, call[i:j], fun.getPlsqlConstName())
 	for _, line := range convOut {
@@ -297,30 +297,35 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
-			fmt.Sprintf("if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }",
-				tableSize, oracleVarTypeName(arg.Type), arg.Charlength))
+			fmt.Sprintf(`if v, err = cur.NewVariable(%d, %s, %d); err != nil {
+                    err = fmt.Errorf("error creating variable for type %s: %%s", err)
+                    return
+                }`,
+				tableSize, oracleVarTypeName(arg.Type), arg.Charlength, arg.Type))
 		if tableSize == 0 {
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
                 if err = v.GetValueInto(&x, 0); err != nil {
+                    err = fmt.Errorf("error getting value of %s: %%s", err)
                     return
                 } else if x != nil {
                     output.%s = x.(%s)
                 }}
-            `, paramName, paramName, name, got))
+            `, paramName, paramName, name, name, got))
 		} else {
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
                 for i := 0; i < %d; i++ {
                     if err = v.GetValueInto(&x, uint(i)); err != nil {
+                        err = fmt.Errorf("error getting %%d. value into %s%s: %%s", i, err)
                         return
                     }
                     output.%s[i]%s = x.(%s)
                 }
             }
-            `, paramName, paramName, tableSize, name, postfix, got))
+            `, paramName, paramName, tableSize, name, postfix, name, postfix, got))
 		}
 		if arg.IsInput() {
 			if tableSize == 0 {
@@ -329,9 +334,12 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				}
 				convIn = append(convIn,
 					fmt.Sprintf(`if input.%s != nil {
-                                if err = v.SetValue(0, *input.%s); err != nil { return }
-                                }`,
-						name, name))
+                        if err = v.SetValue(0, *input.%s); err != nil {
+                            err = fmt.Errorf("error setting value %%v from %s: %%s", v, err)
+                            return
+                        }
+                        }`,
+						name, name, name))
 				if preconcept2 != "" {
 					convIn = append(convIn, "}")
 				}
@@ -342,13 +350,19 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				if postfix == "" {
 					convIn = append(convIn,
 						fmt.Sprintf(`for i, x := range input.%s {
-                                if err = v.SetValue(uint(i), x); err != nil { return }
-                            }`, name))
+                            if err = v.SetValue(uint(i), x); err != nil {
+                                err = fmt.Errorf("error setting value %%v[%%d] from %s: %%s", v, i, err)
+                                return
+                            }
+                            }`, name, name))
 				} else {
 					convIn = append(convIn,
 						fmt.Sprintf(`for i, x := range input.%s {
-                                if err = v.SetValue(uint(i), x%s); err != nil { return }
-                            }`, name, postfix))
+                            if err = v.SetValue(uint(i), x%s); err != nil {
+                                err = fmt.Errorf("error setting value %%v[%%d] from %s%s: %%s", v, i, err)
+                                return
+                            }
+                            }`, name, postfix, name, postfix))
 				}
 				if preconcept2 != "" {
 					convIn = append(convIn, "}")
@@ -362,11 +376,15 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 			}
 			convIn = append(convIn,
 				fmt.Sprintf(`if input.%s != nil {
-                        if v, err = cur.NewVar(*input.%s); err != nil { return }
+                        v, err = cur.NewVar(*input.%s)
                     } else {
-                        if v, err = cur.NewVariable(%d, %s, %d); err != nil { return }
+                        v, err = cur.NewVariable(%d, %s, %d)
+                    }
+                    if err != nil {
+                        err = fmt.Errorf("error creating new var from %s: %%s", err)
+                        return
                     }`,
-					name, name, tableSize, oracleVarTypeName(arg.Type), 0))
+					name, name, tableSize, oracleVarTypeName(arg.Type), 0, name))
 			if preconcept2 != "" {
 				convIn = append(convIn, "} else { v = nil }")
 			}
@@ -379,13 +397,20 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				subGoType = subGoType[1:]
 			}
 			convIn = append(convIn,
-				fmt.Sprintf(`a := make([]%s, len(input.%s))
+				fmt.Sprintf(`if len(input.%s) == 0 {
+                    v = nil
+                } else {
+                    a := make([]%s, len(input.%s))
                     for i, x := range input.%s {
                         if x != nil { a[i] = *x }
                     }
-                    if v, err = cur.NewVar(a); err != nil { return }
+                    if v, err = cur.NewVar(a); err != nil {
+                        err = fmt.Errorf("error creating new var from %s(%%v): %%s", a, err)
+                        return
+                    }
+                }
                     `,
-					subGoType, name, name))
+					name, subGoType, name, name, name))
 			if preconcept2 != "" {
 				convIn = append(convIn, "}")
 			}
