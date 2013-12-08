@@ -164,12 +164,14 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	convIn = append(convIn, "var v *oracle.Variable\nvar x interface{}\n _, _ = v, x")
 	for _, arg := range fun.Args {
 		if arg.Flavor != FLAVOR_SIMPLE {
-			if arg.IsInput() {
-				pre = append(pre, "", "--"+arg.String())
-			}
-			if arg.IsOutput() {
-				post = append(post, "", "--"+arg.String())
-			}
+			/*
+				if arg.IsInput() {
+					pre = append(pre, "", "--"+arg.String())
+				}
+				if arg.IsOutput() {
+					post = append(post, "", "--"+arg.String())
+				}
+			*/
 		}
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
