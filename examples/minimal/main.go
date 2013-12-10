@@ -90,6 +90,8 @@ func main() {
 	cur := oracle.NewCursor(&conn)
 	defer cur.Close()
 
+	oracle.BypassMultipleArgs = true
+
 	// call the function
 	out, err := fun(cur, inp)
 	if err != nil {
