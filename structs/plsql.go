@@ -205,7 +205,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			case FLAVOR_RECORD:
 				vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
 				callArgs[arg.Name] = vn
-				decls = append(decls, vn+" "+arg.TableOf.TypeName+";")
+				decls = append(decls, vn+" "+arg.TypeName+";")
 
 				aname := capitalize(goName(arg.Name))
 				/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható

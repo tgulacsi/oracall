@@ -71,8 +71,8 @@ type Argument struct {
 	Scale                   uint8
 	Charset                 string
 	Charlength              uint
-	TableOf                 *Argument
-	RecordOf                map[string]Argument
+	TableOf                 *Argument           // this argument is a table (array) of this type
+	RecordOf                map[string]Argument //this argument is a record (map) of this type
 	goTypeName              string
 }
 
