@@ -198,9 +198,23 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		case FLAVOR_TABLE:
 			switch arg.TableOf.Flavor {
 			case FLAVOR_SIMPLE:
-				name := capitalize(goName(arg.Name))
-				convIn, convOut = arg.TableOf.getConv(convIn, convOut, fun.types,
-					name, arg.Name, MaxTableSize, "")
+				vn = getInnerVarName(fun.Name(), arg.Name)
+				callArgs[arg.Name] = vn
+				decls = append(decls, vn+" "+arg.TypeName+";")
+				if arg.IsInput() {
+					pre = append(pre, "i1 := :"+arg.Name+".FIRST;",
+						"WHILE i1 IS NOT NULL LOOP",
+						"  "+vn+"(i1) := :"+arg.Name+"(i1);",
+						"  i1 := "+arg.Name+".NEXTVAL(i1);",
+						"END LOOP;")
+				}
+				if arg.IsOutput() {
+					post = append(post, "i1 := "+vn+".FIRST; i2 := 1;",
+						"WHILE i1 IS NOT NULL LOOP",
+						"  :"+arg.Name+"(i2) := "+vn+"(i1);",
+						"  i1 := "+vn+".NEXTVAL(i1); i2 := i2 + 1;",
+						"END LOOP;")
+				}
 
 			case FLAVOR_RECORD:
 				vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
