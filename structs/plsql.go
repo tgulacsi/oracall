@@ -163,6 +163,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
 	convIn = append(convIn, "var v *oracle.Variable\nvar x interface{}\n _, _ = v, x")
 	for _, arg := range fun.Args {
+		decls = append(decls, arg.Name+" "+arg.Type+";")
 		if arg.Flavor != FLAVOR_SIMPLE {
 			/*
 				if arg.IsInput() {
