@@ -154,6 +154,10 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 }
 
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
+	if fun.types == nil {
+		log.Printf("nil types of %s", fun)
+		fun.types = make(map[string]string, 4)
+	}
 	callArgs := make(map[string]string, 16)
 	//fStructIn, fStructOut := fun.getStructName(false), fun.getStructName(true)
 	var (

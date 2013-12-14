@@ -4,6 +4,7 @@ envfn=$(dirname $0)/../goracle/env
 if [ -e "$envfn" ]; then
     . "$envfn"
 fi
+go test ./...
 go build
 dsn=$(cat ../goracle/.dsn)
 {

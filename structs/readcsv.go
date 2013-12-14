@@ -66,7 +66,17 @@ type UserArgument struct {
      FROM user_arguments
      ORDER BY object_id, subprogram_id, SEQUENCE;
 */
-func ParseCsv(filename string) (functions []Function, err error) {
+func ParseCsvFile(filename string) (functions []Function, err error) {
+	fh, err := OpenCsv(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer fh.Close()
+	return ParseCsv(fh)
+}
+
+// ParseCsv parses the csv
+func ParseCsv(r io.Reader) (functions []Function, err error) {
 	userArgs := make(chan UserArgument, 16)
 	errch := make(chan error, 2)
 	defer close(errch)
@@ -77,7 +87,7 @@ func ParseCsv(filename string) (functions []Function, err error) {
 			}
 		}
 	}()
-	go func() { errch <- ReadCsv(filename, userArgs) }()
+	go func() { errch <- ReadCsv(r, userArgs) }()
 	functions, err = ParseArguments(userArgs)
 	if err != nil {
 		return nil, err
@@ -85,34 +95,43 @@ func ParseCsv(filename string) (functions []Function, err error) {
 	return
 }
 
-// ReadCsv reads the given csv file, and sends the arguments to the given channel
-func ReadCsv(filename string, userArgs chan<- UserArgument) error {
+// OpenCsv opens the filename
+func OpenCsv(filename string) (*os.File, error) {
+	if filename == "" || filename == "-" {
+		return os.Stdin, nil
+	}
+	fh, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open %q: %s", filename, err)
+	}
+	return fh, nil
+}
+
+// MustOpenCsv opens the file, or panics on error
+func MustOpenCsv(filename string) *os.File {
+	fh, err := OpenCsv(filename)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	return fh
+}
+
+// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel
+func ReadCsv(r io.Reader, userArgs chan<- UserArgument) error {
 	defer close(userArgs)
 
-	var (
-		err error
-		fh  *os.File
-	)
-	if filename == "" || filename == "-" {
-		fh = os.Stdin
-	} else {
-		fh, err = os.Open(filename)
-		if err != nil {
-			return fmt.Errorf("cannot open %q: %s", filename, err)
-		}
-	}
-	defer fh.Close()
+	var err error
 
-	br := bufio.NewReader(fh)
-	r := csv.NewReader(br)
+	br := bufio.NewReader(r)
+	csvr := csv.NewReader(br)
 	b, err := br.Peek(100)
 	if err != nil {
 		return fmt.Errorf("error peeking into file: %s", err)
 	}
 	if bytes.IndexByte(b, ';') >= 0 {
-		r.Comma = ';'
+		csvr.Comma = ';'
 	}
-	r.LazyQuotes, r.TrailingComma, r.TrimLeadingSpace = true, true, true
+	csvr.LazyQuotes, csvr.TrailingComma, csvr.TrimLeadingSpace = true, true, true
 	var (
 		rec       []string
 		csvFields = make(map[string]int, 20)
@@ -125,7 +144,7 @@ func ReadCsv(filename string, userArgs chan<- UserArgument) error {
 		csvFields[h] = -1
 	}
 	// get head
-	if rec, err = r.Read(); err != nil {
+	if rec, err = csvr.Read(); err != nil {
 		return fmt.Errorf("cannot read head: %s", err)
 	}
 	for i, h := range rec {
@@ -137,7 +156,7 @@ func ReadCsv(filename string, userArgs chan<- UserArgument) error {
 	glog.Infof("field order: %v", csvFields)
 
 	for {
-		if rec, err = r.Read(); err != nil {
+		if rec, err = csvr.Read(); err != nil {
 			if err == io.EOF {
 				err = nil
 			}

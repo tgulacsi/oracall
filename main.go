@@ -33,8 +33,9 @@ func main() {
 	flag.Parse()
 	var functions []structs.Function
 	var err error
+
 	if *flagConnect == "" {
-		functions, err = structs.ParseCsv(flag.Arg(0))
+		functions, err = structs.ParseCsvFile(flag.Arg(0))
 	} else {
 		pattern := "%"
 		if flag.NArg() >= 1 {
