@@ -61,7 +61,7 @@ func oracleVarType(typ string) *oracle.VariableType {
 	case "BOOLEAN", "PL/SQL BOOLEAN":
 		return oracle.BooleanVarType
 	default:
-		log.Fatalf("unknown variable type %q", typ)
+		log.Fatalf("oracleVarType: unknown variable type %q", typ)
 	}
 	return nil
 }
@@ -95,7 +95,7 @@ func oracleVarTypeName(typ string) string {
 	case "BOOLEAN", "PL/SQL BOOLEAN":
 		return "oracle.BooleanVarType"
 	default:
-		log.Fatalf("unknown variable type %q", typ)
+		log.Fatalf("oracleVarTypeName: unknown variable type %q", typ)
 	}
 	return ""
 }
@@ -158,6 +158,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		log.Printf("nil types of %s", fun)
 		fun.types = make(map[string]string, 4)
 	}
+	tableTypes := make(map[string]string, 4)
 	callArgs := make(map[string]string, 16)
 	//fStructIn, fStructOut := fun.getStructName(false), fun.getStructName(true)
 	var (
@@ -167,59 +168,35 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
 	convIn = append(convIn, "var v *oracle.Variable\nvar x interface{}\n _, _ = v, x")
 	for _, arg := range fun.Args {
-		decls = append(decls, arg.Name+" "+arg.Type+";")
-		if arg.Flavor != FLAVOR_SIMPLE {
-			/*
-				if arg.IsInput() {
-					pre = append(pre, "", "--"+arg.String())
-				}
-				if arg.IsOutput() {
-					post = append(post, "", "--"+arg.String())
-				}
-			*/
-		}
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
+			callArgs[arg.Name] = ":" + arg.Name
 			name := capitalize(goName(arg.Name))
 			convIn, convOut = arg.getConv(convIn, convOut, fun.types, name, arg.Name, 0, "")
 
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
-			callArgs[arg.Name] = vn
 			decls = append(decls, vn+" "+arg.TypeName+";")
+			callArgs[arg.Name] = vn
 			aname := capitalize(goName(arg.Name))
 			for k, v := range arg.RecordOf {
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				name := aname + "." + capitalize(goName(k))
-				if arg.IsOutput() {
-					post = append(post, ":"+tmp+"."+k+" := "+vn+"."+k+";")
-				}
-				convIn, convOut = v.getConv(convIn, convOut, fun.types, name, tmp, 0, "")
-
 				if arg.IsInput() {
 					pre = append(pre, vn+"."+k+" := :"+tmp+";")
 				}
+				if arg.IsOutput() {
+					post = append(post, ":"+tmp+" := "+vn+"."+k+";")
+				}
+				convIn, convOut = v.getConv(convIn, convOut, fun.types, name, tmp, 0, "")
 			}
 		case FLAVOR_TABLE:
 			switch arg.TableOf.Flavor {
-			case FLAVOR_SIMPLE:
-				vn = getInnerVarName(fun.Name(), arg.Name)
-				callArgs[arg.Name] = vn
-				decls = append(decls, vn+" "+arg.TypeName+";")
-				if arg.IsInput() {
-					pre = append(pre, "i1 := :"+arg.Name+".FIRST;",
-						"WHILE i1 IS NOT NULL LOOP",
-						"  "+vn+"(i1) := :"+arg.Name+"(i1);",
-						"  i1 := "+arg.Name+".NEXTVAL(i1);",
-						"END LOOP;")
-				}
-				if arg.IsOutput() {
-					post = append(post, "i1 := "+vn+".FIRST; i2 := 1;",
-						"WHILE i1 IS NOT NULL LOOP",
-						"  :"+arg.Name+"(i2) := "+vn+"(i1);",
-						"  i1 := "+vn+".NEXTVAL(i1); i2 := i2 + 1;",
-						"END LOOP;")
-				}
+			case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
+				callArgs[arg.Name] = ":" + arg.Name
+				name := capitalize(goName(arg.Name))
+				convIn, convOut = arg.TableOf.getConv(convIn, convOut,
+					fun.types, name, arg.Name, MaxTableSize, "")
 
 			case FLAVOR_RECORD:
 				vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
@@ -236,51 +213,81 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					}
 				}
 				*/
+				if !arg.IsInput() {
+					pre = append(pre, vn+".DELETE;")
+				}
 
 				var idxvar string
-				for k := range arg.TableOf.RecordOf {
+				for k, v := range arg.TableOf.RecordOf {
+					typ, ok := tableTypes[v.AbsType]
+					if !ok {
+						typ = strings.Map(func(c rune) rune {
+							switch c {
+							case '(', ',':
+								return '_'
+							case ' ', ')':
+								return -1
+							default:
+								return c
+							}
+						}, v.AbsType) + "_tab_typ"
+						decls = append(decls, "TYPE "+typ+" IS TABLE OF "+v.AbsType+" INDEX BY BINARY_INTEGER;")
+						tableTypes[v.AbsType] = typ
+					}
+					decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+";")
+
+					tmp = getParamName(fun.Name(), vn+"."+k)
+					if arg.IsInput() {
+						pre = append(pre, tmp+" := :"+tmp)
+					} else {
+						pre = append(pre, tmp+".DELETE;")
+					}
+
 					if idxvar == "" {
 						idxvar = getParamName(fun.Name(), vn+"."+k)
 						if arg.IsInput() {
-							pre = append(pre,
-								"i1 := :"+idxvar+".FIRST;",
+							pre = append(pre, "",
+								"i1 := "+idxvar+".FIRST;",
 								"WHILE i1 IS NOT NULL LOOP")
 						}
 						if arg.IsOutput() {
-							post = append(post,
+							post = append(post, "",
 								"i1 := "+vn+".FIRST; i2 := 1;",
 								"WHILE i1 IS NOT NULL LOOP")
 						}
 					}
-					tmp = getParamName(fun.Name(), vn+"."+k)
 					//name := aname + "." + capitalize(goName(k))
 
 					convOut = append(convOut, fmt.Sprintf(`
                 if output.%s == nil {
                     output.%s = make([]%s, 0, %d)
                 }`, aname, aname, arg.TableOf.goType(fun.types), MaxTableSize))
-					convIn, convOut = arg.TableOf.RecordOf[k].getConv(
+					convIn, convOut = v.getConv(
 						convIn, convOut, fun.types, aname, tmp, MaxTableSize,
 						"."+capitalize(k))
 
 					if arg.IsInput() {
 						pre = append(pre,
-							"  "+vn+"(i1)."+k+" := :"+tmp+"(i1);")
+							"  "+vn+"(i1)."+k+" := "+tmp+"(i1);")
 					}
 					if arg.IsOutput() {
 						post = append(post,
-							"  :"+tmp+"(i2) := "+vn+"(i1)."+k+";")
+							"  "+tmp+"(i2) := "+vn+"(i1)."+k+";")
 					}
 				}
 				if arg.IsInput() {
 					pre = append(pre,
-						"  i1 := :"+idxvar+".NEXT(i1);",
+						"  i1 := "+idxvar+".NEXT(i1);",
 						"END LOOP;")
 				}
 				if arg.IsOutput() {
 					post = append(post,
 						"  i1 := "+vn+".NEXT(i1); i2 := i2 + 1;",
 						"END LOOP;")
+					for k := range arg.TableOf.RecordOf {
+						tmp = getParamName(fun.Name(), vn+"."+k)
+						post = append(post, ":"+tmp+" := "+tmp+";")
+					}
 				}
 			default:
 				log.Fatalf("%s/%s: only table of simple or record types are allowed (no table of table!)", fun.Name(), arg.Name)
@@ -452,18 +459,24 @@ func getVarName(funName, varName, prefix string) string {
 	}
 	x, ok := m[varName]
 	if !ok {
-		x = fmt.Sprintf("%s%03d", prefix, len(m)+1)
+		length := len(m)
+		if i := strings.LastIndex(varName, "."); i > 0 && i < len(varName)-1 {
+			x = getVarName(funName, varName[:i], prefix) + "#" + varName[i+1:]
+		}
+		if x == "" || len(x) > 30 {
+			x = fmt.Sprintf("%s%03d", prefix, length+1)
+		}
 		m[varName] = x
 	}
 	return x
 }
 
 func getInnerVarName(funName, varName string) string {
-	return getVarName(funName, varName, "v")
+	return getVarName(funName, varName, "x")
 }
 
 func getParamName(funName, paramName string) string {
-	return getVarName(funName, paramName, "p")
+	return getVarName(funName, paramName, "x")
 }
 
 /*

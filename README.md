@@ -9,6 +9,14 @@ As OCI does not allow using PL/SQL record types, this causes some difficulty.
       FROM user_arguments
       ORDER BY object_id, subprogram_id, SEQUENCE;
 
+## Restrictions
+Supported types:
+  * PL/SQL simple types
+  * PL/SQL record types (defined at stored package level)
+  * PL/SQL associative arrays, but just "INDEX BY BINARY_INTEGER" and this arrays
+  must be one of the previously supported types (but not arrays!)
+  'Cause of OCI restrictions, these arrays must be indexed from 1.
+
 ## Examples
 ### Minimal
 Minimal is a minimal example using OraCall: a simple main package which
