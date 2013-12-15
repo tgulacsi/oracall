@@ -36,6 +36,7 @@ import (
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")
+var flagBypassMultipleArgs = flag.Bool("bypassmultipleargs", false, "bypass multiple args - experimental, probably worsens ORA-01008")
 
 func main() {
 	flag.Parse()
@@ -90,7 +91,7 @@ func main() {
 	cur := oracle.NewCursor(&conn)
 	defer cur.Close()
 
-	oracle.BypassMultipleArgs = true
+	oracle.BypassMultipleArgs = *flagBypassMultipleArgs
 
 	// call the function
 	out, err := fun(cur, inp)

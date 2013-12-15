@@ -6,12 +6,15 @@ if [ -e "$envfn" ]; then
 fi
 go test ./...
 go build
-dsn=$(cat ../goracle/.dsn)
+dsn=${DSN}
+if [ -z "$dsn" ]; then
+    dsn=$(cat ../goracle/.dsn)
+fi
 {
 if echo "$dsn" | grep -q '@XE'; then
     ./oracall -F <${1:-one.csv}
 else
-    ./oracall -F -connect="$dsn" 'DB_WEB.SENDPREOFFER_31101'
+    ./oracall -F -connect="$dsn" ${2:-DB_WEB.SENDPREOFFER_31101}
 fi
 } >examples/minimal/generated_functions.go
 go build ./examples/minimal
