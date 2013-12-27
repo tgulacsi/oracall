@@ -41,8 +41,14 @@ func TestGen(t *testing.T) {
 PROCEDURE char_in(txt IN VARCHAR2);
 FUNCTION char_out RETURN VARCHAR2;
 PROCEDURE num_in(num IN NUMBER);
+FUNCTION num_out RETURN NUMBER;
 PROCEDURE date_in(dat IN DATE);
+FUNCTION date_out RETURN DATE;
 FUNCTION char_in_char_ret(txt IN VARCHAR2) RETURN VARCHAR2;
+PROCEDURE all_inout(
+    txt1 IN VARCHAR2, int1 IN PLS_INTEGER, num1 IN NUMBER, dt1 IN DATE,
+    txt2 OUT VARCHAR2, int2 OUT PLS_INTEGER, num2 OUT NUMBER, dt2 OUT DATE,
+    txt3 IN OUT VARCHAR2, int3 IN OUT PLS_INTEGER, num3 IN OUT NUMBER, dt3 IN OUT DATE);
 END TST_oracall;
     `, nil, nil)
 	if err != nil {
@@ -70,45 +76,77 @@ BEGIN
   RETURN v_ret;
 END char_in_char_ret;
 
+FUNCTION date_out RETURN DATE IS BEGIN RETURN SYSDATE; END date_out;
+FUNCTION num_out RETURN NUMBER IS BEGIN RETURN 2/3; END num_out;
+
+PROCEDURE all_inout(
+    txt1 IN VARCHAR2, int1 IN PLS_INTEGER, num1 IN NUMBER, dt1 IN DATE,
+    txt2 OUT VARCHAR2, int2 OUT PLS_INTEGER, num2 OUT NUMBER, dt2 OUT DATE,
+    txt3 IN OUT VARCHAR2,
+    int3 IN OUT PLS_INTEGER, num3 IN OUT NUMBER, dt3 IN OUT DATE) IS
+BEGIN
+  txt2 := txt1||'#'; int2 := NVL(int1, 0) + 1;
+  num2 := NVL(num1, 0) + 1/3; dt2 := ADD_MONTHS(NVL(dt1, SYSDATE), 1);
+  txt3 := txt3||'#'; int3 := NVL(int3, 0) + 1;
+  num3 := NVL(num3, 0) + 1; dt3 := ADD_MONTHS(NVL(dt3, SYSDATE), 1);
+END all_inout;
+
 END TST_oracall;
     `, nil, nil); err != nil {
 		t.Fatalf("error creating package body: %v", err)
+	}
+	if err = cu.Execute("SELECT text FROM user_errors WHERE name = :1", []interface{}{"TST_ORACALL"}, nil); err != nil {
+		t.Fatalf("error querying errors: %v", err)
+	}
+	rows, err := cu.FetchAll()
+	if err != nil {
+		t.Fatalf("error fetching errors: %v", err)
+	}
+	if len(rows) > 0 {
+		errTexts := make([]string, len(rows))
+		for i := range rows {
+			errTexts[i] = rows[i][0].(string)
+		}
+		t.Fatalf("error with package: %s", strings.Join(errTexts, "\n"))
 	}
 
 	var (
 		out   []byte
 		outFn string
 	)
-	for _, command := range []string{
-		"go build",
-		"./oracall -F -connect='" + *dsn + "' TST_ORACALL.% > ./testdata/integration_test/generated_functions.go",
-		"go build ./testdata/integration_test",
-		"integration_test -connect='" + *dsn + "' TST_oracall.char_in '{\"txt\":\"abraka dabra\"}'",
-		"integration_test -connect='" + *dsn + "' TST_oracall.char_out '{}'",
-		"integration_test -connect='" + *dsn + "' TST_oracall.num_in '{\"num\": 3, \"txt\":\"abraka dabra\"}'",
-		"integration_test -connect='" + *dsn + "' TST_oracall.date_in '{\"dat\": \"2013-12-25T21:15:00+01:00\", \"txt\":\"abraka dabra\"}'",
-		"integration_test -connect='" + *dsn + "' TST_oracall.char_in_char_ret '{\"txt\":\"abraka dabra\"}'",
-	} {
-		if command == "go build ./testdata/integration_test" {
-			if outFh, err := ioutil.TempFile("", "oracall-integration_test"); err != nil {
-				t.Errorf("cannot create temp file: %v", err)
-				t.FailNow()
-			} else {
-				outFn = outFh.Name()
-				outFh.Close()
-			}
-			os.Remove(outFn)
-			command = command[:8] + " -o " + outFn + command[8:]
-		} else if strings.HasPrefix(command, "integration_test ") {
-			command = outFn + " " + command[16:]
-			defer os.Remove(outFn)
-		}
-		if out, err = exec.Command("sh", "-c", command).CombinedOutput(); err != nil {
-			t.Errorf("error '%s': %v\n%s", command, err, out)
+	run := func(prog string, args ...string) {
+		if out, err = exec.Command(prog, args...).CombinedOutput(); err != nil {
+			t.Errorf("error '%q %s': %v\n%s", prog, args, err, out)
 			t.FailNow()
 		} else {
-			t.Logf("%s:\n%s", command, out)
+			t.Logf("%q %s:\n%s", prog, args, out)
 		}
+	}
+
+	run("go", "build")
+	run("sh", "-c", "./oracall -F -connect='"+*dsn+"' TST_ORACALL.% > ./testdata/integration_test/generated_functions.go")
+
+	if outFh, err := ioutil.TempFile("", "oracall-integration_test"); err != nil {
+		t.Errorf("cannot create temp file: %v", err)
+		t.FailNow()
+	} else {
+		outFn = outFh.Name()
+		outFh.Close()
+	}
+	os.Remove(outFn)
+	run("go", "build", "-o="+outFn, "./testdata/integration_test")
+
+	for _, todo := range [][2]string{
+		{"char_in", `{"txt": "abraka dabra"}`},
+		{"char_out", `{}`},
+		{"num_in", `{"num": 33}`},
+		{"num_out", `{}`},
+		{"date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`},
+		{"date_out", `{}`},
+		{"char_in_char_ret", `{"txt": "abraka dabra"}`},
+		{"all_inout", `{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null}`},
+	} {
+		run(outFn, "-connect="+*dsn, "TST_oracall."+todo[0], todo[1])
 	}
 }
 
