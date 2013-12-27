@@ -130,7 +130,7 @@ var InputFactories = make(map[string](func() Unmarshaler), %d)
 		}
 	}
 
-	if _, err = io.WriteString(dst, "func init() {\n"); err != nil {
+	if _, err = io.WriteString(dst, "\nfunc init() {\n"); err != nil {
 		return err
 	}
 	for _, text := range inits {
@@ -177,6 +177,10 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		if arg.Direction&dirmap > 0 {
 			args = append(args, arg)
 		}
+	}
+	// return variable for function out structs
+	if out && f.Returns != nil {
+		args = append(args, *f.Returns)
 	}
 	//glog.Infof("args[%d]: %s", dirmap, args)
 

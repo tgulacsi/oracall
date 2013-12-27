@@ -249,7 +249,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
 		if level == 0 {
 			if len(args) == 0 && arg.Name == "" {
-				arg.Name = "return"
+				arg.Name = "ret"
 				fun.Returns = &arg
 			} else {
 				args = append(args, arg)

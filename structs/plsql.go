@@ -167,7 +167,18 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
 	convIn = append(convIn, "var v *oracle.Variable\nvar x interface{}\n _, _ = v, x")
-	for _, arg := range fun.Args {
+
+	var args []Argument
+	if fun.Returns != nil {
+		args = make([]Argument, 0, len(fun.Args)+1)
+		for _, arg := range fun.Args {
+			args = append(args, arg)
+		}
+		args = append(args, *fun.Returns)
+	} else {
+		args = fun.Args
+	}
+	for _, arg := range args {
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
 			callArgs[arg.Name] = ":" + arg.Name
@@ -331,6 +342,9 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                 }`,
 				tableSize, oracleVarTypeName(arg.Type), arg.Charlength, arg.Type))
 		if tableSize == 0 {
+			if got[0] == '*' {
+				got = got[1:]
+			}
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
@@ -338,9 +352,13 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     err = fmt.Errorf("error getting value of %s: %%s", err)
                     return
                 } else if x != nil {
-                    output.%s = x.(%s)
+                    if y, ok := x.(%s); !ok {
+                        err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
+                    } else {
+                        output.%s = &y
+                    }
                 }}
-            `, paramName, paramName, name, name, got))
+            `, paramName, paramName, name, got, name, got, name))
 		} else {
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
