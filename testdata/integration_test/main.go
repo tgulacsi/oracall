@@ -26,7 +26,6 @@ package main
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -69,12 +68,6 @@ func main() {
 	if err = inp.FromJSON(input); err != nil {
 		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
 	}
-	b, err := xml.Marshal(inp)
-	if err != nil {
-		log.Fatalf("error marshaling %v to xml: %s", inp, err)
-	}
-	log.Printf("input marshaled to xml: %s", b)
-
 	DebugLevel = 1
 	log.Printf("calling %s(%#v)", funName, inp)
 
@@ -100,13 +93,8 @@ func main() {
 	}
 
 	// present the output as json
-	if b, err = json.Marshal(out); err != nil {
+	if err = json.NewEncoder(os.Stdout).Encode(out); err != nil {
 		log.Fatalf("error marshaling output: %s", err)
 	}
-	log.Printf("output marshaled to JSON: %s", b)
-
-	if b, err = xml.Marshal(out); err != nil {
-		log.Fatalf("error marshaling output to XML: %s", err)
-	}
-	log.Printf("output marshaled to XML: %s", b)
+	os.Stdout.Close()
 }

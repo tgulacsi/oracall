@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -24,6 +25,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tgulacsi/goracle/oracle"
 )
@@ -114,7 +116,7 @@ END TST_oracall;
 		out   []byte
 		outFn string
 	)
-	run := func(prog string, args ...string) {
+	runCommand := func(prog string, args ...string) {
 		if out, err = exec.Command(prog, args...).CombinedOutput(); err != nil {
 			t.Errorf("error '%q %s': %v\n%s", prog, args, err, out)
 			t.FailNow()
@@ -123,8 +125,8 @@ END TST_oracall;
 		}
 	}
 
-	run("go", "build")
-	run("sh", "-c", "./oracall -F -connect='"+*dsn+"' TST_ORACALL.% > ./testdata/integration_test/generated_functions.go")
+	runCommand("go", "build")
+	runCommand("sh", "-c", "./oracall -F -connect='"+*flagConnect+"' TST_ORACALL.% > ./testdata/integration_test/generated_functions.go")
 
 	if outFh, err := ioutil.TempFile("", "oracall-integration_test"); err != nil {
 		t.Errorf("cannot create temp file: %v", err)
@@ -134,23 +136,45 @@ END TST_oracall;
 		outFh.Close()
 	}
 	os.Remove(outFn)
-	run("go", "build", "-o="+outFn, "./testdata/integration_test")
+	runCommand("go", "build", "-o="+outFn, "./testdata/integration_test")
 
-	for _, todo := range [][2]string{
-		{"char_in", `{"txt": "abraka dabra"}`},
-		{"char_out", `{}`},
-		{"num_in", `{"num": 33}`},
-		{"num_out", `{}`},
-		{"date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`},
-		{"date_out", `{}`},
-		{"char_in_char_ret", `{"txt": "abraka dabra"}`},
-		{"all_inout", `{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null}`},
+	errBuf := bytes.NewBuffer(make([]byte, 0, 512))
+	runTest := func(prog string, args ...string) string {
+		c := exec.Command(prog, args...)
+		errBuf.Reset()
+		c.Stderr = errBuf
+		if out, err = c.Output(); err != nil {
+			t.Errorf("error '%q %s': %v\n%s", prog, args, err, errBuf)
+			t.FailNow()
+		} else {
+			t.Logf("%q %s:\n%s\n%s", prog, args, out, errBuf)
+		}
+		return string(out)
+	}
+
+	for i, todo := range [][3]string{
+		{"char_in", `{"txt": "abraka dabra"}`, `{}`},
+		{"char_out", `{}`, `{"ret":"A"}`},
+		{"num_in", `{"num": 33}`, `{}`},
+		{"num_out", `{}`, `{"ret":0.6666666666666665}`},
+		{"date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
+		{"date_out", `{}`, `{"ret":"{{NOW}}"}`}, // 5.
+		{"char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"NULL"}`},
+		{"all_inout",
+			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+02:00"}`,
+			`{"txt2":"#","num2":0.33333333333333326,"dt2":"0000-01-31T00:00:00+02:00","txt3":"A#","num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
 	} {
-		run(outFn, "-connect="+*dsn, "TST_oracall."+todo[0], todo[1])
+		got := runTest(outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
+		if strings.Index(todo[2], "{{NOW}}") >= 0 {
+			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
+		}
+		if strings.TrimSpace(got) != todo[2] {
+			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
+		}
 	}
 }
 
-var dsn = flag.String("dsn", "", "Oracle DSN (user/passw@sid)")
+//var dsn = flag.String("connect", "", "Oracle DSN (user/passw@sid)")
 var dbg = flag.Bool("debug", false, "print debug messages?")
 
 func init() {
@@ -164,15 +188,15 @@ func getConnection(t *testing.T) oracle.Connection {
 		return conn
 	}
 
-	if !(dsn != nil && *dsn != "") {
+	if !(flagConnect != nil && *flagConnect != "") {
 		t.Logf("cannot test connection without dsn!")
-		return conn
+		t.FailNow()
 	}
-	user, passw, sid := oracle.SplitDSN(*dsn)
+	user, passw, sid := oracle.SplitDSN(*flagConnect)
 	var err error
 	conn, err = oracle.NewConnection(user, passw, sid, false)
 	if err != nil {
-		log.Panicf("error creating connection to %s: %s", *dsn, err)
+		log.Panicf("error creating connection to %s: %s", *flagConnect, err)
 	}
 	if err = conn.Connect(0, false); err != nil {
 		log.Panicf("error connecting: %s", err)
