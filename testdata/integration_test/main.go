@@ -100,13 +100,8 @@ func main() {
 	}
 
 	// present the output as json
-	if b, err = json.Marshal(out); err != nil {
+	if err = json.NewEncoder(os.Stdout).Encode(out); err != nil {
 		log.Fatalf("error marshaling output: %s", err)
 	}
-	log.Printf("output marshaled to JSON: %s", b)
-
-	if b, err = xml.Marshal(out); err != nil {
-		log.Fatalf("error marshaling output to XML: %s", err)
-	}
-	log.Printf("output marshaled to XML: %s", b)
+	os.Stdout.Close()
 }
