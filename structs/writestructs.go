@@ -107,8 +107,8 @@ var InputFactories = make(map[string](func() Unmarshaler), %d)
 			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *oracle.Cursor, input interface{}) (interface{}, error) {
         var inp %s
         switch x := input.(type) {
-        case *%s: input = *x
-        case %s: input = x
+        case *%s: inp = *x
+        case %s: inp = x
         default:
             return nil, fmt.Errorf("to call %s, the input must be %s, not %%T", input)
         }

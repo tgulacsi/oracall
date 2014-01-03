@@ -147,7 +147,7 @@ END TST_oracall;
 			t.Errorf("error '%q %s': %v\n%s", prog, args, err, errBuf)
 			t.FailNow()
 		} else {
-			t.Logf("%q %s:\n%s", prog, args, out)
+			t.Logf("%q %s:\n%s\n%s", prog, args, out, errBuf)
 		}
 		return string(out)
 	}
@@ -161,8 +161,8 @@ END TST_oracall;
 		{"date_out", `{}`, `{"ret":"{{NOW}}"}`}, // 5.
 		{"char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"NULL"}`},
 		{"all_inout",
-			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null}`,
-			`{"txt2":"abraka#","num2":0.43333333333333326,"dt2":"0000-01-31T00:00:00+02:00","txt3":"#","num3":1.3,"dt3":"0000-01-31T00:00:00+02:00"}`},
+			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+02:00"}`,
+			`{"txt2":"#","num2":0.33333333333333326,"dt2":"0000-01-31T00:00:00+02:00","txt3":"A#","num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
 	} {
 		got := runTest(outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
