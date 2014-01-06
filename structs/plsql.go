@@ -415,10 +415,10 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
                 output.%s = output.%s[:cap(output.%s)]
-                if cap(output.%s) < %d {
-                    output.%s = append(output.%s, make([]%s, %d-cap(output.%s))...)
+                if cap(output.%s) < v.Len() {
+                    output.%s = append(output.%s, make([]%s, v.Len()-cap(output.%s))...)
                 }
-                for i := 0; i < %d; i++ {
+                for i := 0; i < v.Len(); i++ {
                     if err = v.GetValueInto(&x, uint(i)); err != nil {
                         err = fmt.Errorf("error getting %%d. value into %s%s: %%s", i, err)
                         return
@@ -433,8 +433,8 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                 }
             }
             `, paramName, paramName,
-					name, name, name, name, tableSize, name, name, got, tableSize, name,
-					tableSize, name, postfix,
+					name, name, name, name, name, name, got, name,
+					name, postfix,
 					pTyp, name, pTyp, outConv))
 		}
 		if arg.IsInput() {

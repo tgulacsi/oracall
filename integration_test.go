@@ -54,6 +54,7 @@ PROCEDURE all_inout(
     txt2 OUT VARCHAR2, int2 OUT PLS_INTEGER, num2 OUT NUMBER, dt2 OUT DATE,
     txt3 IN OUT VARCHAR2, int3 IN OUT PLS_INTEGER, num3 IN OUT NUMBER, dt3 IN OUT DATE);
 
+FUNCTION nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER;
 FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER;
 END TST_oracall;
     `, nil, nil)
@@ -97,9 +98,14 @@ BEGIN
   num3 := NVL(num3, 0) + 1; dt3 := ADD_MONTHS(NVL(dt3, SYSDATE), 1);
 END all_inout;
 
+FUNCTION nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER IS
+BEGIN
+  RETURN nums.COUNT;
+END nums_count;
+
 FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER IS
   v_idx PLS_INTEGER;
-  s NUMBER;
+  s NUMBER := 0;
 BEGIN
   outnums.DELETE;
   v_idx := nums.FIRST;
@@ -177,11 +183,12 @@ END TST_oracall;
 		{"num_out", `{}`, `{"ret":0.6666666666666665}`},
 		{"date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
 		{"date_out", `{}`, `{"ret":"{{NOW}}"}`}, // 5.
-		{"char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"NULL"}`},
+		{"char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
 		{"all_inout",
 			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+02:00"}`,
-			`{"txt2":"#","num2":0.33333333333333326,"dt2":"0000-01-31T00:00:00+02:00","txt3":"A#","num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
-		{"sum_nums", `{"nums":[1,2,3.3]}`, `{"ret":6.3,"outnums":[2,4,6.6]}`},
+			`{"txt2":"abraka#","int2":0,"num2":0.4333333333333333,"dt2":"0000-01-31T00:00:00+02:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
+		{"nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
+		{"sum_nums", `{"nums":[1,2,3.3]}`, `{"outnums":[2,4,6.6000000000000005],"ret":6.3}`},
 	} {
 		got := runTest(outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
