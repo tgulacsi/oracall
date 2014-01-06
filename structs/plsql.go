@@ -160,10 +160,29 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	}
 	tableTypes := make(map[string]string, 4)
 	callArgs := make(map[string]string, 16)
+
+	getTableType := func(absType string) string {
+		typ, ok := tableTypes[absType]
+		if !ok {
+			typ = strings.Map(func(c rune) rune {
+				switch c {
+				case '(', ',':
+					return '_'
+				case ' ', ')':
+					return -1
+				default:
+					return c
+				}
+			}, absType) + "_tab_typ"
+			decls = append(decls, "TYPE "+typ+" IS TABLE OF "+absType+" INDEX BY BINARY_INTEGER;")
+			tableTypes[absType] = typ
+		}
+		return typ
+	}
 	//fStructIn, fStructOut := fun.getStructName(false), fun.getStructName(true)
 	var (
-		vn, tmp string
-		ok      bool
+		vn, tmp, typ string
+		ok           bool
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
 	convIn = append(convIn, "var v *oracle.Variable\nvar x interface{}\n _, _ = v, x")
@@ -204,7 +223,35 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		case FLAVOR_TABLE:
 			switch arg.TableOf.Flavor {
 			case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
-				callArgs[arg.Name] = ":" + arg.Name
+				typ = getTableType(arg.TableOf.AbsType)
+				setvar := ""
+				if arg.IsInput() {
+					setvar = " := :" + arg.Name
+				}
+				decls = append(decls, arg.Name+" "+typ+setvar+";")
+
+				vn = getInnerVarName(fun.Name(), arg.Name)
+				callArgs[arg.Name] = vn
+				decls = append(decls, vn+" "+arg.TypeName+";")
+				if arg.IsInput() {
+					pre = append(pre,
+						vn+".DELETE;",
+						"i1 := "+arg.Name+".FIRST;",
+						"WHILE i1 IS NOT NULL LOOP",
+						"  "+vn+"(i1) := "+arg.Name+"(i1);",
+						"  i1 := "+arg.Name+".NEXT(i1);",
+						"END LOOP;")
+				}
+				if arg.IsOutput() {
+					post = append(post,
+						arg.Name+".DELETE;",
+						"i1 := "+vn+".FIRST;",
+						"WHILE i1 IS NOT NULL LOOP",
+						"  "+arg.Name+"(i1) := "+vn+"(i1);",
+						"  i1 := "+vn+".NEXT(i1);",
+						"END LOOP;",
+						":"+arg.Name+" := "+arg.Name+";")
+				}
 				name := capitalize(goName(arg.Name))
 				convIn, convOut = arg.TableOf.getConv(convIn, convOut,
 					fun.types, name, arg.Name, MaxTableSize, "")
@@ -230,21 +277,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 				var idxvar string
 				for k, v := range arg.TableOf.RecordOf {
-					typ, ok := tableTypes[v.AbsType]
-					if !ok {
-						typ = strings.Map(func(c rune) rune {
-							switch c {
-							case '(', ',':
-								return '_'
-							case ' ', ')':
-								return -1
-							default:
-								return c
-							}
-						}, v.AbsType) + "_tab_typ"
-						decls = append(decls, "TYPE "+typ+" IS TABLE OF "+v.AbsType+" INDEX BY BINARY_INTEGER;")
-						tableTypes[v.AbsType] = typ
-					}
+					typ = getTableType(v.AbsType)
 					decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+";")
 
 					tmp = getParamName(fun.Name(), vn+"."+k)
@@ -443,20 +476,23 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				subGoType = subGoType[1:]
 			}
 			convIn = append(convIn,
-				fmt.Sprintf(`if len(input.%s) == 0 {
-                    v = nil
+				fmt.Sprintf(`{
+                var a []%s
+                if len(input.%s) == 0 {
+                    a = make([]%s, 0)
                 } else {
-                    a := make([]%s, len(input.%s))
+                    a = make([]%s, len(input.%s))
                     for i, x := range input.%s {
                         if x != nil { a[i] = *x }
                     }
-                    if v, err = cur.NewVar(a); err != nil {
-                        err = fmt.Errorf("error creating new var from %s(%%v): %%s", a, err)
-                        return
-                    }
+                }
+                if v, err = cur.NewVar(a); err != nil {
+                    err = fmt.Errorf("error creating new var from %s(%%v): %%s", a, err)
+                    return
+                }
                 }
                     `,
-					name, subGoType, name, name, name))
+					subGoType, name, subGoType, subGoType, name, name, name))
 			if preconcept2 != "" {
 				convIn = append(convIn, "}")
 			}

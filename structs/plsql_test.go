@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kylelemons/godebug/diff"
+	//"github.com/kylelemons/godebug/diff"
 )
 
 const csvSource = `OBJECT_ID;SUBPROGRAM_ID;PACKAGE_NAME;OBJECT_NAME;DATA_LEVEL;POSITION;ARGUMENT_NAME;IN_OUT;DATA_TYPE;DATA_PRECISION;DATA_SCALE;CHARACTER_SET_NAME;PLS_TYPE;CHAR_LENGTH;TYPE_LINK;TYPE_OWNER;TYPE_NAME;TYPE_SUBNAME
@@ -150,9 +150,10 @@ func TestOne(t *testing.T) {
 	}
 	plsBlock, _ := functions[0].PlsqlBlock()
 	if plsBlock != awaited {
-		t.Logf("plsql block diff: " + diff.Diff(plsBlock, awaited))
+		//t.Logf("plsql block diff: " + diff.Diff(plsBlock, awaited))
 		//t.Logf("---------------------------------")
 		//t.Logf(plsBlock)
 		//t.FailNow()
+		t.Logf("plsql block: " + plsBlock)
 	}
 }

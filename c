@@ -4,12 +4,14 @@ envfn=$(dirname $0)/../goracle/env
 if [ -e "$envfn" ]; then
     . "$envfn"
 fi
-go test ./...
-go build
 dsn=${DSN}
 if [ -z "$dsn" ]; then
     dsn=$(cat ../goracle/.dsn)
 fi
+
+go test -connect=${dsn} ./...
+go build
+
 {
 if echo "$dsn" | grep -q '@XE'; then
     ./oracall -F <${1:-one.csv}
@@ -23,4 +25,4 @@ echo '-----------------------------------------------'
 CMD='./minimal -connect='${dsn}" ${2:-DB_web.sendpreoffer_31101}"
 echo "$CMD"
 #$CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":"A", "telep_kod":"C"},{"telep_azon":"z", "telep_kod":"x"}]}'
-$CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":1, "telep_kod":0}]}'
+time $CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":1, "telep_kod":0}], "p_kotveny": {"dijfizgyak":"N"}, "p_kedvezmenyek": ["KEDV01"]}'
