@@ -374,9 +374,20 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     return
                 }`,
 				tableSize, oracleVarTypeName(arg.Type), arg.Charlength, arg.Type))
+		pTyp := got[1:]
+		switch pTyp {
+		case "float32":
+			pTyp = "float64"
+		case "int", "int32":
+			pTyp = "int64"
+		}
+		var outConv string
 		if tableSize == 0 {
-			if got[0] == '*' {
-				got = got[1:]
+			if pTyp == got[1:] {
+				outConv = fmt.Sprintf(`output.%s = &y`, name)
+			} else {
+				outConv = fmt.Sprintf(`z := %s(y)
+            output.%s = &z`, got[1:], name)
 			}
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
@@ -385,26 +396,46 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                     err = fmt.Errorf("error getting value of %s: %%s", err)
                     return
                 } else if x != nil {
-                    if y, ok := x.(%s); !ok {
+                    y, ok := x.(%s)
+                    if !ok {
                         err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
-                    } else {
-                        output.%s = &y
+                        return
                     }
+                    %s
                 }}
-            `, paramName, paramName, name, got, name, got, name))
+                `, paramName, paramName, name, pTyp, name, pTyp, outConv))
 		} else {
+			if pTyp == got[1:] {
+				outConv = fmt.Sprintf(`output.%s[i]%s = &y`, name, postfix)
+			} else {
+				outConv = fmt.Sprintf(`z := %s(y)
+            output.%s[i]%s = &z`, got[1:], name, postfix)
+			}
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
-                for i := 0; i < %d; i++ {
+                output.%s = output.%s[:cap(output.%s)]
+                if cap(output.%s) < v.Len() {
+                    output.%s = append(output.%s, make([]%s, v.Len()-cap(output.%s))...)
+                }
+                for i := 0; i < v.Len(); i++ {
                     if err = v.GetValueInto(&x, uint(i)); err != nil {
                         err = fmt.Errorf("error getting %%d. value into %s%s: %%s", i, err)
                         return
+                    } else if x != nil {
+                        y, ok := x.(%s)
+                        if !ok {
+                            err = fmt.Errorf("out parameter %s has bad type: awaited %s, got %%T", x)
+                            return
+                        }
+                        %s
                     }
-                    output.%s[i]%s = x.(%s)
                 }
             }
-            `, paramName, paramName, tableSize, name, postfix, name, postfix, got))
+            `, paramName, paramName,
+					name, name, name, name, name, name, got, name,
+					name, postfix,
+					pTyp, name, pTyp, outConv))
 		}
 		if arg.IsInput() {
 			if tableSize == 0 {
