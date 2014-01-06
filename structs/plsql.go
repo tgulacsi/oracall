@@ -262,6 +262,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				decls = append(decls, vn+" "+arg.TypeName+";")
 
 				aname := capitalize(goName(arg.Name))
+				convOut = append(convOut, fmt.Sprintf(`
+                    if output.%s == nil {
+                        output.%s = make([]%s, 0, %d)
+                    }`, aname, aname, arg.TableOf.goType(fun.types), MaxTableSize))
 				/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
 				if arg.IsOutput() {
 					// DELETE out tables
@@ -302,10 +306,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					}
 					//name := aname + "." + capitalize(goName(k))
 
-					convOut = append(convOut, fmt.Sprintf(`
-                if output.%s == nil {
-                    output.%s = make([]%s, 0, %d)
-                }`, aname, aname, arg.TableOf.goType(fun.types), MaxTableSize))
 					convIn, convOut = v.getConv(
 						convIn, convOut, fun.types, aname, tmp, MaxTableSize,
 						"."+capitalize(k))
@@ -411,13 +411,17 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
 				outConv = fmt.Sprintf(`z := %s(y)
             output.%s[i]%s = &z`, got[1:], name, postfix)
 			}
+			mk := ""
+			if postfix == "" {
+				mk = fmt.Sprintf(`output.%s = output.%s[:cap(output.%s)]
+                if cap(output.%s) < v.Len() {
+                    output.%s = append(output.%s, make([]%s, v.Len()-cap(output.%s))...)
+                }`, name, name, name, name, name, name, got, name)
+			}
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
                 v = params["%s"].(*oracle.Variable)
-                output.%s = output.%s[:cap(output.%s)]
-                if cap(output.%s) < v.Len() {
-                    output.%s = append(output.%s, make([]%s, v.Len()-cap(output.%s))...)
-                }
+                %s
                 for i := 0; i < v.Len(); i++ {
                     if err = v.GetValueInto(&x, uint(i)); err != nil {
                         err = fmt.Errorf("error getting %%d. value into %s%s: %%s", i, err)
@@ -433,7 +437,7 @@ func (arg Argument) getConv(convIn, convOut []string, types map[string]string, n
                 }
             }
             `, paramName, paramName,
-					name, name, name, name, name, name, got, name,
+					mk,
 					name, postfix,
 					pTyp, name, pTyp, outConv))
 		}
