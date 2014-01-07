@@ -42,6 +42,9 @@ func TestGen(t *testing.T) {
 	err := cu.Execute(`CREATE OR REPLACE PACKAGE TST_oracall AS
 TYPE num_tab_typ IS TABLE OF NUMBER INDEX BY BINARY_INTEGER;
 
+TYPE mix_rec_typ IS RECORD (num NUMBER, dt DATE, text VARCHAR2(1000));
+TYPE mix_tab_typ IS TABLE OF mix_rec_typ INDEX BY BINARY_INTEGER;
+
 PROCEDURE char_in(txt IN VARCHAR2);
 FUNCTION char_out RETURN VARCHAR2;
 PROCEDURE num_in(num IN NUMBER);
@@ -56,6 +59,9 @@ PROCEDURE all_inout(
 
 FUNCTION nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER;
 FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER;
+
+FUNCTION rec_in(rec IN mix_rec_typ) RETURN VARCHAR2;
+FUNCTION tab_in(tab IN mix_tab_typ) RETURN VARCHAR2;
 END TST_oracall;
     `, nil, nil)
 	if err != nil {
@@ -116,6 +122,27 @@ BEGIN
   END LOOP;
   RETURN(s);
 END sum_nums;
+
+FUNCTION rec_in(rec IN mix_rec_typ) RETURN VARCHAR2 IS
+BEGIN
+  RETURN rec.num||';"'||TO_CHAR(rec.dt, 'YYYY-MM-DD HH24:MI:SS')||'";"'||rec.text||'"';
+END rec_in;
+
+FUNCTION tab_in(tab IN mix_tab_typ) RETURN VARCHAR2 IS
+  i PLS_INTEGER;
+  text VARCHAR2(32767);
+BEGIN
+  i := tab.FIRST;
+  WHILE i IS NOT NULL LOOP
+    text := text||CHR(10)||SUBSTR(
+              tab(i).num||';"'||TO_CHAR(tab(i).dt, 'YYYY-MM-DD HH24:MI:SS')
+              ||'";"'||tab(i).text||'"',
+              1, GREATEST(0, 32767-LENGTH(text)-1));
+    EXIT WHEN LENGTH(text) >= 32767;
+    i := tab.NEXT(i);
+  END LOOP;
+  RETURN(text);
+END tab_in;
 
 END TST_oracall;
     `, nil, nil); err != nil {
@@ -189,6 +216,9 @@ END TST_oracall;
 			`{"txt2":"abraka#","int2":0,"num2":0.4333333333333333,"dt2":"0000-01-31T00:00:00+02:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
 		{"nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
 		{"sum_nums", `{"nums":[1,2,3.3]}`, `{"outnums":[2,4,6.6000000000000005],"ret":6.3}`},
+		{"rec_in", `{"rec":{"num":33,"text":"xxx"}}`, `{"ret":"33;;xxx"}`},
+		{"tab_in", `{"tab":[{"num":1,"text":"A"},{"num":2,"text":"B"}]}`,
+			`{"ret":"1;;A` + "\n" + `2;;B"}`},
 	} {
 		got := runTest(outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
