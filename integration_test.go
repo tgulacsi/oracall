@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,9 +34,64 @@ import (
 // TestGen tests the generation - for this, it needs a dsn with privileges
 // if you get "ORA-01031: insufficient privileges", then you need
 // GRANT CREATE PROCEDURE TO username;
-func TestGen(t *testing.T) {
+func TestGenSimple(t *testing.T) {
 	conn := getConnection(t)
 
+	cu := conn.NewCursor()
+	defer cu.Close()
+
+	build(t)
+	outFn := generateAndBuild(t, "SIMPLE_")
+
+	for i, todo := range [][3]string{
+		{"simple_char_in", `{"txt": "abraka dabra"}`, `{}`},
+		{"simple_char_out", `{}`, `{"ret":"A"}`},
+		{"simple_num_in", `{"num": 33}`, `{}`},
+		{"simple_num_out", `{}`, `{"ret":0.6666666666666665}`},
+		{"simple_date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
+		{"simple_date_out", `{}`, `{"ret":"{{NOW}}"}`}, // 5.
+		{"simple_char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
+		{"simple_all_inout",
+			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+02:00"}`,
+			`{"txt2":"abraka#","int2":0,"num2":0.4333333333333333,"dt2":"0000-01-31T00:00:00+02:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
+		{"simple_nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
+		{"simple_sum_nums", `{"nums":[1,2,3.3]}`, `{"outnums":[2,4,6.6000000000000005],"ret":6.3}`},
+	} {
+		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
+		if strings.Index(todo[2], "{{NOW}}") >= 0 {
+			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
+		}
+		if strings.TrimSpace(got) != todo[2] {
+			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
+		}
+	}
+}
+
+func TestGenRec(t *testing.T) {
+	conn := getConnection(t)
+
+	cu := conn.NewCursor()
+	defer cu.Close()
+
+	build(t)
+	outFn := generateAndBuild(t, "REC_")
+
+	for i, todo := range [][3]string{
+		{"rec_in", `{"rec":{"num":33,"text":"xxx"}}`, `{"ret":"33;;xxx"}`},
+		{"rec_tab_in", `{"tab":[{"num":1,"text":"A"},{"num":2,"text":"B"}]}`,
+			`{"ret":"1;;A` + "\n" + `2;;B"}`},
+	} {
+		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
+		if strings.Index(todo[2], "{{NOW}}") >= 0 {
+			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
+		}
+		if strings.TrimSpace(got) != todo[2] {
+			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
+		}
+	}
+}
+
+func createStoredProc(t *testing.T) {
 	cu := conn.NewCursor()
 	defer cu.Close()
 
@@ -45,54 +101,54 @@ TYPE num_tab_typ IS TABLE OF NUMBER INDEX BY BINARY_INTEGER;
 TYPE mix_rec_typ IS RECORD (num NUMBER, dt DATE, text VARCHAR2(1000));
 TYPE mix_tab_typ IS TABLE OF mix_rec_typ INDEX BY BINARY_INTEGER;
 
-PROCEDURE char_in(txt IN VARCHAR2);
-FUNCTION char_out RETURN VARCHAR2;
-PROCEDURE num_in(num IN NUMBER);
-FUNCTION num_out RETURN NUMBER;
-PROCEDURE date_in(dat IN DATE);
-FUNCTION date_out RETURN DATE;
-FUNCTION char_in_char_ret(txt IN VARCHAR2) RETURN VARCHAR2;
-PROCEDURE all_inout(
+PROCEDURE simple_char_in(txt IN VARCHAR2);
+FUNCTION simple_char_out RETURN VARCHAR2;
+PROCEDURE simple_num_in(num IN NUMBER);
+FUNCTION simple_num_out RETURN NUMBER;
+PROCEDURE simple_date_in(dat IN DATE);
+FUNCTION simple_date_out RETURN DATE;
+FUNCTION simple_char_in_char_ret(txt IN VARCHAR2) RETURN VARCHAR2;
+PROCEDURE simple_all_inout(
     txt1 IN VARCHAR2, int1 IN PLS_INTEGER, num1 IN NUMBER, dt1 IN DATE,
     txt2 OUT VARCHAR2, int2 OUT PLS_INTEGER, num2 OUT NUMBER, dt2 OUT DATE,
     txt3 IN OUT VARCHAR2, int3 IN OUT PLS_INTEGER, num3 IN OUT NUMBER, dt3 IN OUT DATE);
 
-FUNCTION nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER;
-FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER;
+FUNCTION simple_nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER;
+FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER;
 
 FUNCTION rec_in(rec IN mix_rec_typ) RETURN VARCHAR2;
-FUNCTION tab_in(tab IN mix_tab_typ) RETURN VARCHAR2;
+FUNCTION rec_tab_in(tab IN mix_tab_typ) RETURN VARCHAR2;
 END TST_oracall;
     `, nil, nil)
 	if err != nil {
 		t.Fatalf("error creating package head: %v", err)
 	}
 	if err = cu.Execute(`CREATE OR REPLACE PACKAGE BODY TST_oracall AS
-PROCEDURE char_in(txt IN VARCHAR2) IS
+PROCEDURE simple_char_in(txt IN VARCHAR2) IS
   v_txt VARCHAR2(1000) := SUBSTR(txt, 1, 100);
-BEGIN NULL; END char_in;
-FUNCTION char_out RETURN VArCHAR2 IS BEGIN RETURN('A'); END char_out;
+BEGIN NULL; END simple_char_in;
+FUNCTION simple_char_out RETURN VArCHAR2 IS BEGIN RETURN('A'); END simple_char_out;
 
-PROCEDURE num_in(num IN NUMBER) IS
+PROCEDURE simple_num_in(num IN NUMBER) IS
   v_num NUMBER := num;
-BEGIN NULL; END num_in;
+BEGIN NULL; END simple_num_in;
 
-PROCEDURE date_in(dat IN DATE) IS
+PROCEDURE simple_date_in(dat IN DATE) IS
   v_dat DATE := dat;
-BEGIN NULL; END date_in;
+BEGIN NULL; END simple_date_in;
 
-FUNCTION char_in_char_ret(txt IN VARCHAR2) RETURN VARCHAR2 IS
+FUNCTION simple_char_in_char_ret(txt IN VARCHAR2) RETURN VARCHAR2 IS
   v_txt CONSTANT VARCHAR2(4000) := SUBSTR(txt, 1, 4000);
   v_ret VARCHAR2(4000);
 BEGIN
   SELECT DUMP(txt) INTO v_ret FROM DUAL;
   RETURN v_ret;
-END char_in_char_ret;
+END simple_char_in_char_ret;
 
-FUNCTION date_out RETURN DATE IS BEGIN RETURN SYSDATE; END date_out;
-FUNCTION num_out RETURN NUMBER IS BEGIN RETURN 2/3; END num_out;
+FUNCTION simple_date_out RETURN DATE IS BEGIN RETURN SYSDATE; END simple_date_out;
+FUNCTION simple_num_out RETURN NUMBER IS BEGIN RETURN 2/3; END simple_num_out;
 
-PROCEDURE all_inout(
+PROCEDURE simple_all_inout(
     txt1 IN VARCHAR2, int1 IN PLS_INTEGER, num1 IN NUMBER, dt1 IN DATE,
     txt2 OUT VARCHAR2, int2 OUT PLS_INTEGER, num2 OUT NUMBER, dt2 OUT DATE,
     txt3 IN OUT VARCHAR2,
@@ -102,14 +158,14 @@ BEGIN
   num2 := NVL(num1, 0) + 1/3; dt2 := ADD_MONTHS(NVL(dt1, SYSDATE), 1);
   txt3 := txt3||'#'; int3 := NVL(int3, 0) + 1;
   num3 := NVL(num3, 0) + 1; dt3 := ADD_MONTHS(NVL(dt3, SYSDATE), 1);
-END all_inout;
+END simple_all_inout;
 
-FUNCTION nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER IS
+FUNCTION simple_nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER IS
 BEGIN
   RETURN nums.COUNT;
-END nums_count;
+END simple_nums_count;
 
-FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER IS
+FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER IS
   v_idx PLS_INTEGER;
   s NUMBER := 0;
 BEGIN
@@ -121,14 +177,14 @@ BEGIN
     v_idx := nums.NEXT(v_idx);
   END LOOP;
   RETURN(s);
-END sum_nums;
+END simple_sum_nums;
 
 FUNCTION rec_in(rec IN mix_rec_typ) RETURN VARCHAR2 IS
 BEGIN
   RETURN rec.num||';"'||TO_CHAR(rec.dt, 'YYYY-MM-DD HH24:MI:SS')||'";"'||rec.text||'"';
 END rec_in;
 
-FUNCTION tab_in(tab IN mix_tab_typ) RETURN VARCHAR2 IS
+FUNCTION rec_tab_in(tab IN mix_tab_typ) RETURN VARCHAR2 IS
   i PLS_INTEGER;
   text VARCHAR2(32767);
 BEGIN
@@ -142,7 +198,7 @@ BEGIN
     i := tab.NEXT(i);
   END LOOP;
   RETURN(text);
-END tab_in;
+END rec_tab_in;
 
 END TST_oracall;
     `, nil, nil); err != nil {
@@ -162,22 +218,29 @@ END TST_oracall;
 		}
 		t.Fatalf("error with package: %s", strings.Join(errTexts, "\n"))
 	}
-
-	var (
-		out   []byte
-		outFn string
-	)
-	runCommand := func(prog string, args ...string) {
-		if out, err = exec.Command(prog, args...).CombinedOutput(); err != nil {
-			t.Errorf("error '%q %s': %v\n%s", prog, args, err, out)
-			t.FailNow()
-		} else {
-			t.Logf("%q %s:\n%s", prog, args, out)
-		}
+}
+func runCommand(t *testing.T, prog string, args ...string) {
+	out, err := exec.Command(prog, args...).CombinedOutput()
+	if err != nil {
+		t.Errorf("error '%q %s': %v\n%s", prog, args, err, out)
+		t.FailNow()
+	} else {
+		t.Logf("%q %s:\n%s", prog, args, out)
 	}
+}
 
-	runCommand("go", "build")
-	runCommand("sh", "-c", "./oracall -F -connect='"+*flagConnect+"' TST_ORACALL.% > ./testdata/integration_test/generated_functions.go")
+func build(t *testing.T) {
+	buildOnce.Do(func() {
+		createStoredProc(t)
+		runCommand(t, "go", "build")
+	})
+}
+
+func generateAndBuild(t *testing.T, prefix string) (outFn string) {
+	runCommand(t, "sh", "-c",
+		"./oracall -F -connect='"+*flagConnect+
+			"' TST_ORACALL."+strings.ToUpper(prefix)+"%"+
+			" >./testdata/integration_test/generated_functions.go")
 
 	if outFh, err := ioutil.TempFile("", "oracall-integration_test"); err != nil {
 		t.Errorf("cannot create temp file: %v", err)
@@ -187,51 +250,29 @@ END TST_oracall;
 		outFh.Close()
 	}
 	os.Remove(outFn)
-	runCommand("go", "build", "-o="+outFn, "./testdata/integration_test")
+	runCommand(t, "go", "build", "-o="+outFn, "./testdata/integration_test")
+	return
+}
 
-	errBuf := bytes.NewBuffer(make([]byte, 0, 512))
-	runTest := func(prog string, args ...string) string {
-		c := exec.Command(prog, args...)
-		errBuf.Reset()
-		c.Stderr = errBuf
-		if out, err = c.Output(); err != nil {
-			t.Errorf("error '%q %s': %v\n%s", prog, args, err, errBuf)
-			t.FailNow()
-		} else {
-			t.Logf("%q %s:\n%s\n%s", prog, args, out, errBuf)
-		}
-		return string(out)
-	}
+var errBuf = bytes.NewBuffer(make([]byte, 0, 512))
 
-	for i, todo := range [][3]string{
-		{"char_in", `{"txt": "abraka dabra"}`, `{}`},
-		{"char_out", `{}`, `{"ret":"A"}`},
-		{"num_in", `{"num": 33}`, `{}`},
-		{"num_out", `{}`, `{"ret":0.6666666666666665}`},
-		{"date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
-		{"date_out", `{}`, `{"ret":"{{NOW}}"}`}, // 5.
-		{"char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
-		{"all_inout",
-			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+02:00"}`,
-			`{"txt2":"abraka#","int2":0,"num2":0.4333333333333333,"dt2":"0000-01-31T00:00:00+02:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
-		{"nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
-		{"sum_nums", `{"nums":[1,2,3.3]}`, `{"outnums":[2,4,6.6000000000000005],"ret":6.3}`},
-		{"rec_in", `{"rec":{"num":33,"text":"xxx"}}`, `{"ret":"33;;xxx"}`},
-		{"tab_in", `{"tab":[{"num":1,"text":"A"},{"num":2,"text":"B"}]}`,
-			`{"ret":"1;;A` + "\n" + `2;;B"}`},
-	} {
-		got := runTest(outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
-		if strings.Index(todo[2], "{{NOW}}") >= 0 {
-			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
-		}
-		if strings.TrimSpace(got) != todo[2] {
-			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
-		}
+func runTest(t *testing.T, prog string, args ...string) string {
+	c := exec.Command(prog, args...)
+	errBuf.Reset()
+	c.Stderr = errBuf
+	out, err := c.Output()
+	if err != nil {
+		t.Errorf("error '%q %s': %v\n%s", prog, args, err, errBuf)
+		t.FailNow()
+	} else {
+		t.Logf("%q %s:\n%s\n%s", prog, args, out, errBuf)
 	}
+	return string(out)
 }
 
 //var dsn = flag.String("connect", "", "Oracle DSN (user/passw@sid)")
 var dbg = flag.Bool("debug", false, "print debug messages?")
+var buildOnce sync.Once
 
 func init() {
 	flag.Parse()
