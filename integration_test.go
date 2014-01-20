@@ -200,6 +200,25 @@ BEGIN
   RETURN(text);
 END rec_tab_in;
 
+FUNCTION nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER IS
+BEGIN
+  RETURN nums.COUNT;
+END nums_count;
+
+FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER IS
+  v_idx PLS_INTEGER;
+  s NUMBER := 0;
+BEGIN
+  outnums.DELETE;
+  v_idx := nums.FIRST;
+  WHILE v_idx IS NOT NULL LOOP
+    s := NVL(s, 0) + NVL(nums(v_idx), 0);
+    outnums(v_idx) := NVL(nums(v_idx), 0) * 2;
+    v_idx := nums.NEXT(v_idx);
+  END LOOP;
+  RETURN(s);
+END sum_nums;
+
 END TST_oracall;
     `, nil, nil); err != nil {
 		t.Fatalf("error creating package body: %v", err)
