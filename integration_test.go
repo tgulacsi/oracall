@@ -77,9 +77,10 @@ func TestGenRec(t *testing.T) {
 	outFn := generateAndBuild(t, "REC_")
 
 	for i, todo := range [][3]string{
-		{"rec_in", `{"rec":{"num":33,"text":"xxx","dt":"2006-08-26T00:00:00Z01:00"}}`, `{"ret":"33;;xxx"}`},
-		{"rec_tab_in", `{"tab":[{"num":1,"text":"A","dt":"2006-08-26T00:00:00Z01:00"},{"num":2,"text":"B"}]}`,
-			`{"ret":"1;;A` + "\n" + `2;;B"}`},
+		{"rec_in", `{"rec":{"num":33,"text":"xxx","dt":"2006-08-26T00:00:00+01:00"}}`,
+			`{"ret":"33;\"2006-08-26 00:00:00\";\"xxx\""}`},
+		{"rec_tab_in", `{"tab":[{"num":1,"text":"A","dt":"2006-08-26T00:00:00+01:00"},{"num":2,"text":"B"},{"num":3,"text":"C"}]}`,
+			`{"ret":"\n1;\"2006-08-26 00:00:00\";\"A\"\n2;\"0001-01-01 00:00:00\";\"B\"\n3;\"0001-01-01 00:00:00\";\"C\""}`},
 	} {
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
@@ -193,7 +194,7 @@ BEGIN
     text := text||CHR(10)||SUBSTR(
               tab(i).num||';"'||TO_CHAR(tab(i).dt, 'YYYY-MM-DD HH24:MI:SS')
               ||'";"'||tab(i).text||'"',
-              1, GREATEST(0, 32767-LENGTH(text)-1));
+              1, GREATEST(0, 32767-NVL(LENGTH(text), 0)-1));
     EXIT WHEN LENGTH(text) >= 32767;
     i := tab.NEXT(i);
   END LOOP;
