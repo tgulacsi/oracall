@@ -291,7 +291,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 					tmp = getParamName(fun.Name(), vn+"."+k)
 					if arg.IsInput() {
-						pre = append(pre, "  "+tmp+" := :"+tmp+";")
+						pre = append(pre, tmp+" := :"+tmp+";")
 					} else {
 						pre = append(pre, tmp+".DELETE;")
 					}

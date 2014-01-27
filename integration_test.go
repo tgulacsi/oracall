@@ -77,8 +77,8 @@ func TestGenRec(t *testing.T) {
 	outFn := generateAndBuild(t, "REC_")
 
 	for i, todo := range [][3]string{
-		{"rec_in", `{"rec":{"num":33,"text":"xxx"}}`, `{"ret":"33;;xxx"}`},
-		{"rec_tab_in", `{"tab":[{"num":1,"text":"A"},{"num":2,"text":"B"}]}`,
+		{"rec_in", `{"rec":{"num":33,"text":"xxx","dt":"2006-08-26T00:00:00Z01:00"}}`, `{"ret":"33;;xxx"}`},
+		{"rec_tab_in", `{"tab":[{"num":1,"text":"A","dt":"2006-08-26T00:00:00Z01:00"},{"num":2,"text":"B"}]}`,
 			`{"ret":"1;;A` + "\n" + `2;;B"}`},
 	} {
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
