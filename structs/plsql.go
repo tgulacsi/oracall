@@ -590,10 +590,10 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                 `, paramName, paramName, name, pTyp, name, pTyp, outConv))
 		} else {
 			if pTyp == got[1:] {
-				outConv = fmt.Sprintf(`output.%s[i].%s = &y`, name, key)
+				outConv = fmt.Sprintf(`output.%s[i].%s = &y`, name, capitalize(key))
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s[i].%s = &z`, got[1:], name, key)
+            output.%s[i].%s = &z`, got[1:], name, capitalize(key))
 			}
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
@@ -642,7 +642,7 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                             err = fmt.Errorf("error setting value %%v[%%d] from %s%s: %%s", v, i, err)
                             return
                         }
-                        }`, name, key, name, key))
+                        }`, name, capitalize(key), name, capitalize(key)))
 				if preconcept2 != "" {
 					convIn = append(convIn, "}")
 				}
