@@ -209,6 +209,12 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			decls = append(decls, vn+" "+arg.TypeName+";")
 			callArgs[arg.Name] = vn
 			aname := capitalize(goName(arg.Name))
+			if arg.IsOutput() {
+				convOut = append(convOut, fmt.Sprintf(`
+                    if output.%s == nil {
+                        output.%s = new(%s)
+                    }`, aname, aname, arg.goType(fun.types)[1:]))
+			}
 			for k, v := range arg.RecordOf {
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				name := aname + "." + capitalize(goName(k))
@@ -461,10 +467,10 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 				}
 				convIn = append(convIn,
 					fmt.Sprintf(`if input.%s != nil {
-                        if err = v.SetValue(0, *input.%s); err != nil {
-                            err = fmt.Errorf("error setting value %%v from %s: %%s", v, err)
-                            return
-                        }
+                            if err = v.SetValue(0, *input.%s); err != nil {
+                                err = fmt.Errorf("error setting value %%v from %s: %%s", v, err)
+                                return
+                            }
                         }`,
 						name, name, name))
 				if preconcept2 != "" {
@@ -480,7 +486,7 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
                                 err = fmt.Errorf("error setting value %%v[%%d] from %s: %%s", v, i, err)
                                 return
                             }
-                            }`, name, name))
+                        }`, name, name))
 				if preconcept2 != "" {
 					convIn = append(convIn, "}")
 				}

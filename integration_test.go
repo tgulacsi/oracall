@@ -18,11 +18,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -81,12 +84,13 @@ func TestGenRec(t *testing.T) {
 			`{"ret":"33;\"2006-08-26 00:00:00\";\"xxx\""}`},
 		{"rec_tab_in", `{"tab":[{"num":1,"text":"A","dt":"2006-08-26T00:00:00+01:00"},{"num":2,"text":"B"},{"num":3,"text":"C"}]}`,
 			`{"ret":"\n1;\"2006-08-26 00:00:00\";\"A\"\n2;\"0001-01-01 00:00:00\";\"B\"\n3;\"0001-01-01 00:00:00\";\"C\""}`},
+		{"rec_sendpreoffer_31101", `{"p_vonalkod":1}`, `{"p_vonalkod":1,"p_kotveny":{"szamlaszam":"","evfordulo_tipus":"","dijfizgyak":"","dijkod":"","e_komm_email":"","dijbekerot_ker":"","dijfizmod":""},"p_kotveny_gfb":{},"p_gepjarmu":{"uzjelleg":"","alvazszam":"","gyartmany":"","jelleg":"","rendszam":"","gyartev":"","tulajdon_visz":""},"p_ajanlat_url":"","p_hiba_kod":0,"p_hiba_szov":""}`},
 	} {
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
 			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
 		}
-		if strings.TrimSpace(got) != todo[2] {
+		if !jsonEqual(strings.TrimSpace(got), todo[2]) {
 			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
 		}
 	}
@@ -96,11 +100,124 @@ func createStoredProc(t *testing.T) {
 	cu := conn.NewCursor()
 	defer cu.Close()
 
-	err := cu.Execute(`CREATE OR REPLACE PACKAGE TST_oracall AS
+	compile(t, cu, `CREATE OR REPLACE PACKAGE TST_oracall AS
 TYPE num_tab_typ IS TABLE OF NUMBER INDEX BY BINARY_INTEGER;
 
 TYPE mix_rec_typ IS RECORD (num NUMBER, dt DATE, text VARCHAR2(1000));
 TYPE mix_tab_typ IS TABLE OF mix_rec_typ INDEX BY BINARY_INTEGER;
+
+  TYPE kotveny_rec_typ IS RECORD (
+    dijkod VARCHAR2(2),
+    dijfizmod VARCHAR2(1),
+    dijfizgyak VARCHAR2(1),
+    szerkot DATE,
+    szerlejar DATE,
+    kockezd DATE,
+    btkezd DATE,
+    halaszt_kockezd DATE,
+    halaszt_dijfiz DATE,
+    szamlaszam VARCHAR2(24),
+    szamla_limit  NUMBER(12,2),
+    evfordulo DATE,
+    evfordulo_tipus VARCHAR2(1),
+    e_komm_email VARCHAR2(100),
+    dijbekerot_ker VARCHAR2(1),
+    ajanlati_evesdij NUMBER(15,2)
+  );
+  TYPE mod_ugyfel_rec_typ IS RECORD (
+    nem VARCHAR2(1),
+    ugyfelnev VARCHAR2(40),
+    szulnev VARCHAR2(40),
+    anyanev VARCHAR2(40),
+    szulhely VARCHAR2(27),
+    szuldat DATE,
+    adoszam VARCHAR2(11),
+    adoaz VARCHAR2(13),
+    aht_azon NUMBER(6),
+    szemelyaz VARCHAR2(8),
+    jogositvany_kelte DATE,
+    tel_otthon VARCHAR2(12),
+    tel_mhely VARCHAR2(12),
+    tel_mobil VARCHAR2(12),
+    email VARCHAR2(100),
+    tbazon VARCHAR2(10),
+    vallalkozo VARCHAR2(1),
+    okmany_tip VARCHAR2(6),
+    okmanyszam VARCHAR2(25),
+    adatkez VARCHAR2(1),
+    cegkepviselo_neve VARCHAR2(40),
+    cegforma VARCHAR2(1),
+    cegjegyzekszam VARCHAR2(25),
+    allampolg VARCHAR2(1),
+    tart_eng VARCHAR2(1),
+    publikus VARCHAR2(1)
+  );
+  TYPE mod_ugyfel_tab_typ IS TABLE OF mod_ugyfel_rec_typ INDEX BY PLS_INTEGER;
+  TYPE mod_cim_rec_typ IS RECORD (
+    ktid PLS_INTEGER,
+    hazszam1 VARCHAR2(5),
+    hazszam2 VARCHAR2(5),
+    epulet VARCHAR2(5),
+    lepcsohaz VARCHAR2(5),
+    emelet VARCHAR2(5),
+    ajto VARCHAR2(5),
+    hrsz VARCHAR2(5),
+    kulf_orsz_kod VARCHAR2(3),
+    kulf_irszam VARCHAR2(5),
+    kulf_helynev VARCHAR2(5),
+    kulf_utca VARCHAR2(5),
+    kulf_hszajto VARCHAR2(5),
+    kulf_egyeb VARCHAR2(5),
+    kulf_pf VARCHAR2(5)
+  );
+  TYPE mod_cim_tab_typ IS TABLE OF mod_cim_rec_typ INDEX BY PLS_INTEGER;
+  TYPE engedmeny_rec_typ IS RECORD (
+    engedm_kezdet DATE,
+    engedm_veg DATE,
+    vagyontargy VARCHAR2(25),
+    engedm_osszeg nUMBER(12,2),
+    also_limit nUMBER(12,2),
+    felso_limit nUMBER(12,2),
+    penznem VARCHAR2(3),
+    szamlaszam VARCHAR2(24),
+    hitel_szam VARCHAR2(10),
+    fed_bejegy VARCHAR2(10),
+    bizt_nyil VARCHAR2(10)
+  );
+  TYPE engedmeny_tab_typ IS TABLE OF engedmeny_rec_typ INDEX BY PLS_INTEGER;
+  TYPE kotveny_gfb_rec_typ IS RECORD (
+    bm_tipus PLS_INTEGER,
+    kotes_oka PLS_INTEGER
+  );
+  TYPE gepjarmu_rec_typ IS RECORD (
+    jelleg VARCHAR2(2),
+    rendszam VARCHAR2(11),
+    teljesitmeny PLS_INTEGER,
+    ossztomeg PLS_INTEGER,
+    ferohely PLS_INTEGER,
+    uzjelleg VARCHAR2(1),
+    alvazszam VARCHAR2(40),
+    gyartev VARCHAR2(4),
+    gyartmany VARCHAR2(20),
+    tulajdon_ido DATE,
+    tulajdon_visz VARCHAR2(1)
+  );
+  TYPE bonusz_elozmeny_rec_typ IS RECORD (
+    zaro_bonusz VARCHAR2(3),
+    kov_bonusz VARCHAR2(3),
+    rendszam VARCHAR2(11),
+    bizt_kod VARCHAR2(2),
+    kotvenyszam VARCHAR2(24),
+    torles_oka VARCHAR2(2),
+    szerkot DATE,
+    szervege DATE
+  );
+  TYPE kedvezmeny_tab_typ IS TABLE OF VARCHAR2(6) INDEX BY PLS_INTEGER;
+  TYPE kedv_modkod_tab_typ IS TABLE OF VARCHAR2(1) INDEX BY VARCHAR2(6);
+  TYPE nevszam_rec_typ IS RECORD (nev VARCHAR2(80), ertek NUMBER(12,2));
+  TYPE nevszam_tab_typ IS TABLE OF nevszam_rec_typ INDEX BY PLS_INTEGER;
+  TYPE hiba_rec_typ IS RECORD (hibaszam PLS_INTEGER, szoveg VARCHAR2(100));
+  TYPE hiba_tab_typ IS TABLE OF hiba_rec_typ INDEX BY PLS_INTEGER;
 
 PROCEDURE simple_char_in(txt IN VARCHAR2);
 FUNCTION simple_char_out RETURN VARCHAR2;
@@ -119,12 +236,36 @@ FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NU
 
 FUNCTION rec_in(rec IN mix_rec_typ) RETURN VARCHAR2;
 FUNCTION rec_tab_in(tab IN mix_tab_typ) RETURN VARCHAR2;
-END TST_oracall;
-    `, nil, nil)
-	if err != nil {
-		t.Fatalf("error creating package head: %v", err)
-	}
-	if err = cu.Execute(`CREATE OR REPLACE PACKAGE BODY TST_oracall AS
+
+  PROCEDURE rec_sendPreOffer_31101(p_sessionid IN VARCHAR2,
+                               p_lang IN VARCHAR2,
+                               p_vegleges IN VARCHAR2 DEFAULT 'N',
+                               p_elso_csekk_atadva IN VARCHAR2 DEFAULT 'N',
+                               p_vonalkod IN OUT PLS_INTEGER,
+                               p_kotveny IN OUT kotveny_rec_typ,
+                               p_szerzodo IN mod_ugyfel_rec_typ,
+                               p_szerzodo_cim IN mod_cim_rec_typ,
+                               p_szerzodo_levelcim IN mod_cim_rec_typ,
+                               p_engedmenyezett IN mod_ugyfel_rec_typ,
+                               p_engedmenyezett_cim IN mod_cim_rec_typ,
+                               p_engedmeny IN engedmeny_rec_typ,
+                               p_kotveny_gfb IN OUT NOCOPY kotveny_gfb_rec_typ,
+                               p_gepjarmu IN OUT gepjarmu_rec_typ,
+                               p_bonusz_elozmeny IN bonusz_elozmeny_rec_typ,
+--                               p_kedvezmenyek IN kedvezmeny_tab_typ,
+                               p_dump_args# IN VARCHAR2,
+                               p_szerz_azon OUT PLS_INTEGER,
+                               p_ajanlat_url OUT VARCHAR2,
+                               p_szamolt_dijtetelek OUT nevszam_tab_typ,
+
+                               p_evesdij OUT NUMBER,
+                               p_hibalista OUT hiba_tab_typ,
+                               p_hiba_kod OUT PLS_INTEGER,
+                               p_hiba_szov OUT VARCHAR2);
+
+END TST_oracall;`)
+
+	compile(t, cu, `CREATE OR REPLACE PACKAGE BODY TST_oracall AS
 PROCEDURE simple_char_in(txt IN VARCHAR2) IS
   v_txt VARCHAR2(1000) := SUBSTR(txt, 1, 100);
 BEGIN NULL; END simple_char_in;
@@ -220,11 +361,52 @@ BEGIN
   RETURN(s);
 END sum_nums;
 
-END TST_oracall;
-    `, nil, nil); err != nil {
-		t.Fatalf("error creating package body: %v", err)
+  PROCEDURE rec_sendPreOffer_31101(p_sessionid IN VARCHAR2,
+                               p_lang IN VARCHAR2,
+                               p_vegleges IN VARCHAR2 DEFAULT 'N',
+                               p_elso_csekk_atadva IN VARCHAR2 DEFAULT 'N',
+                               p_vonalkod IN OUT PLS_INTEGER,
+                               p_kotveny IN OUT kotveny_rec_typ,
+                               p_szerzodo IN mod_ugyfel_rec_typ,
+                               p_szerzodo_cim IN mod_cim_rec_typ,
+                               p_szerzodo_levelcim IN mod_cim_rec_typ,
+                               p_engedmenyezett IN mod_ugyfel_rec_typ,
+                               p_engedmenyezett_cim IN mod_cim_rec_typ,
+                               p_engedmeny IN engedmeny_rec_typ,
+                               p_kotveny_gfb IN OUT NOCOPY kotveny_gfb_rec_typ,
+                               p_gepjarmu IN OUT gepjarmu_rec_typ,
+                               p_bonusz_elozmeny IN bonusz_elozmeny_rec_typ,
+--                               p_kedvezmenyek IN kedvezmeny_tab_typ,
+                               p_dump_args# IN VARCHAR2,
+                               p_szerz_azon OUT PLS_INTEGER,
+                               p_ajanlat_url OUT VARCHAR2,
+                               p_szamolt_dijtetelek OUT nevszam_tab_typ,
+                               p_evesdij OUT NUMBER,
+                               p_hibalista OUT hiba_tab_typ,
+                               p_hiba_kod OUT PLS_INTEGER,
+                               p_hiba_szov OUT VARCHAR2) IS
+  BEGIN
+    p_hiba_kod := 0; p_hiba_szov := NULL;
+  END rec_sendPreOffer_31101;
+
+END TST_oracall;`)
+}
+
+func compile(t *testing.T, cu *oracle.Cursor, qry string) {
+	typ := "PACKAGE"
+	if strings.HasPrefix(qry, "CREATE OR REPLACE PACKAGE BODY") {
+		typ = typ + " BODY"
 	}
-	if err = cu.Execute("SELECT text FROM user_errors WHERE name = :1", []interface{}{"TST_ORACALL"}, nil); err != nil {
+	err := cu.Execute(qry, nil, nil)
+	if err != nil {
+		log.Println(qry)
+		t.Fatalf("error creating %s: %v", typ, err)
+	}
+
+	if err = cu.Execute(`SELECT line||'/'||position||': '||text
+          FROM user_errors WHERE type = :1 AND name = :2`,
+		[]interface{}{typ, "TST_ORACALL"}, nil); err != nil {
+
 		t.Fatalf("error querying errors: %v", err)
 	}
 	rows, err := cu.FetchAll()
@@ -232,6 +414,8 @@ END TST_oracall;
 		t.Fatalf("error fetching errors: %v", err)
 	}
 	if len(rows) > 0 {
+		fmt.Println(qry)
+		fmt.Println("/")
 		errTexts := make([]string, len(rows))
 		for i := range rows {
 			errTexts[i] = rows[i][0].(string)
@@ -239,6 +423,7 @@ END TST_oracall;
 		t.Fatalf("error with package: %s", strings.Join(errTexts, "\n"))
 	}
 }
+
 func runCommand(t *testing.T, prog string, args ...string) {
 	out, err := exec.Command(prog, args...).CombinedOutput()
 	if err != nil {
@@ -319,4 +504,15 @@ func getConnection(t *testing.T) oracle.Connection {
 		log.Panicf("error connecting: %s", err)
 	}
 	return conn
+}
+
+func jsonEqual(a, b string) bool {
+	var aI, bI interface{}
+	if err := json.Unmarshal([]byte(a), &aI); err != nil {
+		log.Panicf("error unmarshaling %s: %v", a, err)
+	}
+	if err := json.Unmarshal([]byte(b), &bI); err != nil {
+		log.Panicf("error unmarshaling %s: %v", b, err)
+	}
+	return reflect.DeepEqual(aI, bI)
 }

@@ -31,6 +31,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/tgulacsi/goracle/oracle"
 )
 
@@ -94,7 +95,8 @@ func main() {
 
 	// present the output as json
 	if err = json.NewEncoder(os.Stdout).Encode(out); err != nil {
-		log.Fatalf("error marshaling output: %s", err)
+		log.Fatalf("error marshaling output: %s\n%+v\n%s", err, out,
+			spew.Sdump(out))
 	}
 	os.Stdout.Close()
 }

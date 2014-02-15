@@ -161,6 +161,8 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 		} else {
 			arg.AbsType = "NUMBER"
 		}
+	case "PLS_INTEGER", "BINARY_INTEGER":
+		arg.AbsType = "INTEGER(10)"
 	default:
 		arg.AbsType = arg.Type
 	}
