@@ -30,7 +30,7 @@ fi
 if [ -n "$CSV" ] || echo "$dsn" | grep -q '@XE'; then
     ./oracall -F -logtostderr <${1:-testdata/db_web.getriskvagyondetails.csv}
 else
-    echo ./oracall -F -connect="$dsn" DB_WEB.%} >&2
+    echo ./oracall -F -connect="$dsn" ${1:-DB_WEB.%} >&2
     ./oracall -F -logtostderr -connect="$dsn" DB_WEB.%
 fi
 } >examples/db_web/generated_functions.go
@@ -40,4 +40,4 @@ echo '-----------------------------------------------'
 CMD='./db_web -connect='${dsn}" -login="$login" ${2:-DB_web.getriskvagyondetails}"
 echo "$CMD"
 #$CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":"A", "telep_kod":"C"},{"telep_azon":"z", "telep_kod":"x"}]}'
-time $CMD '{"p_lang":"hu", "p_sessionid": "123", "p_szerz_azon": 31047441}'
+time $CMD -login=$login '{"p_lang":"hu", "p_sessionid": "123", "p_szerz_azon": 31047441}'
