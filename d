@@ -40,4 +40,4 @@ echo '-----------------------------------------------'
 CMD='./db_web -connect='${dsn}" -login="$login" ${2:-DB_web.getriskvagyondetails}"
 echo "$CMD"
 #$CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":"A", "telep_kod":"C"},{"telep_azon":"z", "telep_kod":"x"}]}'
-time $CMD -login=$login '{"p_lang":"hu", "p_sessionid": "123", "p_szerz_azon": 31047441}'
+time $CMD '{"p_lang":"hu", "p_sessionid": "123", "p_szerz_azon": 31047441}'
