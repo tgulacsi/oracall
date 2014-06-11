@@ -258,6 +258,10 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 			glog.V(2).Infof("row %d: level=%d fun.Args: %s", row, level, fun.Args)
 			lastArgs = lastArgs[:level]
 			lastArg := lastArgs[level-1]
+			if lastArg == nil {
+				glog.Fatalf("row %d: level=%d fun.Args: %+v ua=%+v lastArg is nil!",
+					row, level, fun.Args, ua)
+			}
 			if lastArg.Flavor == FLAVOR_TABLE {
 				lastArg.TableOf = &arg
 			} else {
@@ -300,7 +304,8 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		fun.Args = args
 		functions = append(functions, fun)
 	}
-	glog.V(1).Infof("functions=%s", functions)
+	glog.V(1).Infof("found %d functions.", len(functions))
+	glog.V(2).Infof("functions=%s", functions)
 	return
 }
 

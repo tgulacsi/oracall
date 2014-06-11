@@ -50,15 +50,15 @@ func TestGenSimple(t *testing.T) {
 		{"simple_char_in", `{"txt": "abraka dabra"}`, `{}`},
 		{"simple_char_out", `{}`, `{"ret":"A"}`},
 		{"simple_num_in", `{"num": 33}`, `{}`},
-		{"simple_num_out", `{}`, `{"ret":0.6666666666666665}`},
+		{"simple_num_out", `{}`, `{"ret":0.6666666666666666}`},
 		{"simple_date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
 		{"simple_date_out", `{}`, `{"ret":"{{NOW}}"}`}, // 5.
 		{"simple_char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
 		{"simple_all_inout",
-			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+02:00"}`,
-			`{"txt2":"abraka#","int2":0,"num2":0.4333333333333333,"dt2":"0000-01-31T00:00:00+02:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
+			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
+			`{"txt2":"abraka#","int2":0,"num2":0.43333333333333335,"dt2":"0000-01-31T00:00:00+01:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
 		{"simple_nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
-		{"simple_sum_nums", `{"nums":[1,2,3.3]}`, `{"outnums":[2,4,6.6000000000000005],"ret":6.3}`},
+		{"simple_sum_nums", `{"nums":[1.1,2,3.3]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
 	} {
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
@@ -84,7 +84,8 @@ func TestGenRec(t *testing.T) {
 			`{"ret":"33;\"2006-08-26 00:00:00\";\"xxx\""}`},
 		{"rec_tab_in", `{"tab":[{"num":1,"text":"A","dt":"2006-08-26T00:00:00+01:00"},{"num":2,"text":"B"},{"num":3,"text":"C"}]}`,
 			`{"ret":"\n1;\"2006-08-26 00:00:00\";\"A\"\n2;\"0001-01-01 00:00:00\";\"B\"\n3;\"0001-01-01 00:00:00\";\"C\""}`},
-		{"rec_sendpreoffer_31101", `{"p_vonalkod":1}`, `{"p_vonalkod":1,"p_kotveny":{"szamlaszam":"","evfordulo_tipus":"","dijfizgyak":"","dijkod":"","e_komm_email":"","dijbekerot_ker":"","dijfizmod":""},"p_kotveny_gfb":{},"p_gepjarmu":{"uzjelleg":"","alvazszam":"","gyartmany":"","jelleg":"","rendszam":"","gyartev":"","tulajdon_visz":""},"p_ajanlat_url":"","p_hiba_kod":0,"p_hiba_szov":""}`},
+		{"rec_sendpreoffer_31101", `{"p_vonalkod":1}`,
+			`{"p_vonalkod":1,"p_kotveny":{"szerkot":"0001-01-01T00:00:00Z","halaszt_kockezd":"0001-01-01T00:00:00Z","halaszt_dijfiz":"0001-01-01T00:00:00Z","szamlaszam":"","szamla_limit":0,"e_komm_email":"","evfordulo":"0001-01-01T00:00:00Z","evfordulo_tipus":"","dijbekerot_ker":"","ajanlati_evesdij":0,"kockezd":"0001-01-01T00:00:00Z","btkezd":"0001-01-01T00:00:00Z","dijkod":"","dijfizmod":"","dijfizgyak":"","szerlejar":"0001-01-01T00:00:00Z"},"p_kotveny_gfb":{"bm_tipus":0,"kotes_oka":0},"p_gepjarmu":{"jelleg":"","rendszam":"","gyartev":"","tulajdon_visz":"","teljesitmeny":0,"ossztomeg":0,"ferohely":0,"uzjelleg":"","alvazszam":"","gyartmany":"","tulajdon_ido":"0001-01-01T00:00:00Z"},"p_szerz_azon":0,"p_ajanlat_url":"","p_evesdij":0,"p_hiba_kod":0,"p_hiba_szov":""}`},
 	} {
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
@@ -315,7 +316,7 @@ BEGIN
   v_idx := nums.FIRST;
   WHILE v_idx IS NOT NULL LOOP
     s := NVL(s, 0) + NVL(nums(v_idx), 0);
-    outnums(v_idx) := NVL(nums(v_idx), 0) * 2;
+    outnums(v_idx) := NVL(nums(v_idx), 0) + 1;
     v_idx := nums.NEXT(v_idx);
   END LOOP;
   RETURN(s);

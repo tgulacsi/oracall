@@ -20,10 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
-	"github.com/tgulacsi/goracle/oracle"
+	"github.com/golang/glog"
 )
 
 // MaxTableSize is the maximum size of the array arguments
@@ -32,6 +31,7 @@ const MaxTableSize = 1000
 //
 // OracleArgument
 //
+/*
 func oracleVarType(typ string) *oracle.VariableType {
 	switch typ {
 	case "BINARY_INTEGER", "PLS_INTEGER":
@@ -61,10 +61,11 @@ func oracleVarType(typ string) *oracle.VariableType {
 	case "BOOLEAN", "PL/SQL BOOLEAN":
 		return oracle.BooleanVarType
 	default:
-		log.Fatalf("oracleVarType: unknown variable type %q", typ)
+		glog.Fatalf("oracleVarType: unknown variable type %q", typ)
 	}
 	return nil
 }
+*/
 
 func oracleVarTypeName(typ string) string {
 	switch typ {
@@ -95,7 +96,7 @@ func oracleVarTypeName(typ string) string {
 	case "BOOLEAN", "PL/SQL BOOLEAN":
 		return "oracle.BooleanVarType"
 	default:
-		log.Fatalf("oracleVarTypeName: unknown variable type %q", typ)
+		glog.Fatalf("oracleVarTypeName: unknown variable type %q", typ)
 	}
 	return ""
 }
@@ -104,7 +105,7 @@ func oracleVarTypeName(typ string) string {
 func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
-		log.Fatalf("error preparing %s: %s", fun, err)
+		glog.Fatalf("error preparing %s: %s", fun, err)
 	}
 	fn := strings.Replace(fun.Name(), ".", "__", -1)
 	callBuf := bytes.NewBuffer(make([]byte, 0, 16384))
@@ -119,7 +120,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	}
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
-	log.Printf("i=%d j=%d call=\n%s", i, j, call)
+	glog.V(2).Infof("i=%d j=%d call=\n%s", i, j, call)
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%#v`, params) }"+`
     if err = cur.Execute(%s, nil, params); err != nil { return }
     `, call[i:j], fun.getPlsqlConstName())
@@ -155,7 +156,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
 	if fun.types == nil {
-		log.Printf("nil types of %s", fun)
+		glog.Infof("nil types of %s", fun)
 		fun.types = make(map[string]string, 4)
 	}
 	tableTypes := make(map[string]string, 4)
@@ -353,17 +354,17 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					}
 				}
 			default:
-				log.Fatalf("%s/%s: only table of simple or record types are allowed (no table of table!)", fun.Name(), arg.Name)
+				glog.Fatalf("%s/%s: only table of simple or record types are allowed (no table of table!)", fun.Name(), arg.Name)
 			}
 		default:
-			log.Fatalf("unkown flavor %q", arg.Flavor)
+			glog.Fatalf("unkown flavor %q", arg.Flavor)
 		}
 	}
 	callb := bytes.NewBuffer(nil)
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
 	}
-	log.Printf("callArgs=%s", callArgs)
+	glog.V(1).Infof("callArgs=%s", callArgs)
 	callb.WriteString(fun.Name() + "(")
 	for i, arg := range fun.Args {
 		if i > 0 {
@@ -395,20 +396,17 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
                     return
                 }`,
 				tableSize, oracleVarTypeName(arg.Type), arg.Charlength, arg.Type))
-		pTyp := got[1:]
-		switch pTyp {
-		case "float32":
-			pTyp = "float64"
-		case "int", "int32":
-			pTyp = "int64"
+		pTyp := got
+		if pTyp[0] == '*' {
+			pTyp = pTyp[1:]
 		}
 		var outConv string
 		if tableSize == 0 {
-			if pTyp == got[1:] {
+			if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s = &y`, name)
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s = &z`, got[1:], name)
+            output.%s = &z`, pTyp, name)
 			}
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
@@ -417,20 +415,16 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
                     err = fmt.Errorf("error getting value of %s: %%s", err)
                     return
                 } else if x != nil {
-                    y, ok := x.(%s)
-                    if !ok {
-                        err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
-                        return
-                    }
+					%s
                     %s
                 }}
-                `, paramName, paramName, name, pTyp, name, pTyp, outConv))
+                `, paramName, paramName, name, getOutConvTSwitch(name, pTyp), outConv))
 		} else {
-			if pTyp == got[1:] {
+			if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s[i] = &y`, name)
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s[i] = &z`, got[1:], name)
+            output.%s[i] = &z`, pTyp, name)
 			}
 			mk := ""
 			mk = fmt.Sprintf(`output.%s = output.%s[:cap(output.%s)]
@@ -446,11 +440,7 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
                         err = fmt.Errorf("error getting %%d. value into %s: %%s", i, err)
                         return
                     } else if x != nil {
-                        y, ok := x.(%s)
-                        if !ok {
-                            err = fmt.Errorf("out parameter %s has bad type: awaited %s, got %%T", x)
-                            return
-                        }
+						%s
                         %s
                     }
                 }
@@ -458,7 +448,7 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
             `, paramName, paramName,
 					mk,
 					name,
-					pTyp, name, pTyp, outConv))
+					getOutConvTSwitch(name, pTyp), outConv))
 		}
 		if arg.IsInput() {
 			if tableSize == 0 {
@@ -547,6 +537,49 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 	return convIn, convOut
 }
 
+func getOutConvTSwitch(name, pTyp string) string {
+	parse := ""
+	if strings.HasPrefix(pTyp, "int") {
+		bits := "32"
+		if len(pTyp) == 5 {
+			bits = pTyp[3:5]
+		}
+		parse = "ParseInt(xi, 10, " + bits + ")"
+	} else if strings.HasPrefix(pTyp, "float") {
+		bits := pTyp[5:7]
+		parse = "ParseFloat(xi, " + bits + ")"
+	}
+	if parse != "" {
+		return fmt.Sprintf(`
+			var y `+pTyp+`
+			err = nil
+			switch xi := x.(type) {
+				case int: y = `+pTyp+`(xi)
+				case int8: y = `+pTyp+`(xi)
+				case int16: y = `+pTyp+`(xi)
+				case int32: y = `+pTyp+`(xi)
+				case int64: y = `+pTyp+`(xi)
+				case float32: y = `+pTyp+`(xi)
+				case float64: y = `+pTyp+`(xi)
+				case string:
+					//log.Printf("converting %%q to `+pTyp+`", xi)
+					z, e := strconv.`+parse+`
+					y, err = `+pTyp+`(z), e
+				default:
+					err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
+			}
+			if err != nil {
+				return
+			}`, name, pTyp)
+	}
+	return fmt.Sprintf(`
+				y, ok := x.(%s)
+				if !ok {
+					err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
+					return
+				}`, pTyp, name, pTyp)
+}
+
 func (arg Argument) getConvRec(convIn, convOut []string,
 	types map[string]string, name, paramName string, tableSize uint,
 	parentArg *Argument, key string) ([]string, []string) {
@@ -564,20 +597,17 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                     return
                 }`,
 				tableSize, oracleVarTypeName(arg.Type), arg.Charlength, arg.Type))
-		pTyp := got[1:]
-		switch pTyp {
-		case "float32":
-			pTyp = "float64"
-		case "int", "int32":
-			pTyp = "int64"
+		pTyp := got
+		if pTyp[0] == '*' {
+			pTyp = pTyp[1:]
 		}
 		var outConv string
 		if tableSize == 0 {
-			if pTyp == got[1:] {
+			if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s = &y`, name)
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s = &z`, got[1:], name)
+            output.%s = &z`, pTyp, name)
 			}
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
@@ -586,20 +616,16 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                     err = fmt.Errorf("error getting value of %s: %%s", err)
                     return
                 } else if x != nil {
-                    y, ok := x.(%s)
-                    if !ok {
-                        err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
-                        return
-                    }
+					%s
                     %s
                 }}
-                `, paramName, paramName, name, pTyp, name, pTyp, outConv))
+                `, paramName, paramName, name, getOutConvTSwitch(name, pTyp), outConv))
 		} else {
-			if pTyp == got[1:] {
+			if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s[i].%s = &y`, name, capitalize(key))
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s[i].%s = &z`, got[1:], name, capitalize(key))
+            output.%s[i].%s = &z`, pTyp, name, capitalize(key))
 			}
 			convOut = append(convOut,
 				fmt.Sprintf(`if params["%s"] != nil {
@@ -609,18 +635,14 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                         err = fmt.Errorf("error getting %%d. value into %s%s: %%s", i, err)
                         return
                     } else if x != nil {
-                        y, ok := x.(%s)
-                        if !ok {
-                            err = fmt.Errorf("out parameter %s has bad type: awaited %s, got %%T", x)
-                            return
-                        }
+						%s
                         %s
                     }
                 }
             }
             `, paramName, paramName,
 					name, key,
-					pTyp, name, pTyp, outConv))
+					getOutConvTSwitch(name, pTyp), outConv))
 		}
 		if arg.IsInput() {
 			if tableSize == 0 {

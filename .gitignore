@@ -2,4 +2,6 @@
 .dsn
 minimal
 oracall
+integration_test
+db_web
 function.py

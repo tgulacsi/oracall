@@ -139,7 +139,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 		if arg.TypeName == "" {
 			arg.TypeName = arg.Name
 		}
-	case "TABLE", "PL/SQL TABLE":
+	case "TABLE", "PL/SQL TABLE", "REF CURSOR":
 		arg.Flavor = FLAVOR_TABLE
 	}
 

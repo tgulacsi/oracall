@@ -40,6 +40,8 @@ import (
     "errors"
     "log"
     "fmt"
+	"strings"
+	"strconv"
     "time"    // for datetimes
 
     "github.com/tgulacsi/goracle/oracle"    // Oracle
@@ -47,8 +49,11 @@ import (
 
 var DebugLevel = uint(0)
 
+// against "unused import" error
 var _ time.Time
 var _ oracle.Cursor
+var _ strconv.NumError
+var _ strings.Reader
 var _ = errors.New
 
 // FunctionCaller is a function which calls the stored procedure with
@@ -194,6 +199,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		return err
 	}
 
+	glog.V(1).Infof("function %#v", f)
 	for _, arg := range args {
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types)
