@@ -304,6 +304,9 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 	}
 	if fun.name != "" {
 		fun.Args = args
+		if fun.Returns != nil {
+			glog.V(2).Infof("%s returns: %#v", fun.name, *fun.Returns)
+		}
 		functions = append(functions, fun)
 	}
 	glog.V(1).Infof("found %d functions.", len(functions))

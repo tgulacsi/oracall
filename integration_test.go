@@ -484,9 +484,9 @@ func init() {
 	flag.Parse()
 }
 
-var conn oracle.Connection
+var conn *oracle.Connection
 
-func getConnection(t *testing.T) oracle.Connection {
+func getConnection(t *testing.T) *oracle.Connection {
 	if conn.IsConnected() {
 		return conn
 	}

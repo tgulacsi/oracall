@@ -88,7 +88,7 @@ func main() {
 		log.Fatalf("error connecting: %s", err)
 	}
 	defer conn.Close()
-	cur := oracle.NewCursor(&conn)
+	cur := oracle.NewCursor(conn)
 	defer cur.Close()
 
 	oracle.BypassMultipleArgs = *flagBypassMultipleArgs

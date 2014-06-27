@@ -418,7 +418,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		typName = strings.Join(chunks[1:], "__") + "__" + chunks[0]
 	}
 	typName = capitalize(typName)
-	if _, ok := typedefs[typName]; ok {
+	if td := typedefs[typName]; td != "" {
 		return "*" + typName
 	}
 	if arg.Flavor == FLAVOR_TABLE {
