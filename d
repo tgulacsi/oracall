@@ -28,10 +28,10 @@ fi
 
 {
 if [ -n "$CSV" ] || echo "$dsn" | grep -q '@XE'; then
-    ./oracall -F <${1:-testdata/db_web.getriskvagyondetails.csv}
+    ./oracall -F -logtostderr <${1:-testdata/db_web.getriskvagyondetails.csv}
 else
     echo ./oracall -F -connect="$dsn" DB_WEB.%} >&2
-    ./oracall -F -alsologtostderr -v=$v -connect="$dsn" DB_WEB.%
+    ./oracall -F -logtostderr -connect="$dsn" DB_WEB.%
 fi
 } >examples/db_web/generated_functions.go
 go build ./examples/db_web

@@ -126,6 +126,9 @@ var InputFactories = make(map[string](func() Unmarshaler), %d)
 				fun.Name(), inpstruct))
 	}
 	for tn, text := range types {
+		if tn[0] == '+' { // REF CURSOR skip
+			continue
+		}
 		if b, err = format.Source([]byte(text)); err != nil {
 			return fmt.Errorf("error saving type %s: %s\n%s", tn, err, text)
 		}
@@ -408,8 +411,25 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	}
 	if arg.Flavor == FLAVOR_TABLE {
 		glog.Infof("arg=%s tof=%s", arg, arg.TableOf)
-		return "[]" + arg.TableOf.goType(typedefs)
+		tn := "[]" + arg.TableOf.goType(typedefs)
+		if arg.Type != "REF CURSOR" {
+			return tn
+		}
+		cn := tn[2:] + "__cur"
+		if cn[0] == '*' {
+			cn = cn[1:]
+		}
+		if _, ok := typedefs[cn]; !ok {
+			var buf bytes.Buffer
+			buf.WriteString("\ntype " + cn + " struct { *oracle.Cursor }\n")
+			buf.WriteString("func New" + cn + "(cur *oracle.Cursor) (" + cn + ", error) {\n return " + cn + "{cur}, nil\n }")
+			typedefs[cn] = buf.String()
+		}
+		//typedefs["+"+arg.TableOf.Name] = "REF CURSOR"
+		return cn
 	}
+
+	// FLAVOR_RECORD
 	buf := bytes.NewBuffer(make([]byte, 0, 256))
 	if arg.TypeName == "" {
 		glog.Warningf("arg has no TypeName: %#v\n%s", arg, arg)
@@ -424,6 +444,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 			" xml:\"" + lName + ",omitempty\"`\t\n")
 	}
 	buf.WriteString("}\n")
+
 	typedefs[typName] = buf.String()
 	return "*" + typName
 }

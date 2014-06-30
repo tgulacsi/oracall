@@ -201,7 +201,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	for _, arg := range args {
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
-			callArgs[arg.Name] = ":" + arg.Name
 			name := capitalize(goName(arg.Name))
 			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, arg.Name, 0)
 
@@ -229,132 +228,140 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					0, &arg, k)
 			}
 		case FLAVOR_TABLE:
-			switch arg.TableOf.Flavor {
-			case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
-				typ = getTableType(arg.TableOf.AbsType)
-				setvar := ""
+			if arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
-					setvar = " := :" + arg.Name
-				}
-				decls = append(decls, arg.Name+" "+typ+setvar+";")
-
-				vn = getInnerVarName(fun.Name(), arg.Name)
-				callArgs[arg.Name] = vn
-				decls = append(decls, vn+" "+arg.TypeName+";")
-				if arg.IsInput() {
-					pre = append(pre,
-						vn+".DELETE;",
-						"i1 := "+arg.Name+".FIRST;",
-						"WHILE i1 IS NOT NULL LOOP",
-						"  "+vn+"(i1) := "+arg.Name+"(i1);",
-						"  i1 := "+arg.Name+".NEXT(i1);",
-						"END LOOP;")
-				}
-				if arg.IsOutput() {
-					post = append(post,
-						arg.Name+".DELETE;",
-						"i1 := "+vn+".FIRST;",
-						"WHILE i1 IS NOT NULL LOOP",
-						"  "+arg.Name+"(i1) := "+vn+"(i1);",
-						"  i1 := "+vn+".NEXT(i1);",
-						"END LOOP;",
-						":"+arg.Name+" := "+arg.Name+";")
+					glog.Fatalf("cannot use IN cursor variables (%s)", arg)
 				}
 				name := capitalize(goName(arg.Name))
-				convIn, convOut = arg.TableOf.getConvSimple(convIn, convOut,
-					fun.types, name, arg.Name, MaxTableSize)
-
-			case FLAVOR_RECORD:
-				vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
-				callArgs[arg.Name] = vn
-				decls = append(decls, vn+" "+arg.TypeName+";")
-
-				//log.Printf("arg.Name=%q arg.TableOf.Name=%q arg.TableOf.RecordOf=%#v",
-				//arg.Name, arg.TableOf.Name, arg.TableOf.RecordOf)
-				aname := capitalize(goName(arg.Name))
-				if arg.IsOutput() {
-					convOut = append(convOut, fmt.Sprintf(`
-                    if output.%s == nil {
-                        output.%s = make([]%s, 0, %d)
-                    }`, aname, aname, arg.TableOf.goType(fun.types), MaxTableSize))
-				}
-				/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
-				if arg.IsOutput() {
-					// DELETE out tables
-					for k := range arg.TableOf.RecordOf {
-						post = append(post,
-							":"+getParamName(fun.Name(), vn+"."+k)+".DELETE;")
-					}
-				}
-				*/
-				if !arg.IsInput() {
-					pre = append(pre, vn+".DELETE;")
-				}
-
-				// declarations go first
-				for k, v := range arg.TableOf.RecordOf {
-					typ = getTableType(v.AbsType)
-					decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+";")
-
-					tmp = getParamName(fun.Name(), vn+"."+k)
+				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, arg.Name, 0)
+			} else {
+				switch arg.TableOf.Flavor {
+				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
+					typ = getTableType(arg.TableOf.AbsType)
+					setvar := ""
 					if arg.IsInput() {
-						pre = append(pre, tmp+" := :"+tmp+";")
-					} else {
-						pre = append(pre, tmp+".DELETE;")
+						setvar = " := :" + arg.Name
 					}
-				}
+					decls = append(decls, arg.Name+" "+typ+setvar+";")
 
-				// here comes the loops
-				var idxvar string
-				for k, v := range arg.TableOf.RecordOf {
-					typ = getTableType(v.AbsType)
-
-					tmp = getParamName(fun.Name(), vn+"."+k)
-
-					if idxvar == "" {
-						idxvar = getParamName(fun.Name(), vn+"."+k)
-						if arg.IsInput() {
-							pre = append(pre, "",
-								"i1 := "+idxvar+".FIRST;",
-								"WHILE i1 IS NOT NULL LOOP")
-						}
-						if arg.IsOutput() {
-							post = append(post, "",
-								"i1 := "+vn+".FIRST; i2 := 1;",
-								"WHILE i1 IS NOT NULL LOOP")
-						}
-					}
-					//name := aname + "." + capitalize(goName(k))
-
-					convIn, convOut = v.getConvRec(
-						convIn, convOut, fun.types, aname, tmp, MaxTableSize,
-						arg.TableOf, k)
-
+					vn = getInnerVarName(fun.Name(), arg.Name)
+					callArgs[arg.Name] = vn
+					decls = append(decls, vn+" "+arg.TypeName+";")
 					if arg.IsInput() {
 						pre = append(pre,
-							"  "+vn+"(i1)."+k+" := "+tmp+"(i1);")
+							vn+".DELETE;",
+							"i1 := "+arg.Name+".FIRST;",
+							"WHILE i1 IS NOT NULL LOOP",
+							"  "+vn+"(i1) := "+arg.Name+"(i1);",
+							"  i1 := "+arg.Name+".NEXT(i1);",
+							"END LOOP;")
 					}
 					if arg.IsOutput() {
 						post = append(post,
-							"  "+tmp+"(i2) := "+vn+"(i1)."+k+";")
+							arg.Name+".DELETE;",
+							"i1 := "+vn+".FIRST;",
+							"WHILE i1 IS NOT NULL LOOP",
+							"  "+arg.Name+"(i1) := "+vn+"(i1);",
+							"  i1 := "+vn+".NEXT(i1);",
+							"END LOOP;",
+							":"+arg.Name+" := "+arg.Name+";")
 					}
-				}
-				if arg.IsInput() {
-					pre = append(pre,
-						"  i1 := "+idxvar+".NEXT(i1);",
-						"END LOOP;")
-				}
-				if arg.IsOutput() {
-					post = append(post,
-						"  i1 := "+vn+".NEXT(i1); i2 := i2 + 1;",
-						"END LOOP;")
-					for k := range arg.TableOf.RecordOf {
+					name := capitalize(goName(arg.Name))
+					convIn, convOut = arg.TableOf.getConvSimple(convIn, convOut,
+						fun.types, name, arg.Name, MaxTableSize)
+
+				case FLAVOR_RECORD:
+					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
+					callArgs[arg.Name] = vn
+					decls = append(decls, vn+" "+arg.TypeName+";")
+
+					//log.Printf("arg.Name=%q arg.TableOf.Name=%q arg.TableOf.RecordOf=%#v",
+					//arg.Name, arg.TableOf.Name, arg.TableOf.RecordOf)
+					aname := capitalize(goName(arg.Name))
+					if arg.IsOutput() {
+						convOut = append(convOut, fmt.Sprintf(`
+                    if output.%s == nil {
+                        output.%s = make([]%s, 0, %d)
+                    }`, aname, aname, arg.TableOf.goType(fun.types), MaxTableSize))
+					}
+					/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
+					if arg.IsOutput() {
+						// DELETE out tables
+						for k := range arg.TableOf.RecordOf {
+							post = append(post,
+								":"+getParamName(fun.Name(), vn+"."+k)+".DELETE;")
+						}
+					}
+					*/
+					if !arg.IsInput() {
+						pre = append(pre, vn+".DELETE;")
+					}
+
+					// declarations go first
+					for k, v := range arg.TableOf.RecordOf {
+						typ = getTableType(v.AbsType)
+						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+";")
+
 						tmp = getParamName(fun.Name(), vn+"."+k)
-						post = append(post, ":"+tmp+" := "+tmp+";")
+						if arg.IsInput() {
+							pre = append(pre, tmp+" := :"+tmp+";")
+						} else {
+							pre = append(pre, tmp+".DELETE;")
+						}
 					}
+
+					// here comes the loops
+					var idxvar string
+					for k, v := range arg.TableOf.RecordOf {
+						typ = getTableType(v.AbsType)
+
+						tmp = getParamName(fun.Name(), vn+"."+k)
+
+						if idxvar == "" {
+							idxvar = getParamName(fun.Name(), vn+"."+k)
+							if arg.IsInput() {
+								pre = append(pre, "",
+									"i1 := "+idxvar+".FIRST;",
+									"WHILE i1 IS NOT NULL LOOP")
+							}
+							if arg.IsOutput() {
+								post = append(post, "",
+									"i1 := "+vn+".FIRST; i2 := 1;",
+									"WHILE i1 IS NOT NULL LOOP")
+							}
+						}
+						//name := aname + "." + capitalize(goName(k))
+
+						convIn, convOut = v.getConvRec(
+							convIn, convOut, fun.types, aname, tmp, MaxTableSize,
+							arg.TableOf, k)
+
+						if arg.IsInput() {
+							pre = append(pre,
+								"  "+vn+"(i1)."+k+" := "+tmp+"(i1);")
+						}
+						if arg.IsOutput() {
+							post = append(post,
+								"  "+tmp+"(i2) := "+vn+"(i1)."+k+";")
+						}
+					}
+					if arg.IsInput() {
+						pre = append(pre,
+							"  i1 := "+idxvar+".NEXT(i1);",
+							"END LOOP;")
+					}
+					if arg.IsOutput() {
+						post = append(post,
+							"  i1 := "+vn+".NEXT(i1); i2 := i2 + 1;",
+							"END LOOP;")
+						for k := range arg.TableOf.RecordOf {
+							tmp = getParamName(fun.Name(), vn+"."+k)
+							post = append(post, ":"+tmp+" := "+tmp+";")
+						}
+					}
+				default:
+					glog.Fatalf("%s/%s: only table of simple or record types are allowed (no table of table!)", fun.Name(), arg.Name)
 				}
-			default:
-				glog.Fatalf("%s/%s: only table of simple or record types are allowed (no table of table!)", fun.Name(), arg.Name)
 			}
 		default:
 			glog.Fatalf("unkown flavor %q", arg.Flavor)
@@ -402,7 +409,12 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 		}
 		var outConv string
 		if tableSize == 0 {
-			if got[0] != '*' {
+			if strings.HasSuffix(got, "__cur") {
+				outConv = fmt.Sprintf(`output.%s = %s{y}`, name, got)
+				if arg.Type == "REF CURSOR" {
+					pTyp = "*oracle.Cursor"
+				}
+			} else if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s = &y`, name)
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)

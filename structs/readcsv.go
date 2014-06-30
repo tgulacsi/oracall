@@ -247,6 +247,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		// 2. RECORD at level 0
 		// 3. TABLE OF simple
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
+		glog.V(1).Infof("level=%d arg=%+v", level, arg)
 		if level == 0 {
 			if len(args) == 0 && arg.Name == "" {
 				arg.Name = "ret"
@@ -262,6 +263,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 				glog.Fatalf("row %d: level=%d fun.Args: %+v ua=%+v lastArg is nil!",
 					row, level, fun.Args, ua)
 			}
+			glog.V(2).Infof("lastArg: %+v Flavor: %s", lastArg.Flavor)
 			if lastArg.Flavor == FLAVOR_TABLE {
 				lastArg.TableOf = &arg
 			} else {
