@@ -22,12 +22,14 @@ import (
 	"go/format"
 	"io"
 	"log"
+	"errors"
 	"strings"
 
 	"github.com/golang/glog"
 )
 
 var _ = glog.Infof
+var ErrMissingTableOf = errors.New("missing TableOf info")
 
 func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatting bool) error {
 	var err error
@@ -76,10 +78,15 @@ var InputFactories = make(map[string](func() Unmarshaler), %d)
 	types := make(map[string]string, 16)
 	inits := make([]string, 0, len(functions))
 	var b []byte
+	FunLoop:
 	for _, fun := range functions {
 		fun.types = types
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(dst, dir); err != nil {
+				if err == ErrMissingTableOf {
+					glog.Warningf("%s: %v", fun.Name, err)
+					continue FunLoop
+				}
 				return err
 			}
 		}
@@ -204,6 +211,9 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 
 	glog.V(1).Infof("function %#v", f)
 	for _, arg := range args {
+		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
+			return ErrMissingTableOf
+		}
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types)
 		lName := strings.ToLower(arg.Name)
@@ -392,6 +402,8 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 			return "*oracle.Cursor"
 		case "CLOB", "BLOB":
 			return "*oracle.ExternalLobVar"
+		case "ROWID":
+			return "*string"
 		default:
 			log.Fatalf("unknown simple type %s (%s)", arg.Type, arg)
 		}
