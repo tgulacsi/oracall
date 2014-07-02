@@ -44,10 +44,6 @@ var (
 	flagSkipLogout = flag.Bool("skip-logout", false, "skip log out at the end")
 )
 
-type Sessioner interface {
-	SetSessionID(string)
-}
-
 func main() {
 	flag.Parse()
 	if flag.NArg() < 1 {
@@ -159,6 +155,13 @@ func logout(cur *oracle.Cursor, sessionID string) error {
 
 func StructSet(st interface{}, key string, value interface{}) error {
 	v := reflect.ValueOf(st)
-	v.FieldByName(key).Set(reflect.ValueOf(value))
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	fv :=	v.FieldByName(key)
+	if fv.Kind() == reflect.Ptr {
+		fv = fv.Elem()
+	}
+		fv.Set(reflect.ValueOf(value))
 	return nil
 }
