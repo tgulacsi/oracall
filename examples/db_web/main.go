@@ -27,6 +27,7 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
+	"reflect"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -42,6 +43,10 @@ var (
 	flagLogin      = flag.String("login", "", "username/password to call DB_web.login with")
 	flagSkipLogout = flag.Bool("skip-logout", false, "skip log out at the end")
 )
+
+type Sessioner interface {
+	SetSessionID(string)
+}
 
 func main() {
 	flag.Parse()
@@ -99,6 +104,11 @@ func main() {
 	if err = inp.FromJSON(input); err != nil {
 		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
 	}
+
+	if err = StructSet(inp, "P_sessionid", sessionid); err != nil {
+		log.Fatalf("error setting sessionid on %v: %v", inp, err)
+	}
+
 	b, err := xml.Marshal(inp)
 	if err != nil {
 		log.Fatalf("error marshaling %v to xml: %s", inp, err)
@@ -145,4 +155,10 @@ func logout(cur *oracle.Cursor, sessionID string) error {
 		P_sessionid: &sessionID,
 	})
 	return err
+}
+
+func StructSet(st interface{}, key string, value interface{}) error {
+	v := reflect.ValueOf(st)
+	v.FieldByName(key).Set(reflect.ValueOf(value))
+	return nil
 }

@@ -69,6 +69,10 @@ type Unmarshaler interface {
     FromJSON([]byte) error
 }
 
+type Setter interface {
+	Set(key string, value string) error
+}
+
 // InputFactories is the map of function name -> input factory
 var InputFactories = make(map[string](func() Unmarshaler), %d)
 `, len(functions), len(functions)); err != nil {
