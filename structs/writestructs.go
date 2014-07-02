@@ -391,7 +391,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2":
-			return "*string"
+			return "string"  // NULL is the same as the empty string for Oracle
 		case "NUMBER":
 			return "*float64"
 		case "INTEGER":

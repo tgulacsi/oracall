@@ -112,7 +112,7 @@ func main() {
 	log.Printf("input marshaled to xml: %s", b)
 
 	DebugLevel = 1
-	log.Printf("calling %s(%#v)", funName, inp)
+	log.Printf("calling %s(%s)", funName, inp)
 
 	// call the function
 	out, err := fun(cur, inp)
@@ -135,20 +135,20 @@ func main() {
 func login(cur *oracle.Cursor, username, password string) (string, error) {
 	lang, addr := "hu", "127.0.0.1"
 	out, err := Functions["DB_web.login"](cur, Db_web__login__input{
-		P_login_nev: &username,
-		P_jelszo:    &password,
-		P_lang:      &lang,
-		P_addr匿:     &addr,
+		P_login_nev: username,
+		P_jelszo:    password,
+		P_lang:      lang,
+		P_addr匿:     addr,
 	})
 	if err != nil {
 		return "", fmt.Errorf("DB_web.login: %v", err)
 	}
-	return *(out.(Db_web__login__output).P_sessionid), nil
+	return (out.(Db_web__login__output).P_sessionid), nil
 }
 
 func logout(cur *oracle.Cursor, sessionID string) error {
 	_, err := Functions["DB_web.logout"](cur, Db_web__logout__input{
-		P_sessionid: &sessionID,
+		P_sessionid: sessionID,
 	})
 	return err
 }

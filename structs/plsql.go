@@ -67,6 +67,8 @@ func oracleVarType(typ string) *oracle.VariableType {
 }
 */
 
+var stringTypes = make(map[string]struct{}, 16)
+
 func oracleVarTypeName(typ string) string {
 	switch typ {
 	case "BINARY_INTEGER", "PLS_INTEGER":
@@ -396,6 +398,10 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 		preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
 		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
 	}
+	nilS, deRef := `nil`, "*"
+	if got == "string" {
+		nilS, deRef = `""`, ""
+	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
 			fmt.Sprintf(`if v, err = cur.NewVariable(%d, %s, %d); err != nil {
@@ -414,6 +420,8 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 				if arg.Type == "REF CURSOR" {
 					pTyp = "*oracle.Cursor"
 				}
+			} else if got == "string" {
+				outConv = fmt.Sprintf(`output.%s = y`, name)
 			} else if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s = &y`, name)
 			} else {
@@ -426,13 +434,15 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
                 if err = v.GetValueInto(&x, 0); err != nil {
                     err = fmt.Errorf("error getting value of %s: %%s", err)
                     return
-                } else if x != nil {
+                } else if x != `+nilS+` {
 					%s
                     %s
                 }}
                 `, paramName, paramName, name, getOutConvTSwitch(name, pTyp), outConv))
 		} else {
-			if got[0] != '*' {
+			if got == "string" {
+				outConv = fmt.Sprintf(`output.%s[i] = y`, name)
+			} else if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s[i] = &y`, name)
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)
@@ -451,7 +461,7 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
                     if err = v.GetValueInto(&x, uint(i)); err != nil {
                         err = fmt.Errorf("error getting %%d. value into %s: %%s", i, err)
                         return
-                    } else if x != nil {
+                    } else if x != `+nilS+` {
 						%s
                         %s
                     }
@@ -468,8 +478,8 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 					convIn = append(convIn, preconcept2)
 				}
 				convIn = append(convIn,
-					fmt.Sprintf(`if input.%s != nil {
-                            if err = v.SetValue(0, *input.%s); err != nil {
+					fmt.Sprintf(`if input.%s != `+nilS+` {
+                            if err = v.SetValue(0, `+deRef+`input.%s); err != nil {
                                 err = fmt.Errorf("error setting value %%v from %s: %%s", v, err)
                                 return
                             }
@@ -500,8 +510,8 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 				convIn = append(convIn, preconcept2)
 			}
 			convIn = append(convIn,
-				fmt.Sprintf(`if input.%s != nil {
-                        v, err = cur.NewVar(*input.%s)
+				fmt.Sprintf(`if input.%s != `+nilS+` {
+                        v, err = cur.NewVar(`+deRef+`input.%s)
                     } else {
                         v, err = cur.NewVariable(%d, %s, %d)
                     }
@@ -529,7 +539,7 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
                 } else {
                     a = make([]%s, len(input.%s))
                     for i, x := range input.%s {
-                        if x != nil { a[i] = *x }
+                        if x != `+nilS+` { a[i] = `+deRef+`x }
                     }
                 }
                 if v, err = cur.NewVar(a); err != nil {
@@ -598,9 +608,13 @@ func (arg Argument) getConvRec(convIn, convOut []string,
 
 	got := arg.goType(types)
 	preconcept, preconcept2 := "", ""
-	if strings.Count(name, ".") >= 1 {
+	if strings.Count(name, ".") >= 1 && parentArg != nil {
 		preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
 		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
+	}
+	nilS, deRef := `nil`, "*"
+	if arg.goType(types) == "string" {
+		nilS, deRef = `""`, ""
 	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
@@ -615,7 +629,9 @@ func (arg Argument) getConvRec(convIn, convOut []string,
 		}
 		var outConv string
 		if tableSize == 0 {
-			if got[0] != '*' {
+			if got == "string" {
+				outConv = fmt.Sprintf(`output.%s = y`, name)
+			} else if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s = &y`, name)
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)
@@ -627,13 +643,15 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                 if err = v.GetValueInto(&x, 0); err != nil {
                     err = fmt.Errorf("error getting value of %s: %%s", err)
                     return
-                } else if x != nil {
+                } else if x != `+nilS+` {
 					%s
                     %s
                 }}
                 `, paramName, paramName, name, getOutConvTSwitch(name, pTyp), outConv))
 		} else {
-			if got[0] != '*' {
+			if got == "string" {
+				outConv = fmt.Sprintf(`output.%s[i].%s = y`, name, capitalize(key))
+			} else if got[0] != '*' {
 				outConv = fmt.Sprintf(`output.%s[i].%s = &y`, name, capitalize(key))
 			} else {
 				outConv = fmt.Sprintf(`z := %s(y)
@@ -646,7 +664,7 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                     if err = v.GetValueInto(&x, uint(i)); err != nil {
                         err = fmt.Errorf("error getting %%d. value into %s%s: %%s", i, err)
                         return
-                    } else if x != nil {
+                    } else if x != `+nilS+` {
 						%s
                         %s
                     }
@@ -662,8 +680,8 @@ func (arg Argument) getConvRec(convIn, convOut []string,
 					convIn = append(convIn, preconcept2)
 				}
 				convIn = append(convIn,
-					fmt.Sprintf(`if input.%s != nil {
-                        if err = v.SetValue(0, *input.%s); err != nil {
+					fmt.Sprintf(`if input.%s != `+nilS+` {
+                        if err = v.SetValue(0, `+deRef+`input.%s); err != nil {
                             err = fmt.Errorf("error setting value %%v from %s: %%s", v, err)
                             return
                         }
@@ -694,8 +712,8 @@ func (arg Argument) getConvRec(convIn, convOut []string,
 				convIn = append(convIn, preconcept2)
 			}
 			convIn = append(convIn,
-				fmt.Sprintf(`if input.%s != nil {
-                        v, err = cur.NewVar(*input.%s)
+				fmt.Sprintf(`if input.%s != `+nilS+` {
+                        v, err = cur.NewVar(`+deRef+`input.%s)
                     } else {
                         v, err = cur.NewVariable(%d, %s, %d)
                     }
@@ -723,7 +741,7 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                 } else {
                     a = make([]%s, len(input.%s))
                     for i, x := range input.%s {
-                        if x != nil && x.%s != nil { a[i] = *(x.%s) }
+                        if x != nil && x.%s != `+nilS+` { a[i] = `+deRef+`(x.%s) }
                     }
                 }
                 if v, err = cur.NewVar(a); err != nil {
