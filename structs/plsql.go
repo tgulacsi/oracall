@@ -678,7 +678,7 @@ func (arg Argument) getConvRec(convIn, convOut []string,
 				}
 				convIn = append(convIn,
 					fmt.Sprintf(`for i, x := range input.%s {
-                        if err = v.SetValue(uint(i), x%s); err != nil {
+                        if err = v.SetValue(uint(i), x.%s); err != nil {
                             err = fmt.Errorf("error setting value %%v[%%d] from %s%s: %%s", v, i, err)
                             return
                         }
