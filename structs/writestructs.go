@@ -88,7 +88,7 @@ var InputFactories = make(map[string](func() Unmarshaler), %d)
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(dst, dir); err != nil {
 				if err == ErrMissingTableOf {
-					glog.Warningf("%s: %v", fun.Name, err)
+					glog.Warningf("SKIP function, missing TableOf info (%s)", fun.Name)
 					continue FunLoop
 				}
 				return err

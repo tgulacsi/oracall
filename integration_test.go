@@ -21,16 +21,18 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
-	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/kylelemons/godebug/diff"
 	"github.com/tgulacsi/goracle/oracle"
 )
 
@@ -85,14 +87,14 @@ func TestGenRec(t *testing.T) {
 		{"rec_tab_in", `{"tab":[{"num":1,"text":"A","dt":"2006-08-26T00:00:00+01:00"},{"num":2,"text":"B"},{"num":3,"text":"C"}]}`,
 			`{"ret":"\n1;\"2006-08-26 00:00:00\";\"A\"\n2;\"0001-01-01 00:00:00\";\"B\"\n3;\"0001-01-01 00:00:00\";\"C\""}`},
 		{"rec_sendpreoffer_31101", `{"p_vonalkod":1}`,
-			`{"p_vonalkod":1,"p_kotveny":{"szerkot":"0001-01-01T00:00:00Z","halaszt_kockezd":"0001-01-01T00:00:00Z","halaszt_dijfiz":"0001-01-01T00:00:00Z","szamlaszam":"","szamla_limit":0,"e_komm_email":"","evfordulo":"0001-01-01T00:00:00Z","evfordulo_tipus":"","dijbekerot_ker":"","ajanlati_evesdij":0,"kockezd":"0001-01-01T00:00:00Z","btkezd":"0001-01-01T00:00:00Z","dijkod":"","dijfizmod":"","dijfizgyak":"","szerlejar":"0001-01-01T00:00:00Z"},"p_kotveny_gfb":{"bm_tipus":0,"kotes_oka":0},"p_gepjarmu":{"jelleg":"","rendszam":"","gyartev":"","tulajdon_visz":"","teljesitmeny":0,"ossztomeg":0,"ferohely":0,"uzjelleg":"","alvazszam":"","gyartmany":"","tulajdon_ido":"0001-01-01T00:00:00Z"},"p_szerz_azon":0,"p_ajanlat_url":"","p_evesdij":0,"p_hiba_kod":0,"p_hiba_szov":""}`},
+			`{"p_vonalkod":1,"p_kotveny":{"szerkot":"0001-01-01T00:00:00Z","halaszt_kockezd":"0001-01-01T00:00:00Z","halaszt_dijfiz":"0001-01-01T00:00:00Z","szamlaszam":"","szamla_limit":0,"e_komm_email":"","evfordulo":"0001-01-01T00:00:00Z","evfordulo_tipus":"","dijbekerot_ker":"","ajanlati_evesdij":0,"kockezd":"0001-01-01T00:00:00Z","btkezd":"0001-01-01T00:00:00Z","dijkod":"","dijfizmod":"","dijfizgyak":"","szerlejar":"0001-01-01T00:00:00Z"},"p_kotveny_gfb":{"bm_tipus":0,"kotes_oka":0},"p_gepjarmu":{"jelleg":"","rendszam":"","gyartev":"","tulajdon_visz":"","teljesitmeny":0,"ossztomeg":0,"ferohely":0,"uzjelleg":"","alvazszam":"","gyartmany":"","tulajdon_ido":"0001-01-01T00:00:00Z"},"p_szerz_azon":0,"p_ajanlat_url":"","p_evesdij":0,"p_hiba_kod":0}`},
 	} {
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
 			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
 		}
-		if !jsonEqual(strings.TrimSpace(got), todo[2]) {
-			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
+		if diff := jsonEqual(strings.TrimSpace(got), todo[2]); diff != "" {
+			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s\ndiff\n\t%s", i, todo[2], got, diff)
 		}
 	}
 }
@@ -507,13 +509,48 @@ func getConnection(t *testing.T) *oracle.Connection {
 	return conn
 }
 
-func jsonEqual(a, b string) bool {
-	var aI, bI interface{}
-	if err := json.Unmarshal([]byte(a), &aI); err != nil {
-		log.Panicf("error unmarshaling %s: %v", a, err)
+func jsonEqual(a, b string) string {
+	var aJ, bJ map[string]interface{}
+	if err := json.Unmarshal([]byte(a), &aJ); err != nil {
+		return "ERROR a: " + err.Error()
 	}
-	if err := json.Unmarshal([]byte(b), &bI); err != nil {
-		log.Panicf("error unmarshaling %s: %v", b, err)
+	if err := json.Unmarshal([]byte(b), &bJ); err != nil {
+		return "ERROR b: " + err.Error()
 	}
-	return reflect.DeepEqual(aI, bI)
+	var bufA, bufB bytes.Buffer
+	prettyPrint(&bufA, "  ", aJ)
+	prettyPrint(&bufB, "  ", bJ)
+	return diff.Diff(bufA.String(), bufB.String())
+}
+
+func prettyPrint(w io.Writer, prefix string, m map[string]interface{}) error {
+	if len(m) == 0 {
+		return nil
+	}
+	keys := make([]string, len(m))
+	i := 0
+	for k := range m {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+
+	io.WriteString(w, prefix+"{")
+	for _, k := range keys {
+		fmt.Fprintf(w, "%s%q: ", prefix, k)
+		v := m[k]
+		switch x := v.(type) {
+		case map[string]interface{}:
+			prettyPrint(w, prefix+"  ", x)
+		default:
+			str, err := json.Marshal(v)
+			if err != nil {
+				return err
+			}
+			w.Write(str)
+		}
+		io.WriteString(w, ",\n")
+	}
+	io.WriteString(w, "}\n")
+	return nil
 }
