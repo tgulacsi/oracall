@@ -21,18 +21,16 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/diff"
+	"github.com/kylelemons/godebug/pretty"
 	"github.com/tgulacsi/goracle/oracle"
 )
 
@@ -514,43 +512,32 @@ func jsonEqual(a, b string) string {
 	if err := json.Unmarshal([]byte(a), &aJ); err != nil {
 		return "ERROR a: " + err.Error()
 	}
+	omitEmpty(aJ)
 	if err := json.Unmarshal([]byte(b), &bJ); err != nil {
 		return "ERROR b: " + err.Error()
 	}
-	var bufA, bufB bytes.Buffer
-	prettyPrint(&bufA, "  ", aJ)
-	prettyPrint(&bufB, "  ", bJ)
-	return diff.Diff(bufA.String(), bufB.String())
+	omitEmpty(bJ)
+	return pretty.Compare(aJ, bJ)
 }
 
-func prettyPrint(w io.Writer, prefix string, m map[string]interface{}) error {
-	if len(m) == 0 {
-		return nil
-	}
-	keys := make([]string, len(m))
-	i := 0
-	for k := range m {
-		keys[i] = k
-		i++
-	}
-	sort.Strings(keys)
-
-	io.WriteString(w, prefix+"{")
-	for _, k := range keys {
-		fmt.Fprintf(w, "%s%q: ", prefix, k)
-		v := m[k]
+func omitEmpty(m map[string]interface{}) {
+	for k, v := range m {
+		empty := false
 		switch x := v.(type) {
+		case string:
+			empty = x == ""
+		case int:
+			empty = x == 0
+		case float64:
+			empty = x == 0
+		case time.Time:
+			empty = x.IsZero()
 		case map[string]interface{}:
-			prettyPrint(w, prefix+"  ", x)
-		default:
-			str, err := json.Marshal(v)
-			if err != nil {
-				return err
-			}
-			w.Write(str)
+			omitEmpty(x)
+			empty = len(x) == 0
 		}
-		io.WriteString(w, ",\n")
+		if empty {
+			delete(m, k)
+		}
 	}
-	io.WriteString(w, "}\n")
-	return nil
 }
