@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -31,18 +32,12 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/tgulacsi/goracle/oracle"
 )
 
 // TestGen tests the generation - for this, it needs a dsn with privileges
 // if you get "ORA-01031: insufficient privileges", then you need
 // GRANT CREATE PROCEDURE TO username;
 func TestGenSimple(t *testing.T) {
-	conn := getConnection(t)
-
-	cu := conn.NewCursor()
-	defer cu.Close()
-
 	build(t)
 	outFn := generateAndBuild(t, "SIMPLE_")
 
@@ -71,11 +66,6 @@ func TestGenSimple(t *testing.T) {
 }
 
 func TestGenRec(t *testing.T) {
-	conn := getConnection(t)
-
-	cu := conn.NewCursor()
-	defer cu.Close()
-
 	build(t)
 	outFn := generateAndBuild(t, "REC_")
 
@@ -98,10 +88,7 @@ func TestGenRec(t *testing.T) {
 }
 
 func createStoredProc(t *testing.T) {
-	cu := conn.NewCursor()
-	defer cu.Close()
-
-	compile(t, cu, `CREATE OR REPLACE PACKAGE TST_oracall AS
+	compile(t, `CREATE OR REPLACE PACKAGE TST_oracall AS
 TYPE num_tab_typ IS TABLE OF NUMBER INDEX BY BINARY_INTEGER;
 
 TYPE mix_rec_typ IS RECORD (num NUMBER, dt DATE, text VARCHAR2(1000));
@@ -266,7 +253,7 @@ FUNCTION rec_tab_in(tab IN mix_tab_typ) RETURN VARCHAR2;
 
 END TST_oracall;`)
 
-	compile(t, cu, `CREATE OR REPLACE PACKAGE BODY TST_oracall AS
+	compile(t, `CREATE OR REPLACE PACKAGE BODY TST_oracall AS
 PROCEDURE simple_char_in(txt IN VARCHAR2) IS
   v_txt VARCHAR2(1000) := SUBSTR(txt, 1, 100);
 BEGIN NULL; END simple_char_in;
@@ -393,34 +380,35 @@ END sum_nums;
 END TST_oracall;`)
 }
 
-func compile(t *testing.T, cu *oracle.Cursor, qry string) {
+func compile(t *testing.T, qry string) {
 	typ := "PACKAGE"
 	if strings.HasPrefix(qry, "CREATE OR REPLACE PACKAGE BODY") {
 		typ = typ + " BODY"
 	}
-	err := cu.Execute(qry, nil, nil)
-	if err != nil {
+	db := getConnection(t)
+	if _, err := db.Exec(qry); err != nil {
 		log.Println(qry)
 		t.Fatalf("error creating %s: %v", typ, err)
 	}
 
-	if err = cu.Execute(`SELECT line||'/'||position||': '||text
+	rows, err := db.Query(`SELECT line||'/'||position||': '||text
           FROM user_errors WHERE type = :1 AND name = :2`,
-		[]interface{}{typ, "TST_ORACALL"}, nil); err != nil {
-
+		typ, "TST_ORACALL")
+	if err != nil {
 		t.Fatalf("error querying errors: %v", err)
 	}
-	rows, err := cu.FetchAll()
-	if err != nil {
-		t.Fatalf("error fetching errors: %v", err)
+	defer rows.Close()
+	var str string
+	var errTexts []string
+	for rows.Next() {
+		if err = rows.Scan(&str); err != nil {
+			t.Fatalf("error fetching: %v", err)
+		}
+		errTexts = append(errTexts, str)
 	}
-	if len(rows) > 0 {
+	if len(errTexts) > 0 {
 		fmt.Println(qry)
 		fmt.Println("/")
-		errTexts := make([]string, len(rows))
-		for i := range rows {
-			errTexts[i] = rows[i][0].(string)
-		}
 		t.Fatalf("error with package: %s", strings.Join(errTexts, "\n"))
 	}
 }
@@ -484,27 +472,23 @@ func init() {
 	flag.Parse()
 }
 
-var conn *oracle.Connection
+var db *sql.DB
 
-func getConnection(t *testing.T) *oracle.Connection {
-	if conn.IsConnected() {
-		return conn
+func getConnection(t *testing.T) *sql.DB {
+	if db != nil && db.Ping() == nil {
+		return db
 	}
 
 	if !(flagConnect != nil && *flagConnect != "") {
 		t.Logf("cannot test connection without dsn!")
 		t.FailNow()
 	}
-	user, passw, sid := oracle.SplitDSN(*flagConnect)
 	var err error
-	conn, err = oracle.NewConnection(user, passw, sid, false)
+	db, err = sql.Open("goracle", *flagConnect)
 	if err != nil {
 		log.Panicf("error creating connection to %s: %s", *flagConnect, err)
 	}
-	if err = conn.Connect(0, false); err != nil {
-		log.Panicf("error connecting: %s", err)
-	}
-	return conn
+	return db
 }
 
 func jsonEqual(a, b string) string {
