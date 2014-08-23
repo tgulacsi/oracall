@@ -64,19 +64,48 @@ func main() {
 		var readErr error
 		go func() {
 			defer close(userArgs)
+			var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString
 			var oid, subid, level, pos, prec, scale, length sql.NullInt64
 			ua := structs.UserArgument{}
 			for rows.Next() {
-				err = rows.Scan(&oid, &subid, &ua.PackageName, &ua.ObjectName,
-					&level, &pos, &ua.ArgumentName, &ua.InOut,
-					&ua.DataType, &prec, &scale, &ua.CharacterSetName,
-					&ua.PlsType, &length, &ua.TypeOwner, &ua.TypeName, &ua.TypeSubname, &ua.TypeLink)
+				err = rows.Scan(&oid, &subid, &pn, &on,
+					&level, &pos, &an, &ua.InOut,
+					&ua.DataType, &prec, &scale, &cs,
+					&plsT, &length, &tOwner, &tName, &tSub, &tLink)
 				if err != nil {
 					readErr = err
 					log.Fatalf("error reading row %q: %s", rows, err)
 				}
+				ua.PackageName, ua.ObjectName, ua.ArgumentName = "", "", ""
 				ua.ObjectID, ua.SubprogramID, ua.DataLevel = 0, 0, 0
 				ua.Position, ua.DataPrecision, ua.DataScale, ua.CharLength = 0, 0, 0, 0
+				if pn.Valid {
+					ua.PackageName = pn.String
+				}
+				if on.Valid {
+					ua.ObjectName = on.String
+				}
+				if an.Valid {
+					ua.ArgumentName = an.String
+				}
+				if cs.Valid {
+					ua.CharacterSetName = cs.String
+				}
+				if plsT.Valid {
+					ua.PlsType = plsT.String
+				}
+				if tOwner.Valid {
+					ua.TypeOwner = tOwner.String
+				}
+				if tName.Valid {
+					ua.TypeName = tName.String
+				}
+				if tSub.Valid {
+					ua.TypeSubname = tSub.String
+				}
+				if tLink.Valid {
+					ua.TypeLink = tLink.String
+				}
 				if oid.Valid {
 					ua.ObjectID = uint(oid.Int64)
 				}
