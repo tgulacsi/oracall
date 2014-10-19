@@ -24,17 +24,21 @@ go test -connect=${dsn} ./...
 go build
 
 {
-if echo "$dsn" | grep -q '@XE'; then
-    ./oracall -F <${1:-one.csv}
-else
-    echo ./oracall -F -connect="$dsn" ${2:-DB_WEB.SENDPREOFFER_31101} >&2
-    ./oracall -F -connect="$dsn" ${2:-DB_WEB.SENDPREOFFER_31101}
+if echo "$dsn" | fgrep -q '@XE'; then
+	if [ -x "$ORACLE_HOME/bin/sqlplus" -a -e testdata/db_web.sql ]; then
+		$ORACLE_HOME/bin/sqlplus "$dsn" <<EOF
+@testdata/db_web.pck
+EXIT
+EOF
+	fi
 fi
+echo ./oracall -F -connect="$dsn" ${1:-DB_WEB.SENDPREOFFER_31101} >&2
+./oracall -F -connect="$dsn" ${1:-DB_WEB.SENDPREOFFER_31101}
 } >examples/minimal/generated_functions.go
 go build ./examples/minimal
 echo
 echo '-----------------------------------------------'
-CMD='./minimal -connect='${dsn}" ${2:-DB_web.sendpreoffer_31101}"
+CMD='./minimal -connect='${dsn}" ${1:-DB_web.sendpreoffer_31101}"
 echo "$CMD"
 #$CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":"A", "telep_kod":"C"},{"telep_azon":"z", "telep_kod":"x"}]}'
 time $CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":1, "telep_kod":0}], "p_kotveny": {"dijfizgyak":"N"}, "p_kedvezmenyek": ["KEDV01"]}'

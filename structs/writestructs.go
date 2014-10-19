@@ -57,6 +57,9 @@ var _ oracle.Cursor
 var _ strconv.NumError
 var _ strings.Reader
 var _ = errors.New
+var _ json.Marshaler
+var _ log.Logger
+var _ = fmt.Printf
 
 // FunctionCaller is a function which calls the stored procedure with
 // the input struct, and returns the output struct as an interface{}
