@@ -18,11 +18,11 @@ package structs
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/format"
 	"io"
 	"log"
-	"errors"
 	"strings"
 
 	"github.com/golang/glog"
@@ -39,6 +39,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 			"package "+pkg+`
 import (
     "encoding/json"
+	"encoding/xml"
     "errors"
     "log"
     "fmt"
@@ -58,6 +59,7 @@ var _ strconv.NumError
 var _ strings.Reader
 var _ = errors.New
 var _ json.Marshaler
+var _ xml.Name
 var _ log.Logger
 var _ = fmt.Printf
 
@@ -85,7 +87,7 @@ var InputFactories = make(map[string](func() Unmarshaler), %d)
 	types := make(map[string]string, 16)
 	inits := make([]string, 0, len(functions))
 	var b []byte
-	FunLoop:
+FunLoop:
 	for _, fun := range functions {
 		fun.types = types
 		for _, dir := range []bool{false, true} {
@@ -211,8 +213,12 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	}
 	structName = f.getStructName(out)
 	buf := bytes.NewBuffer(make([]byte, 0, 65536))
-	if _, err = io.WriteString(buf,
-		"\n// "+f.Name()+" "+dirname+"\ntype "+structName+" struct {\n"); err != nil {
+	if _, err = fmt.Fprintf(buf, `
+	// %s %s
+	type %s struct {
+		XMLName xml.Name `+"`json:\"-\" xml:\"%s\"`"+`
+		`, f.Name(), dirname, structName, strings.ToLower(structName[:1])+structName[1:],
+	); err != nil {
 		return err
 	}
 
@@ -394,7 +400,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2":
-			return "string"  // NULL is the same as the empty string for Oracle
+			return "string" // NULL is the same as the empty string for Oracle
 		case "NUMBER":
 			return "*float64"
 		case "INTEGER":
