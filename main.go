@@ -24,13 +24,26 @@ import (
 
 	_ "github.com/tgulacsi/goracle/godrv" // for Oracle-specific drivers
 	"github.com/tgulacsi/oracall/structs"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
-var flagSkipFormat = flag.Bool("F", false, "skip formatting")
-var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
+var Log = log15.New()
 
 func main() {
+	Log.SetHandler(log15.StderrHandler)
+	structs.Log.SetHandler(log15.StderrHandler)
+
+	flagSkipFormat := flag.Bool("F", false, "skip formatting")
+	flagConnect := flag.String("connect", "", "connect to DB for retrieving function arguments")
+	flagVerbose := flag.Bool("v", false, "verbose logging")
+
 	flag.Parse()
+	if !*flagVerbose {
+		hndl := log15.LvlFilterHandler(log15.LvlInfo, log15.StderrHandler)
+		Log.SetHandler(hndl)
+		structs.Log.SetHandler(hndl)
+	}
+
 	var functions []structs.Function
 	var err error
 

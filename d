@@ -28,16 +28,17 @@ fi
 
 {
 if [ -n "$CSV" ] || echo "$dsn" | grep -q '@XE'; then
-    ./oracall -F -logtostderr <${1:-testdata/db_web.getriskvagyondetails.csv}
+    ./oracall -F <${1:-testdata/db_web.getriskvagyondetails.csv}
 else
-    echo ./oracall -F -connect="$dsn" ${1:-DB_WEB.%} >&2
-    ./oracall -F -logtostderr -connect="$dsn" ${1:-DB_WEB.%}
+	set -x
+    ./oracall -F -connect="$dsn" ${1:-DB_WEB.%}
+	set +x
 fi
 } >examples/db_web/generated_functions.go
 go build ./examples/db_web
 echo
 echo '-----------------------------------------------'
-CMD='./db_web -connect='${dsn}" -login="$login" ${2:-DB_web.getriskvagyondetails}"
-echo "$CMD"
+set -x
+time ./db_web -connect="${dsn}" -login="$login" "${2:-DB_web.getriskvagyondetails}" \
+	'{"p_lang":"hu", "p_sessionid": "123", "p_szerz_azon": 31047441}'
 #$CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":"A", "telep_kod":"C"},{"telep_azon":"z", "telep_kod":"x"}]}'
-time $CMD '{"p_lang":"hu", "p_sessionid": "123", "p_szerz_azon": 31047441}'

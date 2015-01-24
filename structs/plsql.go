@@ -20,9 +20,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"strings"
-
-	"github.com/golang/glog"
 )
 
 // MaxTableSize is the maximum size of the array arguments
@@ -98,7 +97,8 @@ func oracleVarTypeName(typ string) string {
 	case "BOOLEAN", "PL/SQL BOOLEAN":
 		return "oracle.BooleanVarType"
 	default:
-		glog.Fatalf("oracleVarTypeName: unknown variable type %q", typ)
+		Log.Crit("oracleVarTypeName: unknown variable type", "type", typ)
+		os.Exit(1)
 	}
 	return ""
 }
@@ -107,7 +107,8 @@ func oracleVarTypeName(typ string) string {
 func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
-		glog.Fatalf("error preparing %s: %s", fun, err)
+		Log.Crit("error preparing", "function", fun, "error", err)
+		os.Exit(1)
 	}
 	fn := strings.Replace(fun.Name(), ".", "__", -1)
 	callBuf := bytes.NewBuffer(make([]byte, 0, 16384))
@@ -122,7 +123,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	}
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
-	glog.V(2).Infof("i=%d j=%d call=\n%s", i, j, call)
+	Log.Debug("PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%#v`, params) }"+`
     if err = cur.Execute(%s, nil, params); err != nil { return }
     `, call[i:j], fun.getPlsqlConstName())
@@ -158,7 +159,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
 	if fun.types == nil {
-		glog.Infof("nil types of %s", fun)
+		Log.Info("nil types", "function", fun)
 		fun.types = make(map[string]string, 4)
 	}
 	tableTypes := make(map[string]string, 4)
@@ -232,7 +233,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
-					glog.Fatalf("cannot use IN cursor variables (%s)", arg)
+					Log.Crit("cannot use IN cursor variables", "arg", arg)
+					os.Exit(1)
 				}
 				name := capitalize(goName(arg.Name))
 				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, arg.Name, 0)
@@ -277,8 +279,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					callArgs[arg.Name] = vn
 					decls = append(decls, vn+" "+arg.TypeName+";")
 
-					//log.Printf("arg.Name=%q arg.TableOf.Name=%q arg.TableOf.RecordOf=%#v",
-					//arg.Name, arg.TableOf.Name, arg.TableOf.RecordOf)
 					aname := capitalize(goName(arg.Name))
 					if arg.IsOutput() {
 						convOut = append(convOut, fmt.Sprintf(`
@@ -362,18 +362,20 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						}
 					}
 				default:
-					glog.Fatalf("%s/%s: only table of simple or record types are allowed (no table of table!)", fun.Name(), arg.Name)
+					Log.Crit("Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
+					os.Exit(1)
 				}
 			}
 		default:
-			glog.Fatalf("unkown flavor %q", arg.Flavor)
+			Log.Crit("unkown flavor", "flavor", arg.Flavor)
+			os.Exit(1)
 		}
 	}
 	callb := bytes.NewBuffer(nil)
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
 	}
-	glog.V(1).Infof("callArgs=%s", callArgs)
+	Log.Debug("prepareCall", "callArgs", callArgs)
 	callb.WriteString(fun.Name() + "(")
 	for i, arg := range fun.Args {
 		if i > 0 {

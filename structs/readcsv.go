@@ -25,8 +25,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/golang/glog"
 )
 
 // UserArgument represents the required info from the user_arguments view
@@ -111,7 +109,8 @@ func OpenCsv(filename string) (*os.File, error) {
 func MustOpenCsv(filename string) *os.File {
 	fh, err := OpenCsv(filename)
 	if err != nil {
-		glog.Fatal(err)
+		Log.Crit("MustOpenCsv", "file", filename, "error", err)
+		os.Exit(1)
 	}
 	return fh
 }
@@ -153,7 +152,7 @@ func ReadCsv(r io.Reader, userArgs chan<- UserArgument) error {
 			csvFields[h] = i
 		}
 	}
-	glog.Infof("field order: %v", csvFields)
+	Log.Info("field order", "fields", csvFields)
 
 	for {
 		if rec, err = csvr.Read(); err != nil {
@@ -210,17 +209,16 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		nameFun := Function{Package: ua.PackageName, name: ua.ObjectName}
 		funName = nameFun.Name()
 		if seen[funName] > 1 {
-			glog.Warningf("function %s already seen! skipping...", funName)
+			Log.Warn("function " + funName + " already seen! skipping...")
 			continue
 		}
 		if fun.Name() == "" || funName != fun.Name() { //new (differs from prev record
 			seen[funName]++
-			glog.V(1).Infof("old=%s new=%s seen=%d", fun.Name(), funName, seen[funName])
-			glog.V(1).Infof("New function %s", funName)
+			Log.Debug("ParseArguments", "old", fun.Name(), "new", funName, "seen", seen[funName])
+			Log.Debug("New function " + funName)
 			if fun.name != "" {
 				x := fun // copy
 				x.Args = append(make([]Argument, 0, len(args)), args...)
-				//glog.V(1).Infof("old fun: %s", x)
 				functions = append(functions, x)
 			}
 			if seen[funName] > 1 {
@@ -247,7 +245,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		// 2. RECORD at level 0
 		// 3. TABLE OF simple
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-		glog.V(1).Infof("level=%d arg=%+v", level, arg)
+		Log.Info("ParseArguments", "level", level, "arg", arg)
 		if level == 0 {
 			if len(args) == 0 && arg.Name == "" {
 				arg.Name = "ret"
@@ -256,14 +254,12 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 				args = append(args, arg)
 			}
 		} else {
-			glog.V(2).Infof("row %d: level=%d fun.Args: %s", row, level, fun.Args)
 			lastArgs = lastArgs[:level]
 			lastArg := lastArgs[level-1]
 			if lastArg == nil {
-				glog.Fatalf("row %d: level=%d fun.Args: %+v ua=%+v lastArg is nil!",
-					row, level, fun.Args, ua)
+				Log.Crit("lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
+				os.Exit(1)
 			}
-			glog.V(2).Infof("lastArg: %+v Flavor: %s", lastArg.Flavor)
 			if lastArg.Flavor == FLAVOR_TABLE {
 				lastArg.TableOf = &arg
 			} else {
@@ -275,12 +271,8 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 			/*
 				for i := int(level) - 2; i >= 0; i-- {
 						if lastArgs[i].Flavor == FLAVOR_TABLE {
-							glog.V(1).Infof("setting %v.TableOf to %v",
-								lastArgs[i], lastArgs[i+1])
 							lastArgs[i].TableOf = lastArgs[i+1]
 						} else {
-							glog.V(1).Infof("setting %v.RecordOf[%q] to %v",
-								lastArgs[i], lastArgs[i+1].Name, lastArgs[i+1])
 							if lastArgs[i].RecordOf == nil {
 								lastArgs[i].RecordOf = make(map[string]Argument, 1)
 							}
@@ -296,21 +288,12 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		if arg.Flavor != FLAVOR_SIMPLE {
 			lastArgs = append(lastArgs[:level], &arg)
 		}
-		if lastArgs != nil && len(lastArgs) > 0 {
-			glog.V(2).Infof("lastArg: %q tof=%#v", lastArgs, lastArgs[len(lastArgs)-1].TableOf)
-		}
-		//glog.V(2).Infof("last arg: %q tof=%#v", args[len(args)-1], args[len(args)-1].TableOf)
-		//glog.Infof("arg=%#v", arg)
 	}
 	if fun.name != "" {
 		fun.Args = args
-		if fun.Returns != nil {
-			glog.V(2).Infof("%s returns: %#v", fun.name, *fun.Returns)
-		}
 		functions = append(functions, fun)
 	}
-	glog.V(1).Infof("found %d functions.", len(functions))
-	glog.V(2).Infof("functions=%s", functions)
+	Log.Info(fmt.Sprintf("found %d functions.", len(functions)))
 	return
 }
 

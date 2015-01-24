@@ -19,7 +19,16 @@ package structs
 import (
 	"fmt"
 	"strings"
+
+	"gopkg.in/inconshreveable/log15.v2"
 )
+
+// Log is discarded by default.
+var Log = log15.New()
+
+func init() {
+	Log.SetHandler(log15.DiscardHandler())
+}
 
 const (
 	MarkNull = "␀" // 0x2400 = nul

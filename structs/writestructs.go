@@ -22,13 +22,12 @@ import (
 	"fmt"
 	"go/format"
 	"io"
-	"log"
+	"os"
 	"strings"
 
-	"github.com/golang/glog"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
-var _ = glog.Infof
 var ErrMissingTableOf = errors.New("missing TableOf info")
 
 func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatting bool) error {
@@ -93,7 +92,7 @@ FunLoop:
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(dst, dir); err != nil {
 				if err == ErrMissingTableOf {
-					glog.Warningf("SKIP function, missing TableOf info (%s)", fun.Name)
+					Log.Warn("SKIP function, missing TableOf info", "function", fun.Name)
 					continue FunLoop
 				}
 				return err
@@ -117,7 +116,7 @@ FunLoop:
 			if !skipFormatting {
 				return fmt.Errorf("error saving function %s: %s\n%s", fun.Name(), err, callFun)
 			}
-			log.Printf("error saving function %s: %s", fun.Name(), err)
+			Log.Warn("saving function", "function", fun.Name(), "error", err)
 			b = []byte(callFun)
 		}
 		if _, err = dst.Write(b); err != nil {
@@ -185,7 +184,6 @@ func (f Function) getStructName(out bool) string {
 }
 
 func (f Function) SaveStruct(dst io.Writer, out bool) error {
-	//glog.Infof("f=%s", f)
 	dirmap, dirname := uint8(DIR_IN), "input"
 	if out {
 		dirmap, dirname = DIR_OUT, "output"
@@ -197,7 +195,6 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	)
 	args := make([]Argument, 0, len(f.Args))
 	for _, arg := range f.Args {
-		//glog.Infof("dir=%d map=%d => %d", arg.Direction, dirmap, arg.Direction&dirmap)
 		if arg.Direction&dirmap > 0 {
 			args = append(args, arg)
 		}
@@ -206,7 +203,6 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	if out && f.Returns != nil {
 		args = append(args, *f.Returns)
 	}
-	//glog.Infof("args[%d]: %s", dirmap, args)
 
 	if dirmap == uint8(DIR_IN) {
 		checks = make([]string, 0, len(args)+1)
@@ -222,7 +218,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		return err
 	}
 
-	glog.V(1).Infof("function %#v", f)
+	Log.Debug("SaveStruct",
+		"function", log15.Lazy{func() string { return fmt.Sprintf("%#v", f) }})
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			return ErrMissingTableOf
@@ -361,7 +358,8 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 				fmt.Sprintf("\tfor _, v := range %s.%s {\n\t%s\n}", base, aName, plus))
 		}
 	default:
-		log.Fatalf("unknown flavor %q", arg.Flavor)
+		Log.Crit("unknown flavor", "flavor", arg.Flavor)
+		os.Exit(1)
 	}
 	return checks
 }
@@ -418,7 +416,8 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		case "ROWID":
 			return "*string"
 		default:
-			log.Fatalf("unknown simple type %s (%s)", arg.Type, arg)
+			Log.Crit("unknown simple type", "type", arg.Type, "arg", arg)
+			os.Exit(1)
 		}
 	}
 	typName = arg.TypeName
@@ -435,7 +434,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		return "*" + typName
 	}
 	if arg.Flavor == FLAVOR_TABLE {
-		glog.Infof("arg=%s tof=%s", arg, arg.TableOf)
+		Log.Info("TABLE", "arg", arg, "tableOf", arg.TableOf)
 		tn := "[]" + arg.TableOf.goType(typedefs)
 		if arg.Type != "REF CURSOR" {
 			return tn
@@ -457,7 +456,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	// FLAVOR_RECORD
 	buf := bytes.NewBuffer(make([]byte, 0, 256))
 	if arg.TypeName == "" {
-		glog.Warningf("arg has no TypeName: %#v\n%s", arg, arg)
+		Log.Warn("arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
 	buf.WriteString("\ntype " + typName + " struct {\n")
