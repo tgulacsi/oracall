@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antzucaro/matchr"
 	"github.com/kylelemons/godebug/pretty"
 )
 
@@ -56,11 +57,26 @@ func TestGenSimple(t *testing.T) {
 		{"simple_sum_nums", `{"nums":[1.1,2,3.3]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
 	} {
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
+		withTime := false
+		todo[2] = strings.TrimSpace(todo[2])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
 			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
+			withTime = true
 		}
-		if strings.TrimSpace(got) != todo[2] {
-			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
+		gotS := strings.TrimSpace(got)
+		if gotS != todo[2] {
+			ok := false
+			if withTime && len(gotS) == len(todo[2]) {
+				dist, err := matchr.Hamming(gotS, todo[2])
+				if err != nil {
+					t.Errorf("compute hamming distance of %q/%q: %v", gotS, todo[2], err)
+				} else if dist <= 1 {
+					ok = true
+				}
+			}
+			if !ok {
+				t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
+			}
 		}
 	}
 }
