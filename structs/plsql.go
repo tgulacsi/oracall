@@ -124,9 +124,10 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
 	Log.Debug("PlsqlBlock", "i", i, "j", j, "call", call)
-	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%#v`, params) }"+`
+	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%s`, params) }"+`
     if err = cur.Execute(%s, nil, params); err != nil { return }
     `, call[i:j], fun.getPlsqlConstName())
+	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`result params: %%s`, params) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}

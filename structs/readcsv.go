@@ -245,7 +245,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		// 2. RECORD at level 0
 		// 3. TABLE OF simple
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-		Log.Info("ParseArguments", "level", level, "arg", arg)
+		Log.Debug("ParseArguments", "level", level, "arg", arg)
 		if level == 0 {
 			if len(args) == 0 && arg.Name == "" {
 				arg.Name = "ret"

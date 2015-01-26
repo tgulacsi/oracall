@@ -27,12 +27,12 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
-	"reflect"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/tgulacsi/goracle/oracle"
@@ -143,6 +143,7 @@ func login(cur *oracle.Cursor, username, password string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("DB_web.login: %v", err)
 	}
+	log.Printf("Login(%q): %#v", username, out.(Db_web__login__output))
 	return (out.(Db_web__login__output).P_sessionid), nil
 }
 
@@ -158,10 +159,10 @@ func StructSet(st interface{}, key string, value interface{}) error {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	fv :=	v.FieldByName(key)
+	fv := v.FieldByName(key)
 	if fv.Kind() == reflect.Ptr {
 		fv = fv.Elem()
 	}
-		fv.Set(reflect.ValueOf(value))
+	fv.Set(reflect.ValueOf(value))
 	return nil
 }
