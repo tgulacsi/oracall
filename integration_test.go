@@ -35,6 +35,10 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 )
 
+func init() {
+	flag.Parse()
+}
+
 // TestGen tests the generation - for this, it needs a dsn with privileges
 // if you get "ORA-01031: insufficient privileges", then you need
 // GRANT CREATE PROCEDURE TO username;

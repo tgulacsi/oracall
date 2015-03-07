@@ -29,12 +29,13 @@ import (
 
 var Log = log15.New()
 
+var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
+
 func main() {
 	Log.SetHandler(log15.StderrHandler)
 	structs.Log.SetHandler(log15.StderrHandler)
 
 	flagSkipFormat := flag.Bool("F", false, "skip formatting")
-	flagConnect := flag.String("connect", "", "connect to DB for retrieving function arguments")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
 
 	flag.Parse()
