@@ -45,6 +45,7 @@ func init() {
 func TestGenSimple(t *testing.T) {
 	build(t)
 	outFn := generateAndBuild(t, "SIMPLE_")
+	var err error
 
 	for i, todo := range [][3]string{
 		{"simple_char_in", `{"txt": "abraka dabra"}`, `{}`},
@@ -68,20 +69,22 @@ func TestGenSimple(t *testing.T) {
 			withTime = true
 		}
 		gotS := strings.TrimSpace(got)
-		if gotS != todo[2] {
-			ok := false
-			if withTime && len(gotS) == len(todo[2]) {
-				dist, err := matchr.Hamming(gotS, todo[2])
-				if err != nil {
-					t.Errorf("compute hamming distance of %q/%q: %v", gotS, todo[2], err)
-				} else if dist <= 1 {
-					ok = true
-				}
+		if gotS == todo[2] {
+			continue
+		}
+		dist := 0
+		if withTime {
+			dist, err = matchr.Hamming(gotS, todo[2])
+			if err != nil {
+				t.Errorf("compute hamming distance of %q/%q: %v", gotS, todo[2], err)
+				return
 			}
-			if !ok {
-				t.Errorf("%d. awaited\n\t%s\ngot\n\t%s", i, todo[2], got)
+			if dist <= 2 {
+				continue
 			}
 		}
+		t.Errorf("%d. awaited\n\t%s\ngot (distance=%d)\n\t%s", i, todo[2], dist, got)
+		return
 	}
 }
 
@@ -468,10 +471,25 @@ func generateAndBuild(t *testing.T, prefix string) (outFn string) {
 	return
 }
 
-var errBuf = bytes.NewBuffer(make([]byte, 0, 512))
+var (
+	errBuf = bytes.NewBuffer(make([]byte, 0, 512))
+	nlsEnv []string
+)
 
 func runTest(t *testing.T, prog string, args ...string) string {
 	c := exec.Command(prog, args...)
+	if nlsEnv == nil {
+		nlsEnv = make([]string, 0, len(os.Environ())+2)
+		for _, line := range os.Environ() {
+			if strings.HasPrefix(line, "NLS_DATE_FORMAT=") || strings.HasPrefix(line, "ORA_SDTZ=") {
+				continue
+			}
+			nlsEnv = append(nlsEnv, line)
+		}
+		nlsEnv = append(nlsEnv, "NLS_DATE_FORMAT=YYYY-MM-DD",
+			"ORA_SDTZ="+time.Local.String())
+	}
+	c.Env = nlsEnv
 	errBuf.Reset()
 	c.Stderr = errBuf
 	out, err := c.Output()
