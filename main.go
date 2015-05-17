@@ -22,8 +22,8 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/tgulacsi/goracle/godrv" // for Oracle-specific drivers
 	"github.com/tgulacsi/oracall/structs"
+	_ "gopkg.in/goracle.v1" // for Oracle-specific drivers
 	"gopkg.in/inconshreveable/log15.v2"
 )
 

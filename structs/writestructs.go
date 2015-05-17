@@ -46,7 +46,7 @@ import (
 	"strconv"
     "time"    // for datetimes
 
-    "github.com/tgulacsi/goracle/oracle"    // Oracle
+    "gopkg.in/goracle.v1/oracle"    // Oracle
 )
 
 var DebugLevel = uint(0)

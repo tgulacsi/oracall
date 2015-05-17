@@ -26,7 +26,7 @@ import (
 	"os"
 	"strings"
 
-	_ "github.com/tgulacsi/goracle/godrv"
+	_ "gopkg.in/goracle.v1"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")

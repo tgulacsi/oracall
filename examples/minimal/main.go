@@ -32,7 +32,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/tgulacsi/goracle/oracle"
+	"gopkg.in/goracle.v1/oracle"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")

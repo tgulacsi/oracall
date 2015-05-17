@@ -35,7 +35,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/tgulacsi/goracle/oracle"
+	"gopkg.in/goracle.v1/oracle"
 )
 
 var (
