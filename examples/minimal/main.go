@@ -51,7 +51,7 @@ func main() {
 	if !ok {
 		log.Fatalf("cannot find function named %q", funName)
 	}
-	log.Printf("fun to be called is %s", fun)
+	log.Printf("fun to be called is %v", fun)
 
 	// parse stdin as json into the proper input struct
 	var (

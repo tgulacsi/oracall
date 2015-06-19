@@ -57,7 +57,7 @@ func main() {
 			if err == io.EOF {
 				break
 			}
-			log.Fatalf("error reading %s: %v", input, err)
+			log.Fatalf("error reading %v: %v", input, err)
 		}
 		if isPrefix {
 			log.Fatalf("line too long (%q)", line)

@@ -88,7 +88,7 @@ func main() {
 					&plsT, &length, &tOwner, &tName, &tSub, &tLink)
 				if err != nil {
 					readErr = err
-					log.Fatalf("error reading row %q: %s", rows, err)
+					log.Fatalf("error reading row %v: %v", rows, err)
 				}
 				ua.PackageName, ua.ObjectName, ua.ArgumentName = "", "", ""
 				ua.ObjectID, ua.SubprogramID, ua.DataLevel = 0, 0, 0
