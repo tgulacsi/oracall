@@ -23,8 +23,8 @@ import (
 	"os"
 
 	"github.com/tgulacsi/oracall/structs"
-	_ "gopkg.in/goracle.v1" // for Oracle-specific drivers
 	"gopkg.in/inconshreveable/log15.v2"
+	"gopkg.in/rana/ora.v2" // for Oracle-specific drivers
 )
 
 var Log = log15.New()
@@ -55,7 +55,8 @@ func main() {
 		if flag.NArg() >= 1 {
 			pattern = flag.Arg(0)
 		}
-		cx, err := sql.Open("goracle", *flagConnect)
+		ora.Register(nil)
+		cx, err := sql.Open("ora", *flagConnect)
 		if err != nil {
 			log.Fatalf("error connecting to %q: %s", *flagConnect, err)
 		}
@@ -66,7 +67,7 @@ func main() {
            data_type, data_precision, data_scale, character_set_name,
            pls_type, char_length, type_owner, type_name, type_subname, type_link
       FROM user_arguments
-      WHERE package_name||'.'||object_name LIKE UPPER(?)
+	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
       ORDER BY object_id, subprogram_id, SEQUENCE`
 		rows, err := cx.Query(qry, pattern)
 		if err != nil {

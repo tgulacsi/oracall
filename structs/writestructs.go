@@ -46,14 +46,14 @@ import (
 	"strconv"
     "time"    // for datetimes
 
-    "gopkg.in/goracle.v1/oracle"    // Oracle
+    "gopkg.in/rana/ora.v2"    // Oracle
 )
 
 var DebugLevel = uint(0)
 
 // against "unused import" error
+var _ ora.Ses
 var _ time.Time
-var _ oracle.Cursor
 var _ strconv.NumError
 var _ strings.Reader
 var _ = errors.New
@@ -64,7 +64,7 @@ var _ = fmt.Printf
 
 // FunctionCaller is a function which calls the stored procedure with
 // the input struct, and returns the output struct as an interface{}
-type FunctionCaller func(*oracle.Cursor, interface{}) (interface{}, error)
+type FunctionCaller func(*ora.Ses, interface{}) (interface{}, error)
 
 // Functions is the map of function name -> function
 var Functions = make(map[string]FunctionCaller, %d)
@@ -124,7 +124,7 @@ FunLoop:
 		}
 		inpstruct := fun.getStructName(false)
 		inits = append(inits,
-			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *oracle.Cursor, input interface{}) (interface{}, error) {
+			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *ora.Ses, input interface{}) (interface{}, error) {
         var inp %s
         switch x := input.(type) {
         case *%s: inp = *x
@@ -410,7 +410,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
 			return "*time.Time"
 		case "REF CURSOR":
-			return "*oracle.Cursor"
+			return "*ora.Ses"
 		case "CLOB", "BLOB":
 			return "*oracle.ExternalLobVar"
 		case "ROWID":
@@ -445,8 +445,8 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		}
 		if _, ok := typedefs[cn]; !ok {
 			var buf bytes.Buffer
-			buf.WriteString("\ntype " + cn + " struct { *oracle.Cursor }\n")
-			buf.WriteString("func New" + cn + "(cur *oracle.Cursor) (" + cn + ", error) {\n return " + cn + "{cur}, nil\n }")
+			buf.WriteString("\ntype " + cn + " struct { *ora.Ses }\n")
+			buf.WriteString("func New" + cn + "(cur *ora.Ses) (" + cn + ", error) {\n return " + cn + "{cur}, nil\n }")
 			typedefs[cn] = buf.String()
 		}
 		//typedefs["+"+arg.TableOf.Name] = "REF CURSOR"

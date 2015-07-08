@@ -33,6 +33,7 @@ import (
 
 	"github.com/antzucaro/matchr"
 	"github.com/kylelemons/godebug/pretty"
+	"gopkg.in/rana/ora.v2"
 )
 
 func init() {
@@ -508,6 +509,7 @@ var buildOnce sync.Once
 
 func init() {
 	flag.Parse()
+	ora.Register(nil)
 }
 
 var db *sql.DB
@@ -522,7 +524,7 @@ func getConnection(t *testing.T) *sql.DB {
 		t.FailNow()
 	}
 	var err error
-	db, err = sql.Open("goracle", *flagConnect)
+	db, err = sql.Open("ora", *flagConnect)
 	if err != nil {
 		log.Panicf("error creating connection to %s: %s", *flagConnect, err)
 	}

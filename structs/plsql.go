@@ -112,7 +112,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	}
 	fn := strings.Replace(fun.Name(), ".", "__", -1)
 	callBuf := bytes.NewBuffer(make([]byte, 0, 16384))
-	fmt.Fprintf(callBuf, `func Call_%s(cur *oracle.Cursor, input %s) (output %s, err error) {
+	fmt.Fprintf(callBuf, `func Call_%s(cur *ora.Ses, input %s) (output %s, err error) {
     if err = input.Check(); err != nil {
         return
     }
@@ -190,7 +190,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		ok           bool
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
-	convIn = append(convIn, "var v *oracle.Variable\nvar x interface{}\n _, _ = v, x")
+	convIn = append(convIn, "var x interface{}\n _ = x")
 
 	var args []Argument
 	if fun.Returns != nil {
@@ -421,7 +421,7 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 			if strings.HasSuffix(got, "__cur") {
 				outConv = fmt.Sprintf(`output.%s = %s{y}`, name, got)
 				if arg.Type == "REF CURSOR" {
-					pTyp = "*oracle.Cursor"
+					pTyp = "*ora.Ses"
 				}
 			} else if got == "string" {
 				outConv = fmt.Sprintf(`output.%s = y`, name)
