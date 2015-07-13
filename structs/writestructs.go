@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -32,9 +33,10 @@ var ErrMissingTableOf = errors.New("missing TableOf info")
 
 func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatting bool) error {
 	var err error
+	w := errWriter{Writer: dst, err: &err}
 
 	if pkg != "" {
-		if _, err = fmt.Fprintf(dst,
+		fmt.Fprintf(w,
 			"package "+pkg+`
 import (
     "encoding/json"
@@ -79,18 +81,17 @@ type Setter interface {
 
 // InputFactories is the map of function name -> input factory
 var InputFactories = make(map[string](func() Unmarshaler), %d)
-`, len(functions), len(functions)); err != nil {
-			return err
-		}
+`, len(functions), len(functions))
 	}
 	types := make(map[string]string, 16)
 	inits := make([]string, 0, len(functions))
 	var b []byte
+
 FunLoop:
 	for _, fun := range functions {
 		fun.types = types
 		for _, dir := range []bool{false, true} {
-			if err = fun.SaveStruct(dst, dir); err != nil {
+			if err = fun.SaveStruct(w, dir); err != nil {
 				if err == ErrMissingTableOf {
 					Log.Warn("SKIP function, missing TableOf info", "function", fun.Name)
 					continue FunLoop
@@ -99,19 +100,9 @@ FunLoop:
 			}
 		}
 		plsBlock, callFun := fun.PlsqlBlock()
-		if _, err = fmt.Fprintf(dst, "\nconst %s = `", fun.getPlsqlConstName()); err != nil {
-			return err
-		}
-		if _, err = io.WriteString(dst, plsBlock); err != nil {
-			return err
-		}
-		if _, err = io.WriteString(dst, "`\n"); err != nil {
-			return err
-		}
-
-		if _, err = io.WriteString(dst, "\n"); err != nil {
-			return err
-		}
+		fmt.Fprintf(w, "\nconst %s = `", fun.getPlsqlConstName())
+		io.WriteString(w, plsBlock)
+		io.WriteString(w, "`\n\n")
 		if b, err = format.Source([]byte(callFun)); err != nil {
 			if !skipFormatting {
 				return fmt.Errorf("error saving function %s: %s\n%s", fun.Name(), err, callFun)
@@ -119,9 +110,7 @@ FunLoop:
 			Log.Warn("saving function", "function", fun.Name(), "error", err)
 			b = []byte(callFun)
 		}
-		if _, err = dst.Write(b); err != nil {
-			return err
-		}
+		w.Write(b)
 		inpstruct := fun.getStructName(false)
 		inits = append(inits,
 			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *ora.Ses, input interface{}) (interface{}, error) {
@@ -147,24 +136,15 @@ FunLoop:
 		if b, err = format.Source([]byte(text)); err != nil {
 			return fmt.Errorf("error saving type %s: %s\n%s", tn, err, text)
 		}
-		//if _, err = io.WriteString(dst, text); err != nil {
-		if _, err = dst.Write(b); err != nil {
-			return err
-		}
+		w.Write(b)
 	}
 
-	if _, err = io.WriteString(dst, "\nfunc init() {\n"); err != nil {
-		return err
-	}
+	io.WriteString(w, "\nfunc init() {\n")
 	for _, text := range inits {
-		if _, err = io.WriteString(dst, text); err != nil {
-			return err
-		}
-		if _, err = dst.Write([]byte{'\n'}); err != nil {
-			return err
-		}
+		io.WriteString(w, text)
+		w.Write([]byte{'\n'})
 	}
-	if _, err = io.WriteString(dst, "}\n"); err != nil {
+	if _, err = io.WriteString(w, "}\n"); err != nil {
 		return err
 	}
 
@@ -182,6 +162,8 @@ func (f Function) getStructName(out bool) string {
 	}
 	return capitalize(f.Package + "__" + f.name + "__" + dirname)
 }
+
+var buffers = newBufPool(1 << 16)
 
 func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	dirmap, dirname := uint8(DIR_IN), "input"
@@ -208,15 +190,16 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		checks = make([]string, 0, len(args)+1)
 	}
 	structName = f.getStructName(out)
-	buf := bytes.NewBuffer(make([]byte, 0, 65536))
-	if _, err = fmt.Fprintf(buf, `
+	buf := buffers.Get()
+	defer buffers.Put(buf)
+	w := errWriter{Writer: buf, err: &err}
+
+	fmt.Fprintf(w, `
 	// %s %s
 	type %s struct {
 		XMLName xml.Name `+"`json:\"-\" xml:\"%s\"`"+`
 		`, f.Name(), dirname, structName, strings.ToLower(structName[:1])+structName[1:],
-	); err != nil {
-		return err
-	}
+	)
 
 	Log.Debug("SaveStruct",
 		"function", log15.Lazy{func() string { return fmt.Sprintf("%#v", f) }})
@@ -227,26 +210,22 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types)
 		lName := strings.ToLower(arg.Name)
-		if _, err = io.WriteString(buf, "\t"+aName+" "+got+
+		io.WriteString(w, "\t"+aName+" "+got+
 			"\t`json:\""+lName+",omitempty\""+
-			" xml:\""+lName+",omitempty\"`\n"); err != nil {
-			return err
-		}
+			" xml:\""+lName+",omitempty\"`\n")
 		if checks != nil {
 			checks = genChecks(checks, arg, f.types, "s")
 		}
 	}
-
-	if _, err = io.WriteString(buf, "}\n"); err != nil {
-		return err
-	}
+	io.WriteString(w, "}\n")
 
 	if !out {
-		if _, err = fmt.Fprintf(buf, `func (s *%s) FromJSON(data []byte) error {
+		fmt.Fprintf(w, `func (s *%s) FromJSON(data []byte) error {
     return json.Unmarshal(data, s)
-}`, structName); err != nil {
-			return err
-		}
+}`, structName)
+	}
+	if err != nil {
+		return err
 	}
 
 	var b []byte
@@ -257,13 +236,9 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 
 	if checks != nil {
 		buf.Reset()
-		if _, err = fmt.Fprintf(buf, "\n// Check checks input bounds for %s\nfunc (s %s) Check() error {\n", structName, structName); err != nil {
-			return err
-		}
+		fmt.Fprintf(w, "\n// Check checks input bounds for %s\nfunc (s %s) Check() error {\n", structName, structName)
 		for _, line := range checks {
-			if _, err = fmt.Fprintf(buf, line+"\n"); err != nil {
-				return err
-			}
+			fmt.Fprintf(w, line+"\n")
 		}
 		if _, err = io.WriteString(buf, "\n\treturn nil\n}\n"); err != nil {
 			return err
@@ -290,16 +265,9 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 	switch arg.Flavor {
 	case FLAVOR_SIMPLE:
 		switch got {
-		case "string":
+		case "ora.String":
 			checks = append(checks,
-				fmt.Sprintf(`if len(%s) > %d {
-        return errors.New("%s is longer then accepted (%d)")
-    }`,
-					name, arg.Charlength,
-					name, arg.Charlength))
-		case "*string":
-			checks = append(checks,
-				fmt.Sprintf(`if %s != nil && len(*%s) > %d {
+				fmt.Sprintf(`if %s.IsNull && len(%s.Value) > %d {
         return errors.New("%s is longer then accepted (%d)")
     }`,
 					name, name, arg.Charlength,
@@ -311,16 +279,6 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
-		case "*int32", "*int64", "*float32", "*float64":
-			if arg.Precision > 0 {
-				cons := strings.Repeat("9", int(arg.Precision))
-				checks = append(checks,
-					fmt.Sprintf(`if %s != nil && (*%s <= -%s || *%s > %s) {
-        return errors.New("%s is out of bounds (-%s..%s)")
-    }`,
-						name, name, cons, name, cons,
-						name, cons, cons))
-			}
 		case "int64", "float64":
 			if arg.Precision > 0 {
 				cons := strings.Repeat("9", int(arg.Precision))
@@ -329,6 +287,16 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
         return errors.New("%s is out of bounds (-%s..%s)")
     }`,
 						name, cons, name, cons,
+						name, cons, cons))
+			}
+		case "ora.Int32", "ora.Int64", "ora.Float32", "ora.Float64":
+			if arg.Precision > 0 {
+				cons := strings.Repeat("9", int(arg.Precision))
+				checks = append(checks,
+					fmt.Sprintf(`if !%s.IsNull && (%s.Value <= -%s || %s.Value > %s) {
+        return errors.New("%s is out of bounds (-%s..%s)")
+    }`,
+						name, name, cons, name, cons,
 						name, cons, cons))
 			}
 		case "NullInt64", "NullFloat64", "sql.NullInt64", "sql.NullFloat64":
@@ -346,8 +314,7 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 	case FLAVOR_RECORD:
 		//checks = append(checks, "if "+name+MarkValid+" {")
 		checks = append(checks, "if "+name+" != nil {")
-		for k, sub := range arg.RecordOf {
-			_ = k
+		for _, sub := range arg.RecordOf {
 			checks = genChecks(checks, sub, types, name)
 		}
 		checks = append(checks, "}")
@@ -397,24 +364,22 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	}()
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
-		case "CHAR", "VARCHAR2":
-			return "string" // NULL is the same as the empty string for Oracle
+		case "CHAR", "VARCHAR2", "ROWID":
+			return "ora.String" // NULL is the same as the empty string for Oracle
 		case "NUMBER":
-			return "*float64"
+			return "ora.Float64"
 		case "INTEGER":
-			return "*int64"
+			return "ora.Int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
-			return "*int32"
+			return "ora.Int32"
 		case "BOOLEAN", "PL/SQL BOOLEAN":
-			return "*bool"
+			return "sql.NullBool"
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
-			return "*time.Time"
+			return "ora.Time"
 		case "REF CURSOR":
 			return "*ora.Ses"
 		case "CLOB", "BLOB":
-			return "*oracle.ExternalLobVar"
-		case "ROWID":
-			return "*string"
+			return "ora.Lob"
 		default:
 			Log.Crit("unknown simple type", "type", arg.Type, "arg", arg)
 			os.Exit(1)
@@ -433,6 +398,10 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if td := typedefs[typName]; td != "" {
 		return "*" + typName
 	}
+
+	buf := buffers.Get()
+	defer buffers.Put(buf)
+
 	if arg.Flavor == FLAVOR_TABLE {
 		Log.Info("TABLE", "arg", arg, "tableOf", arg.TableOf)
 		tn := "[]" + arg.TableOf.goType(typedefs)
@@ -444,17 +413,16 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 			cn = cn[1:]
 		}
 		if _, ok := typedefs[cn]; !ok {
-			var buf bytes.Buffer
 			buf.WriteString("\ntype " + cn + " struct { *ora.Ses }\n")
 			buf.WriteString("func New" + cn + "(cur *ora.Ses) (" + cn + ", error) {\n return " + cn + "{cur}, nil\n }")
 			typedefs[cn] = buf.String()
+			buf.Reset()
 		}
 		//typedefs["+"+arg.TableOf.Name] = "REF CURSOR"
 		return cn
 	}
 
 	// FLAVOR_RECORD
-	buf := bytes.NewBuffer(make([]byte, 0, 256))
 	if arg.TypeName == "" {
 		Log.Warn("arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
 		arg.TypeName = strings.ToLower(arg.Name)
@@ -481,4 +449,38 @@ func goName(text string) string {
 		return text[:len(text)-1] + MarkHidden
 	}
 	return text
+}
+
+type errWriter struct {
+	io.Writer
+	err *error
+}
+
+func (ew errWriter) Write(p []byte) (int, error) {
+	if ew.err != nil && *ew.err != nil {
+		return 0, *ew.err
+	}
+	n, err := ew.Writer.Write(p)
+	if err != nil {
+		*ew.err = err
+	}
+	return n, err
+}
+
+type bufPool struct {
+	sync.Pool
+}
+
+func newBufPool(size int) bufPool {
+	return bufPool{sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 1<<16)) }}}
+}
+func (bp bufPool) Get() *bytes.Buffer {
+	return bp.Pool.Get().(*bytes.Buffer)
+}
+func (bp bufPool) Put(b *bytes.Buffer) {
+	if b == nil {
+		return
+	}
+	b.Reset()
+	bp.Pool.Put(b)
 }

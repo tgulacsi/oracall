@@ -30,72 +30,31 @@ const MaxTableSize = 1000
 //
 // OracleArgument
 //
-/*
-func oracleVarType(typ string) *oracle.VariableType {
-	switch typ {
-	case "BINARY_INTEGER", "PLS_INTEGER":
-		return oracle.Int32VarType
-	case "STRING", "VARCHAR2":
-		return oracle.StringVarType
-	case "INTEGER":
-		return oracle.Int64VarType
-	case "ROWID":
-		return oracle.RowidVarType
-	case "REF CURSOR":
-		return oracle.CursorVarType
-	//case "TIMESTAMP":
-	//return oracle.TimestampVarType
-	case "NUMBER":
-		return oracle.FloatVarType
-	case "DATE":
-		return oracle.DateTimeVarType
-	case "BLOB":
-		return oracle.BlobVarType
-	case "CHAR":
-		return oracle.FixedCharVarType
-	case "BINARY":
-		return oracle.BinaryVarType
-	case "CLOB":
-		return oracle.ClobVarType
-	case "BOOLEAN", "PL/SQL BOOLEAN":
-		return oracle.BooleanVarType
-	default:
-		glog.Fatalf("oracleVarType: unknown variable type %q", typ)
-	}
-	return nil
-}
-*/
 
 var stringTypes = make(map[string]struct{}, 16)
 
 func oracleVarTypeName(typ string) string {
 	switch typ {
 	case "BINARY_INTEGER", "PLS_INTEGER":
-		return "oracle.Int32VarType"
-	case "STRING", "VARCHAR2":
-		return "oracle.StringVarType"
+		return "ora.Int32"
+	case "BINARY_FLOAT":
+		return "ora.Float32"
+	case "BINARY_DOUBLE", "NUMBER":
+		return "ora.Float64"
+	case "STRING", "VARCHAR2", "ROWID", "CHAR":
+		return "ora.String"
 	case "INTEGER":
-		return "oracle.Int64VarType"
-	case "ROWID":
-		return "oracle.RowidVarType"
+		return "ora.Int64"
 	case "REF CURSOR":
 		return "oracle.CursorVarType"
-	//case "TIMESTAMP":
-	//return oracle.TimestampVarType
-	case "NUMBER":
-		return "oracle.FloatVarType"
-	case "DATE":
-		return "oracle.DateTimeVarType"
-	case "BLOB":
-		return "oracle.BlobVarType"
-	case "CHAR":
-		return "oracle.FixedCharVarType"
-	case "BINARY":
-		return "oracle.BinaryVarType"
-	case "CLOB":
-		return "oracle.ClobVarType"
+	case "DATE", "TIMESTAMP":
+		return "ora.Time"
+	case "BLOB", "CLOB":
+		return "ora.Lob"
+	case "BFILE":
+		return "ora.Bfile"
 	case "BOOLEAN", "PL/SQL BOOLEAN":
-		return "oracle.BooleanVarType"
+		return "ora.Int8"
 	default:
 		Log.Crit("oracleVarTypeName: unknown variable type", "type", typ)
 		os.Exit(1)
@@ -111,12 +70,13 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 		os.Exit(1)
 	}
 	fn := strings.Replace(fun.Name(), ".", "__", -1)
-	callBuf := bytes.NewBuffer(make([]byte, 0, 16384))
-	fmt.Fprintf(callBuf, `func Call_%s(cur *ora.Ses, input %s) (output %s, err error) {
+	callBuf := buffers.Get()
+	defer buffers.Put(callBuf)
+	fmt.Fprintf(callBuf, `func Call_%s(ses *ora.Ses, input %s) (output %s, err error) {
     if err = input.Check(); err != nil {
         return
     }
-    params := make(map[string]interface{}, %d)
+    params := make([]interface{}, %d)
     `, fn, fun.getStructName(false), fun.getStructName(true), len(fun.Args)+1)
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
@@ -125,7 +85,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	j := i + strings.Index(call[i:], ")") + 1
 	Log.Debug("PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%s`, params) }"+`
-    if err = cur.Execute(%s, nil, params); err != nil { return }
+    if _, err = ses.PrepAndExe(%s, params...); err != nil { return }
     `, call[i:j], fun.getPlsqlConstName())
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`result params: %%s`, params) }\n")
 	for _, line := range convOut {
@@ -190,7 +150,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		ok           bool
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
-	convIn = append(convIn, "var x interface{}\n _ = x")
+	convIn = append(convIn, "var x, v interface{}\n _,_ = x,v")
 
 	var args []Argument
 	if fun.Returns != nil {
@@ -392,8 +352,12 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
-func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]string,
-	name, paramName string, tableSize uint) ([]string, []string) {
+func (arg Argument) getConvSimple(
+	convIn, convOut []string,
+	types map[string]string,
+	name, paramName string,
+	tableSize uint,
+) ([]string, []string) {
 
 	got := arg.goType(types)
 	preconcept, preconcept2 := "", ""
@@ -406,12 +370,10 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 		nilS, deRef = `""`, ""
 	}
 	if arg.IsOutput() {
-		convIn = append(convIn,
-			fmt.Sprintf(`if v, err = cur.NewVariable(%d, %s, %d); err != nil {
-                    err = fmt.Errorf("error creating variable for type %s: %%s", err)
-                    return
-                }`,
-				tableSize, oracleVarTypeName(arg.Type), arg.Charlength, arg.Type))
+		if arg.IsInput() {
+			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
+		}
+		convIn = append(convIn, fmt.Sprintf(`v = &output.%s`, name))
 		pTyp := got
 		if pTyp[0] == '*' {
 			pTyp = pTyp[1:]
@@ -513,16 +475,7 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 				convIn = append(convIn, preconcept2)
 			}
 			convIn = append(convIn,
-				fmt.Sprintf(`if input.%s != `+nilS+` {
-                        v, err = cur.NewVar(`+deRef+`input.%s)
-                    } else {
-                        v, err = cur.NewVariable(%d, %s, %d)
-                    }
-                    if err != nil {
-                        err = fmt.Errorf("error creating new var from %s: %%s", err)
-                        return
-                    }`,
-					name, name, tableSize, oracleVarTypeName(arg.Type), 0, name))
+				fmt.Sprintf(`v = input.%s`, name))
 			if preconcept2 != "" {
 				convIn = append(convIn, "} else { v = nil }")
 			}
@@ -535,23 +488,7 @@ func (arg Argument) getConvSimple(convIn, convOut []string, types map[string]str
 				subGoType = subGoType[1:]
 			}
 			convIn = append(convIn,
-				fmt.Sprintf(`{
-                var a []%s
-                if len(input.%s) == 0 {
-                    a = make([]%s, 0)
-                } else {
-                    a = make([]%s, len(input.%s))
-                    for i, x := range input.%s {
-                        if x != `+nilS+` { a[i] = `+deRef+`x }
-                    }
-                }
-                if v, err = cur.NewVar(a); err != nil {
-                    err = fmt.Errorf("error creating new var from %s(%%v): %%s", a, err)
-                    return
-                }
-                }
-                    `,
-					subGoType, name, subGoType, subGoType, name, name, name))
+				fmt.Sprintf(`v = input.%s`, name))
 			if preconcept2 != "" {
 				convIn = append(convIn, "}")
 			}
@@ -621,7 +558,7 @@ func (arg Argument) getConvRec(convIn, convOut []string,
 	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
-			fmt.Sprintf(`if v, err = cur.NewVariable(%d, %s, %d); err != nil {
+			fmt.Sprintf(`if v, err = ses.NewVariable(%d, %s, %d); err != nil {
                     err = fmt.Errorf("error creating variable for type %s: %%s", err)
                     return
                 }`,
@@ -715,16 +652,7 @@ func (arg Argument) getConvRec(convIn, convOut []string,
 				convIn = append(convIn, preconcept2)
 			}
 			convIn = append(convIn,
-				fmt.Sprintf(`if input.%s != `+nilS+` {
-                        v, err = cur.NewVar(`+deRef+`input.%s)
-                    } else {
-                        v, err = cur.NewVariable(%d, %s, %d)
-                    }
-                    if err != nil {
-                        err = fmt.Errorf("error creating new var from %s: %%s", err)
-                        return
-                    }`,
-					name, name, tableSize, oracleVarTypeName(arg.Type), 0, name))
+				fmt.Sprintf(`v = input.%s`, name))
 			if preconcept2 != "" {
 				convIn = append(convIn, "} else { v = nil }")
 			}
@@ -747,7 +675,7 @@ func (arg Argument) getConvRec(convIn, convOut []string,
                         if x != nil && x.%s != `+nilS+` { a[i] = `+deRef+`(x.%s) }
                     }
                 }
-                if v, err = cur.NewVar(a); err != nil {
+                if v, err = ses.NewVar(a); err != nil {
                     err = fmt.Errorf("error creating new var from %s(%%v): %%s", a, err)
                     return
                 }
