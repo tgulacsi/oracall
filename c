@@ -10,7 +10,7 @@ if [ -z "$dsn" ]; then
         if ! [ -e "$fn" ]; then
             continue
         fi
-        dsn=$(cat $fn)
+        dsn=$(grep -v '^#' $fn | head -n 1)
         break
     done
 fi
