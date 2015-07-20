@@ -17,45 +17,70 @@ limitations under the License.
 package structs
 
 import (
+	"flag"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
-func TestWriteStruct(t *testing.T) {
-	functions, err := ParseCsv(strings.NewReader(csvSource))
-	if err != nil {
-		t.Errorf("error parsing csv: %v", err)
-		t.FailNow()
-	}
+var flagKeep = flag.Bool("x", false, "keep temp files")
 
-	dn, err := ioutil.TempDir("", "structs-")
-	if err != nil {
-		t.Skipf("cannot create temp dir: %v", err)
-		return
-	}
-	defer os.RemoveAll(dn)
-	fh, err := os.Create(filepath.Join(dn + "main.go"))
-	if err != nil {
-		t.Skipf("cannot create temp file in %q: %v", dn, err)
-		return
-	}
-	defer os.Remove(fh.Name())
-	err = SaveFunctions(fh, functions, "main", false)
-	if closeErr := fh.Close(); closeErr != nil {
-		t.Errorf("Writing to %s: %v", fh.Name(), err)
-	}
-	if err != nil {
-		t.Errorf("Saving functions: %v", err)
-		t.FailNow()
-	}
-	cmd := exec.Command("go", "run", fh.Name())
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		t.Errorf("go run %q: %v", fh.Name(), err)
-		t.FailNow()
+func TestWriteStruct(t *testing.T) {
+	var (
+		dn, fn string
+		keep   = *flagKeep
+		err    error
+	)
+	for i, tc := range testCases {
+		functions := tc.ParseCsv(t, i)
+
+		if dn == "" {
+			if dn, err = ioutil.TempDir("", "structs-"); err != nil {
+				t.Skipf("cannot create temp dir: %v", err)
+				return
+			}
+			defer func() {
+				if !keep {
+					os.RemoveAll(dn)
+				}
+			}()
+		}
+		if !keep && fn != "" {
+			_ = os.Remove(fn)
+		}
+		fn = filepath.Join(dn, fmt.Sprintf("main-%d.go", i))
+		defer func() {
+			if !keep {
+				os.Remove(fn)
+			}
+		}()
+		fh, err := os.Create(fn)
+		if err != nil {
+			t.Skipf("cannot create temp file in %q: %v", dn, err)
+			return
+		}
+		err = SaveFunctions(fh, functions, "main", false)
+		if err != nil {
+			_ = fh.Close()
+			t.Errorf("%d. Saving functions: %v", i, err)
+			t.FailNow()
+		}
+		if _, err = io.WriteString(fh, "\nfunc main() {}\n"); err != nil {
+			t.Errorf("%d. append main: %v", i, err)
+		}
+		if err = fh.Close(); err != nil {
+			t.Errorf("%d. Writing to %s: %v", i, fh.Name(), err)
+		}
+		cmd := exec.Command("go", "run", fh.Name())
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			keep = true
+			t.Errorf("%d. go run %q: %v", i, fh.Name(), err)
+			t.FailNow()
+		}
 	}
 }

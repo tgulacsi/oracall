@@ -268,14 +268,14 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 		case "ora.String":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.IsNull && len(%s.Value) > %d {
-        return errors.New("%s is longer then accepted (%d)")
+        return errors.New("%s is longer than accepted (%d)")
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
 		case "NullString", "sql.NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
-        return errors.New("%s is longer then accepted (%d)")
+        return errors.New("%s is longer than accepted (%d)")
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))

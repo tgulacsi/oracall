@@ -35,6 +35,9 @@ const (
 	//MarkValid  = "滿" // 0x6eff = fill; full, satisfied
 	MarkValid  = "Valid" // 0x6eff = fill; full, satisfied
 	MarkHidden = "匿"     // 0x533f = hide
+
+	DefaultMaxVARCHARLength = 32767
+	DefaultMaxCHARLength    = 10
 )
 
 type Function struct {
@@ -155,10 +158,10 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	switch arg.Type {
 	case "CHAR", "NCHAR", "VARCHAR", "NVARCHAR", "VARCHAR2", "NVARCHAR2":
 		if arg.Charlength <= 0 {
-			if strings.Index(arg.Type, "VAR") >= 0 {
-				arg.Charlength = 1000
+			if strings.Contains(arg.Type, "VAR") {
+				arg.Charlength = DefaultMaxVARCHARLength
 			} else {
-				arg.Charlength = 10
+				arg.Charlength = DefaultMaxCHARLength
 			}
 		}
 		arg.AbsType = fmt.Sprintf("%s(%d)", arg.Type, arg.Charlength)

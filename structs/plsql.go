@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync/atomic"
 )
 
 // MaxTableSize is the maximum size of the array arguments
@@ -31,7 +32,9 @@ const MaxTableSize = 1000
 // OracleArgument
 //
 
-var stringTypes = make(map[string]struct{}, 16)
+var (
+	stringTypes = make(map[string]struct{}, 16)
+)
 
 func oracleVarTypeName(typ string) string {
 	switch typ {
@@ -46,7 +49,7 @@ func oracleVarTypeName(typ string) string {
 	case "INTEGER":
 		return "ora.Int64"
 	case "REF CURSOR":
-		return "oracle.CursorVarType"
+		return "*ora.Ses"
 	case "DATE", "TIMESTAMP":
 		return "ora.Time"
 	case "BLOB", "CLOB":
@@ -76,8 +79,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
     if err = input.Check(); err != nil {
         return
     }
-    params := make([]interface{}, %d)
-    `, fn, fun.getStructName(false), fun.getStructName(true), len(fun.Args)+1)
+    `, fn, fun.getStructName(false), fun.getStructName(true))
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -150,7 +152,14 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		ok           bool
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
-	convIn = append(convIn, "var x, v interface{}\n _,_ = x,v")
+	convIn = append(convIn, "", "var x, v interface{}\n _,_ = x,v")
+
+	var nextParamID uint32
+	getNextParamID := func(name string) uint32 {
+		i := atomic.AddUint32(&nextParamID, 1)
+		callArgs[name] = fmt.Sprintf(":%d", i)
+		return i - 1 // start from 0
+	}
 
 	var args []Argument
 	if fun.Returns != nil {
@@ -166,7 +175,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
 			name := capitalize(goName(arg.Name))
-			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, arg.Name, 0)
+			paramIdx := getNextParamID(arg.Name)
+			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, paramIdx)
 
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
@@ -198,7 +208,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					os.Exit(1)
 				}
 				name := capitalize(goName(arg.Name))
-				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, arg.Name, 0)
+				paramIdx := getNextParamID(arg.Name)
+				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, paramIdx)
 			} else {
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
@@ -232,8 +243,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							":"+arg.Name+" := "+arg.Name+";")
 					}
 					name := capitalize(goName(arg.Name))
+					paramIdx := getNextParamID(arg.Name)
 					convIn, convOut = arg.TableOf.getConvSimple(convIn, convOut,
-						fun.types, name, arg.Name, MaxTableSize)
+						fun.types, name, paramIdx)
 
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
@@ -332,6 +344,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			os.Exit(1)
 		}
 	}
+
+	convIn[0] = fmt.Sprintf("params := make([]interface{}, %d)", nextParamID)
+
 	callb := bytes.NewBuffer(nil)
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
@@ -352,150 +367,35 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
+func (arg Argument) getIsValidCheck(types map[string]string, name string) string {
+	got := arg.goType(types)
+	if got == "ora.*Ses" {
+		return name + " != nil"
+	}
+	if strings.HasPrefix(got, "ora.") {
+		return "!" + name + ".IsNull"
+	}
+	if strings.HasPrefix(got, "sql.Null") {
+		return name + ".Valid"
+	}
+	return name + " != nil /*" + got + "*/"
+}
+
 func (arg Argument) getConvSimple(
 	convIn, convOut []string,
 	types map[string]string,
-	name, paramName string,
-	tableSize uint,
+	name string,
+	paramIdx uint32,
 ) ([]string, []string) {
-
-	got := arg.goType(types)
-	preconcept, preconcept2 := "", ""
-	if strings.Count(name, ".") >= 1 {
-		preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
-		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
-	}
-	nilS, deRef := `nil`, "*"
-	if got == "string" {
-		nilS, deRef = `""`, ""
-	}
 	if arg.IsOutput() {
 		if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
 		}
 		convIn = append(convIn, fmt.Sprintf(`v = &output.%s`, name))
-		pTyp := got
-		if pTyp[0] == '*' {
-			pTyp = pTyp[1:]
-		}
-		var outConv string
-		if tableSize == 0 {
-			if strings.HasSuffix(got, "__cur") {
-				outConv = fmt.Sprintf(`output.%s = %s{y}`, name, got)
-				if arg.Type == "REF CURSOR" {
-					pTyp = "*ora.Ses"
-				}
-			} else if got == "string" {
-				outConv = fmt.Sprintf(`output.%s = y`, name)
-			} else if got[0] != '*' {
-				outConv = fmt.Sprintf(`output.%s = &y`, name)
-			} else {
-				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s = &z`, pTyp, name)
-			}
-			convOut = append(convOut,
-				fmt.Sprintf(`if params["%s"] != nil {
-                v = params["%s"].(*oracle.Variable)
-                if err = v.GetValueInto(&x, 0); err != nil {
-                    err = fmt.Errorf("error getting value of %s: %%s", err)
-                    return
-                } else if x != `+nilS+` {
-					%s
-                    %s
-                }}
-                `, paramName, paramName, name, getOutConvTSwitch(name, pTyp), outConv))
-		} else {
-			if got == "string" {
-				outConv = fmt.Sprintf(`output.%s[i] = y`, name)
-			} else if got[0] != '*' {
-				outConv = fmt.Sprintf(`output.%s[i] = &y`, name)
-			} else {
-				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s[i] = &z`, pTyp, name)
-			}
-			mk := ""
-			mk = fmt.Sprintf(`output.%s = output.%s[:cap(output.%s)]
-                if cap(output.%s) < v.Len() {
-                    output.%s = append(output.%s, make([]%s, v.Len()-cap(output.%s))...)
-                }`, name, name, name, name, name, name, got, name)
-			convOut = append(convOut,
-				fmt.Sprintf(`if params["%s"] != nil {
-                v = params["%s"].(*oracle.Variable)
-                %s
-                for i := 0; i < v.Len(); i++ {
-                    if err = v.GetValueInto(&x, uint(i)); err != nil {
-                        err = fmt.Errorf("error getting %%d. value into %s: %%s", i, err)
-                        return
-                    } else if x != `+nilS+` {
-						%s
-                        %s
-                    }
-                }
-            }
-            `, paramName, paramName,
-					mk,
-					name,
-					getOutConvTSwitch(name, pTyp), outConv))
-		}
-		if arg.IsInput() {
-			if tableSize == 0 {
-				if preconcept2 != "" {
-					convIn = append(convIn, preconcept2)
-				}
-				convIn = append(convIn,
-					fmt.Sprintf(`if input.%s != `+nilS+` {
-                            if err = v.SetValue(0, `+deRef+`input.%s); err != nil {
-                                err = fmt.Errorf("error setting value %%v from %s: %%s", v, err)
-                                return
-                            }
-                        }`,
-						name, name, name))
-				if preconcept2 != "" {
-					convIn = append(convIn, "}")
-				}
-			} else {
-				if preconcept2 != "" {
-					convIn = append(convIn, preconcept2)
-				}
-				convIn = append(convIn,
-					fmt.Sprintf(`for i, x := range input.%s {
-                            if err = v.SetValue(uint(i), x); err != nil {
-                                err = fmt.Errorf("error setting value %%v[%%d] from %s: %%s", v, i, err)
-                                return
-                            }
-                        }`, name, name))
-				if preconcept2 != "" {
-					convIn = append(convIn, "}")
-				}
-			}
-		}
-	} else { // just and only input
-		if tableSize == 0 {
-			if preconcept2 != "" {
-				convIn = append(convIn, preconcept2)
-			}
-			convIn = append(convIn,
-				fmt.Sprintf(`v = input.%s`, name))
-			if preconcept2 != "" {
-				convIn = append(convIn, "} else { v = nil }")
-			}
-		} else {
-			if preconcept2 != "" {
-				convIn = append(convIn, preconcept2)
-			}
-			subGoType := got
-			if subGoType[0] == '*' {
-				subGoType = subGoType[1:]
-			}
-			convIn = append(convIn,
-				fmt.Sprintf(`v = input.%s`, name))
-			if preconcept2 != "" {
-				convIn = append(convIn, "}")
-			}
-		}
+	} else {
+		convIn = append(convIn, fmt.Sprintf("v = input.%s", name))
 	}
-	convIn = append(convIn,
-		fmt.Sprintf("params[\"%s\"] = v\n", paramName))
+	convIn = append(convIn, fmt.Sprintf("params[%d] = v\n", paramIdx))
 	return convIn, convOut
 }
 
@@ -549,7 +449,7 @@ func (arg Argument) getConvRec(convIn, convOut []string,
 	got := arg.goType(types)
 	preconcept, preconcept2 := "", ""
 	if strings.Count(name, ".") >= 1 && parentArg != nil {
-		preconcept = "input." + name[:strings.LastIndex(name, ".")] + " != nil &&"
+		preconcept = "!input." + name[:strings.LastIndex(name, ".")] + ".IsNull &&"
 		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
 	}
 	nilS, deRef := `nil`, "*"
