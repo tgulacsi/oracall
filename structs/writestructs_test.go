@@ -27,7 +27,7 @@ import (
 	"testing"
 )
 
-var flagKeep = flag.Bool("x", false, "keep temp files")
+var flagKeep = flag.Bool("keep", false, "keep temp files")
 
 func TestWriteStruct(t *testing.T) {
 	var (
