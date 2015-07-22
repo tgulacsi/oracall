@@ -32,11 +32,11 @@ import (
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
-	"gopkg.in/goracle.v1/oracle"
+	"github.com/tgulacsi/go/orahlp"
+	"gopkg.in/rana/ora.v2"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")
-var flagBypassMultipleArgs = flag.Bool("bypassmultipleargs", false, "bypass multiple args - experimental, probably worsens ORA-01008")
 
 func main() {
 	flag.Parse()
@@ -73,22 +73,30 @@ func main() {
 	log.Printf("calling %s(%#v)", funName, inp)
 
 	// get cursor
-	user, passw, sid := oracle.SplitDSN(*flagConnect)
-	conn, err := oracle.NewConnection(user, passw, sid, false)
+	ora.Register(nil)
+	user, passw, sid := orahlp.SplitDSN(*flagConnect)
+	env, err := ora.OpenEnv(nil)
 	if err != nil {
-		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
+		panic(err)
 	}
-	if err = conn.Connect(0, false); err != nil {
-		log.Fatalf("error connecting: %s", err)
+	defer env.Close()
+	srvCfg := ora.NewSrvCfg()
+	srvCfg.Dblink = sid
+	srv, err := env.OpenSrv(srvCfg)
+	if err != nil {
+		log.Fatalf("connect to %s: %v", sid, err)
 	}
-	defer conn.Close()
-	cur := oracle.NewCursor(conn)
-	defer cur.Close()
-
-	oracle.BypassMultipleArgs = *flagBypassMultipleArgs
+	defer srv.Close()
+	sesCfg := ora.NewSesCfg()
+	sesCfg.Username, sesCfg.Password = user, passw
+	ses, err := srv.OpenSes(sesCfg)
+	if err != nil {
+		log.Fatalf("auth %s: %v", user, err)
+	}
+	defer ses.Close()
 
 	// call the function
-	out, err := fun(cur, inp)
+	out, err := fun(ses, inp)
 	if err != nil {
 		log.Fatalf("error calling %s(%s): %s", funName, inp, err)
 	}

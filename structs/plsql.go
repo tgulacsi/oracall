@@ -143,7 +143,7 @@ func demap(plsql, callFun string) (string, string) {
 		ParamsArrLen: len(paramsArr),
 	}
 	var callBuf bytes.Buffer
-	fmt.Fprintln(os.Stderr, callFun)
+	//fmt.Fprintln(os.Stderr, callFun)
 	if err := template.Must(template.New("callFun").
 		Funcs(
 		map[string]interface{}{
