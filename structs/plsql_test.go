@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/kylelemons/godebug/diff"
-
-	//"github.com/kylelemons/godebug/diff"
+	"github.com/tgulacsi/go/loghlp/tsthlp"
 )
 
 func TestOne(t *testing.T) {
+	Log.SetHandler(tsthlp.TestHandler(t))
 	for i, tc := range testCases {
 		functions := tc.ParseCsv(t, i)
 		got, _ := functions[0].PlsqlBlock()

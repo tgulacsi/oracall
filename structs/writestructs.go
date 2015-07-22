@@ -265,9 +265,16 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 	switch arg.Flavor {
 	case FLAVOR_SIMPLE:
 		switch got {
+		case "*string":
+			checks = append(checks,
+				fmt.Sprintf(`if %s != nil && len(*%s) > %d {
+        return errors.New("%s is longer than accepted (%d)")
+    }`,
+					name, name, arg.Charlength,
+					name, arg.Charlength))
 		case "ora.String":
 			checks = append(checks,
-				fmt.Sprintf(`if %s.IsNull && len(%s.Value) > %d {
+				fmt.Sprintf(`if !%s.IsNull && len(%s.Value) > %d {
         return errors.New("%s is longer than accepted (%d)")
     }`,
 					name, name, arg.Charlength,
@@ -365,6 +372,9 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2", "ROWID":
+			if arg.IsOutput() {
+				return "*string"
+			}
 			return "ora.String" // NULL is the same as the empty string for Oracle
 		case "NUMBER":
 			return "ora.Float64"

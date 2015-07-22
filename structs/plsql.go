@@ -19,10 +19,12 @@ package structs
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"os"
 	"strings"
-	"sync/atomic"
+
+	"github.com/tgulacsi/go/orahlp"
 )
 
 // MaxTableSize is the maximum size of the array arguments
@@ -89,7 +91,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%s`, params) }"+`
     if _, err = ses.PrepAndExe(%s, params...); err != nil { return }
     `, call[i:j], fun.getPlsqlConstName())
-	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`result params: %%s`, params) }\n")
+	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %s`, params) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -117,7 +119,51 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	}
 	io.WriteString(plsBuf, "\nEND;\n")
 	plsql = plsBuf.String()
+
+	plsql, callFun = demap(plsql, callFun)
 	return
+}
+
+func demap(plsql, callFun string) (string, string) {
+	type repl struct {
+		ParamsArrLen int
+	}
+	paramsMap := make(map[string][]int, 16)
+
+	var i int
+	old := plsql
+	plsql, paramsArr := orahlp.MapToSlice(plsql, func(key string) interface{} {
+		paramsMap[key] = append(paramsMap[key], i)
+		i++
+		return key
+	})
+	Log.Debug("MapToSlice", "old", old, "new", plsql, "params", paramsMap, "arr", paramsArr)
+
+	opts := repl{
+		ParamsArrLen: len(paramsArr),
+	}
+	var callBuf bytes.Buffer
+	fmt.Fprintln(os.Stderr, callFun)
+	if err := template.Must(template.New("callFun").
+		Funcs(
+		map[string]interface{}{
+			"paramsIdx": func(key string) int {
+				arr := paramsMap[key]
+				if len(arr) == 0 {
+					Log.Error("paramsIdx", "key", key, "val", arr, "map", paramsMap)
+				} else {
+					Log.Debug("paramsIdx", "key", key, "val", paramsMap[key])
+				}
+				i = arr[0]
+				paramsMap[key] = arr[1:]
+				return i
+			},
+		}).
+		Parse(callFun)).
+		Execute(&callBuf, opts); err != nil {
+		panic(err)
+	}
+	return plsql, callBuf.String()
 }
 
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
@@ -152,14 +198,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		ok           bool
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
-	convIn = append(convIn, "", "var x, v interface{}\n _,_ = x,v")
-
-	var nextParamID uint32
-	getNextParamID := func(name string) uint32 {
-		i := atomic.AddUint32(&nextParamID, 1)
-		callArgs[name] = fmt.Sprintf(":%d", i)
-		return i - 1 // start from 0
-	}
+	convIn = append(convIn, "params := make([]interface{}, {{.ParamsArrLen}})", "var x, v interface{}\n _,_ = x,v")
 
 	var args []Argument
 	if fun.Returns != nil {
@@ -171,13 +210,18 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	} else {
 		args = fun.Args
 	}
+	addParam := func(paramName string) string {
+		if paramName == "" {
+			panic("empty param name")
+		}
+		return `params[{{paramsIdx "` + paramName + `"}}]`
+	}
 	for _, arg := range args {
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
 			name := capitalize(goName(arg.Name))
-			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name)
-			paramIdx := getNextParamID(arg.Name)
-			convIn, convOut = arg.addParam(convIn, convOut, paramIdx, paramIdx)
+			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types,
+				name, addParam(arg.Name))
 
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
@@ -200,20 +244,15 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			for k, v := range arg.RecordOf {
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				name := aname + "." + capitalize(goName(k))
-				var paramIdxIn, paramIdxOut uint32
 				if arg.IsInput() {
-					paramIdxIn = getNextParamID(tmp)
-					pre = append(pre,
-						fmt.Sprintf("%s.%s := :%d;", vn, k, paramIdxIn))
+					pre = append(pre, vn+"."+k+" := :"+tmp+";")
 				}
 				if arg.IsOutput() {
-					paramIdxOut = getNextParamID(tmp)
-					post = append(post,
-						fmt.Sprintf(":%d := %s.%s;", paramIdxOut, vn, k))
+					post = append(post, ":"+tmp+" := "+vn+"."+k+";")
 				}
 				convIn, convOut = v.getConvRec(convIn, convOut, fun.types,
-					name, 0, &arg, k)
-				convIn, convOut = v.addParam(convIn, convOut, paramIdxIn, paramIdxOut)
+					name, addParam(tmp),
+					0, &arg, k)
 			}
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
@@ -222,9 +261,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					os.Exit(1)
 				}
 				name := capitalize(goName(arg.Name))
-				paramIdx := getNextParamID(arg.Name)
-				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name)
-				convIn, convOut = arg.addParam(convIn, convOut, paramIdx, paramIdx)
+				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types,
+					name, addParam(arg.Name))
 			} else {
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
@@ -238,7 +276,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					vn = getInnerVarName(fun.Name(), arg.Name)
 					callArgs[arg.Name] = vn
 					decls = append(decls, vn+" "+arg.TypeName+";")
-					var paramIdx uint32
 					if arg.IsInput() {
 						pre = append(pre,
 							vn+".DELETE;",
@@ -249,7 +286,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							"END LOOP;")
 					}
 					if arg.IsOutput() {
-						paramIdx = getNextParamID(arg.Name)
 						post = append(post,
 							arg.Name+".DELETE;",
 							"i1 := "+vn+".FIRST;",
@@ -257,15 +293,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							"  "+arg.Name+"(i1) := "+vn+"(i1);",
 							"  i1 := "+vn+".NEXT(i1);",
 							"END LOOP;",
-							fmt.Sprintf(":%d := %s;", paramIdx, arg.Name))
+							":"+arg.Name+" := "+arg.Name+";")
 					}
 					name := capitalize(goName(arg.Name))
-					convIn, convOut = arg.TableOf.getConvSimple(convIn, convOut,
-						fun.types, name)
-					if arg.IsOutput() {
-						convOut = append(convOut,
-							fmt.Sprintf("params[%d] = v", paramIdx))
-					}
+					convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types,
+						name, addParam(arg.Name))
 
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
@@ -327,9 +359,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						}
 						//name := aname + "." + capitalize(goName(k))
 
-						paramIdx := getNextParamID(tmp)
 						convIn, convOut = v.getConvRec(
-							convIn, convOut, fun.types, aname, paramIdx, MaxTableSize,
+							convIn, convOut, fun.types, aname, addParam(tmp),
+							MaxTableSize,
 							arg.TableOf, k)
 
 						if arg.IsInput() {
@@ -366,8 +398,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		}
 	}
 
-	convIn[0] = fmt.Sprintf("params := make([]interface{}, %d)", nextParamID)
-
 	callb := bytes.NewBuffer(nil)
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
@@ -388,23 +418,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
-func (arg Argument) addParam(convIn, convOut []string, idxIn, idxOut uint32) ([]string, []string) {
-	if arg.IsInput() {
-		convIn = append(convIn,
-			fmt.Sprintf("params[%d] = v", idxIn))
-	}
-	if arg.IsOutput() {
-		if !(arg.IsInput() && idxIn == idxOut) {
-			convOut = append(convOut,
-				fmt.Sprintf("params[%d] = v", idxOut))
-		}
-	}
-	return convIn, convOut
-}
-
 func (arg Argument) getIsValidCheck(types map[string]string, name string) string {
 	got := arg.goType(types)
-	if got == "ora.*Ses" {
+	if got[0] == '*' {
 		return name + " != nil"
 	}
 	if strings.HasPrefix(got, "ora.") {
@@ -419,15 +435,15 @@ func (arg Argument) getIsValidCheck(types map[string]string, name string) string
 func (arg Argument) getConvSimple(
 	convIn, convOut []string,
 	types map[string]string,
-	name string,
+	name, paramName string,
 ) ([]string, []string) {
 	if arg.IsOutput() {
 		if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
 		}
-		convIn = append(convIn, fmt.Sprintf(`v = &output.%s`, name))
+		convIn = append(convIn, fmt.Sprintf(`%s = &output.%s`, paramName, name))
 	} else {
-		convIn = append(convIn, fmt.Sprintf("v = input.%s", name))
+		convIn = append(convIn, fmt.Sprintf("%s = input.%s", paramName, name))
 	}
 	return convIn, convOut
 }
@@ -478,18 +494,19 @@ func getOutConvTSwitch(name, pTyp string) string {
 func (arg Argument) getConvRec(
 	convIn, convOut []string,
 	types map[string]string,
-	name string,
+	name, paramName string,
 	tableSize uint,
 	parentArg *Argument,
 	key string,
 ) ([]string, []string) {
 
+	if arg.IsInput() {
+		convIn = append(convIn,
+			fmt.Sprintf("%s = input.%s", paramName, name))
+	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
-			fmt.Sprintf("v = &output.%s", name))
-	} else { // just and only input
-		convIn = append(convIn,
-			fmt.Sprintf("v = input.%s", name))
+			fmt.Sprintf("%s = &output.%s", paramName, name))
 	}
 	return convIn, convOut
 }

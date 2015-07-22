@@ -17,6 +17,7 @@ limitations under the License.
 package structs
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -25,11 +26,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/tgulacsi/go/loghlp/tsthlp"
 )
 
 var flagKeep = flag.Bool("keep", false, "keep temp files")
 
 func TestWriteStruct(t *testing.T) {
+	Log.SetHandler(tsthlp.TestHandler(t))
 	var (
 		dn, fn string
 		keep   = *flagKeep
@@ -76,10 +80,11 @@ func TestWriteStruct(t *testing.T) {
 			t.Errorf("%d. Writing to %s: %v", i, fh.Name(), err)
 		}
 		cmd := exec.Command("go", "run", fh.Name())
-		cmd.Stderr = os.Stderr
+		var errBuf bytes.Buffer
+		cmd.Stderr = &errBuf
 		if err := cmd.Run(); err != nil {
 			keep = true
-			t.Errorf("%d. go run %q: %v", i, fh.Name(), err)
+			t.Errorf("%d. go run %q: %v\n%s", i, fh.Name(), err, errBuf.String())
 			t.FailNow()
 		}
 	}
