@@ -175,8 +175,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
 			name := capitalize(goName(arg.Name))
+			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name)
 			paramIdx := getNextParamID(arg.Name)
-			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, paramIdx)
+			convIn, convOut = arg.addParam(convIn, convOut, paramIdx, paramIdx)
 
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
@@ -184,22 +185,35 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			callArgs[arg.Name] = vn
 			aname := capitalize(goName(arg.Name))
 			if arg.IsOutput() {
-				convOut = append(convOut, fmt.Sprintf(`
+				if arg.IsInput() {
+					convIn = append(convIn, fmt.Sprintf(`
+					if input.%s != nil { *output.%s = *input.%s
+					} else { output.%s = new(%s) }
+					`, aname, aname, aname, aname, arg.goType(fun.types)[1:]))
+				} else {
+					convOut = append(convOut, fmt.Sprintf(`
                     if output.%s == nil {
                         output.%s = new(%s)
                     }`, aname, aname, arg.goType(fun.types)[1:]))
+				}
 			}
 			for k, v := range arg.RecordOf {
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				name := aname + "." + capitalize(goName(k))
+				var paramIdxIn, paramIdxOut uint32
 				if arg.IsInput() {
-					pre = append(pre, vn+"."+k+" := :"+tmp+";")
+					paramIdxIn = getNextParamID(tmp)
+					pre = append(pre,
+						fmt.Sprintf("%s.%s := :%d;", vn, k, paramIdxIn))
 				}
 				if arg.IsOutput() {
-					post = append(post, ":"+tmp+" := "+vn+"."+k+";")
+					paramIdxOut = getNextParamID(tmp)
+					post = append(post,
+						fmt.Sprintf(":%d := %s.%s;", paramIdxOut, vn, k))
 				}
-				convIn, convOut = v.getConvRec(convIn, convOut, fun.types, name, tmp,
-					0, &arg, k)
+				convIn, convOut = v.getConvRec(convIn, convOut, fun.types,
+					name, 0, &arg, k)
+				convIn, convOut = v.addParam(convIn, convOut, paramIdxIn, paramIdxOut)
 			}
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
@@ -209,7 +223,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 				name := capitalize(goName(arg.Name))
 				paramIdx := getNextParamID(arg.Name)
-				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name, paramIdx)
+				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types, name)
+				convIn, convOut = arg.addParam(convIn, convOut, paramIdx, paramIdx)
 			} else {
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
@@ -223,6 +238,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					vn = getInnerVarName(fun.Name(), arg.Name)
 					callArgs[arg.Name] = vn
 					decls = append(decls, vn+" "+arg.TypeName+";")
+					var paramIdx uint32
 					if arg.IsInput() {
 						pre = append(pre,
 							vn+".DELETE;",
@@ -233,6 +249,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							"END LOOP;")
 					}
 					if arg.IsOutput() {
+						paramIdx = getNextParamID(arg.Name)
 						post = append(post,
 							arg.Name+".DELETE;",
 							"i1 := "+vn+".FIRST;",
@@ -240,12 +257,15 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							"  "+arg.Name+"(i1) := "+vn+"(i1);",
 							"  i1 := "+vn+".NEXT(i1);",
 							"END LOOP;",
-							":"+arg.Name+" := "+arg.Name+";")
+							fmt.Sprintf(":%d := %s;", paramIdx, arg.Name))
 					}
 					name := capitalize(goName(arg.Name))
-					paramIdx := getNextParamID(arg.Name)
 					convIn, convOut = arg.TableOf.getConvSimple(convIn, convOut,
-						fun.types, name, paramIdx)
+						fun.types, name)
+					if arg.IsOutput() {
+						convOut = append(convOut,
+							fmt.Sprintf("params[%d] = v", paramIdx))
+					}
 
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
@@ -307,8 +327,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						}
 						//name := aname + "." + capitalize(goName(k))
 
+						paramIdx := getNextParamID(tmp)
 						convIn, convOut = v.getConvRec(
-							convIn, convOut, fun.types, aname, tmp, MaxTableSize,
+							convIn, convOut, fun.types, aname, paramIdx, MaxTableSize,
 							arg.TableOf, k)
 
 						if arg.IsInput() {
@@ -367,6 +388,20 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
+func (arg Argument) addParam(convIn, convOut []string, idxIn, idxOut uint32) ([]string, []string) {
+	if arg.IsInput() {
+		convIn = append(convIn,
+			fmt.Sprintf("params[%d] = v", idxIn))
+	}
+	if arg.IsOutput() {
+		if !(arg.IsInput() && idxIn == idxOut) {
+			convOut = append(convOut,
+				fmt.Sprintf("params[%d] = v", idxOut))
+		}
+	}
+	return convIn, convOut
+}
+
 func (arg Argument) getIsValidCheck(types map[string]string, name string) string {
 	got := arg.goType(types)
 	if got == "ora.*Ses" {
@@ -385,7 +420,6 @@ func (arg Argument) getConvSimple(
 	convIn, convOut []string,
 	types map[string]string,
 	name string,
-	paramIdx uint32,
 ) ([]string, []string) {
 	if arg.IsOutput() {
 		if arg.IsInput() {
@@ -395,7 +429,6 @@ func (arg Argument) getConvSimple(
 	} else {
 		convIn = append(convIn, fmt.Sprintf("v = input.%s", name))
 	}
-	convIn = append(convIn, fmt.Sprintf("params[%d] = v\n", paramIdx))
 	return convIn, convOut
 }
 
@@ -442,154 +475,22 @@ func getOutConvTSwitch(name, pTyp string) string {
 				}`, pTyp, name, pTyp)
 }
 
-func (arg Argument) getConvRec(convIn, convOut []string,
-	types map[string]string, name, paramName string, tableSize uint,
-	parentArg *Argument, key string) ([]string, []string) {
+func (arg Argument) getConvRec(
+	convIn, convOut []string,
+	types map[string]string,
+	name string,
+	tableSize uint,
+	parentArg *Argument,
+	key string,
+) ([]string, []string) {
 
-	got := arg.goType(types)
-	preconcept, preconcept2 := "", ""
-	if strings.Count(name, ".") >= 1 && parentArg != nil {
-		preconcept = "!input." + name[:strings.LastIndex(name, ".")] + ".IsNull &&"
-		preconcept2 = "if " + preconcept[:len(preconcept)-3] + " {"
-	}
-	nilS, deRef := `nil`, "*"
-	if arg.goType(types) == "string" {
-		nilS, deRef = `""`, ""
-	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
-			fmt.Sprintf(`if v, err = ses.NewVariable(%d, %s, %d); err != nil {
-                    err = fmt.Errorf("error creating variable for type %s: %%s", err)
-                    return
-                }`,
-				tableSize, oracleVarTypeName(arg.Type), arg.Charlength, arg.Type))
-		pTyp := got
-		if pTyp[0] == '*' {
-			pTyp = pTyp[1:]
-		}
-		var outConv string
-		if tableSize == 0 {
-			if got == "string" {
-				outConv = fmt.Sprintf(`output.%s = y`, name)
-			} else if got[0] != '*' {
-				outConv = fmt.Sprintf(`output.%s = &y`, name)
-			} else {
-				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s = &z`, pTyp, name)
-			}
-			convOut = append(convOut,
-				fmt.Sprintf(`if params["%s"] != nil {
-                v = params["%s"].(*oracle.Variable)
-                if err = v.GetValueInto(&x, 0); err != nil {
-                    err = fmt.Errorf("error getting value of %s: %%s", err)
-                    return
-                } else if x != `+nilS+` {
-					%s
-                    %s
-                }}
-                `, paramName, paramName, name, getOutConvTSwitch(name, pTyp), outConv))
-		} else {
-			if got == "string" {
-				outConv = fmt.Sprintf(`output.%s[i].%s = y`, name, capitalize(key))
-			} else if got[0] != '*' {
-				outConv = fmt.Sprintf(`output.%s[i].%s = &y`, name, capitalize(key))
-			} else {
-				outConv = fmt.Sprintf(`z := %s(y)
-            output.%s[i].%s = &z`, pTyp, name, capitalize(key))
-			}
-			convOut = append(convOut,
-				fmt.Sprintf(`if params["%s"] != nil {
-                v = params["%s"].(*oracle.Variable)
-                for i := 0; i < v.Len(); i++ {
-                    if err = v.GetValueInto(&x, uint(i)); err != nil {
-                        err = fmt.Errorf("error getting %%d. value into %s%s: %%s", i, err)
-                        return
-                    } else if x != `+nilS+` {
-						%s
-                        %s
-                    }
-                }
-            }
-            `, paramName, paramName,
-					name, key,
-					getOutConvTSwitch(name, pTyp), outConv))
-		}
-		if arg.IsInput() {
-			if tableSize == 0 {
-				if preconcept2 != "" {
-					convIn = append(convIn, preconcept2)
-				}
-				convIn = append(convIn,
-					fmt.Sprintf(`if input.%s != `+nilS+` {
-                        if err = v.SetValue(0, `+deRef+`input.%s); err != nil {
-                            err = fmt.Errorf("error setting value %%v from %s: %%s", v, err)
-                            return
-                        }
-                        }`,
-						name, name, name))
-				if preconcept2 != "" {
-					convIn = append(convIn, "}")
-				}
-			} else {
-				if preconcept2 != "" {
-					convIn = append(convIn, preconcept2)
-				}
-				convIn = append(convIn,
-					fmt.Sprintf(`for i, x := range input.%s {
-                        if err = v.SetValue(uint(i), x.%s); err != nil {
-                            err = fmt.Errorf("error setting value %%v[%%d] from %s%s: %%s", v, i, err)
-                            return
-                        }
-                        }`, name, capitalize(key), name, capitalize(key)))
-				if preconcept2 != "" {
-					convIn = append(convIn, "}")
-				}
-			}
-		}
+			fmt.Sprintf("v = &output.%s", name))
 	} else { // just and only input
-		if tableSize == 0 {
-			if preconcept2 != "" {
-				convIn = append(convIn, preconcept2)
-			}
-			convIn = append(convIn,
-				fmt.Sprintf(`v = input.%s`, name))
-			if preconcept2 != "" {
-				convIn = append(convIn, "} else { v = nil }")
-			}
-		} else {
-			if preconcept2 != "" {
-				convIn = append(convIn, preconcept2)
-			}
-			subGoType := got
-			if subGoType[0] == '*' {
-				subGoType = subGoType[1:]
-			}
-			convIn = append(convIn,
-				fmt.Sprintf(`{
-                var a []%s
-                if len(input.%s) == 0 {
-                    a = make([]%s, 0)
-                } else {
-                    a = make([]%s, len(input.%s))
-                    for i, x := range input.%s {
-                        if x != nil && x.%s != `+nilS+` { a[i] = `+deRef+`(x.%s) }
-                    }
-                }
-                if v, err = ses.NewVar(a); err != nil {
-                    err = fmt.Errorf("error creating new var from %s(%%v): %%s", a, err)
-                    return
-                }
-                }
-                    `,
-					subGoType, name, subGoType, subGoType, name, name,
-					capitalize(key), capitalize(key), name))
-			if preconcept2 != "" {
-				convIn = append(convIn, "}")
-			}
-		}
+		convIn = append(convIn,
+			fmt.Sprintf("v = input.%s", name))
 	}
-	convIn = append(convIn,
-		fmt.Sprintf("params[\"%s\"] = v\n", paramName))
 	return convIn, convOut
 }
 
@@ -616,9 +517,9 @@ func getVarName(funName, varName, prefix string) string {
 }
 
 func getInnerVarName(funName, varName string) string {
-	return getVarName(funName, varName, "x")
+	return getVarName(funName, varName, "v")
 }
 
 func getParamName(funName, paramName string) string {
-	return getVarName(funName, paramName, "x")
+	return getVarName(funName, paramName, "p")
 }
