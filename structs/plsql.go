@@ -252,7 +252,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 				convIn, convOut = v.getConvRec(convIn, convOut, fun.types,
 					name, addParam(tmp),
-					0, &arg, k)
+					0, arg, k)
 			}
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
@@ -362,7 +362,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						convIn, convOut = v.getConvRec(
 							convIn, convOut, fun.types, aname, addParam(tmp),
 							MaxTableSize,
-							arg.TableOf, k)
+							v, k)
 
 						if arg.IsInput() {
 							pre = append(pre,
@@ -504,7 +504,7 @@ func (arg Argument) getConvRec(
 	types map[string]string,
 	name, paramName string,
 	tableSize uint,
-	parentArg *Argument,
+	parentArg Argument,
 	key string,
 ) ([]string, []string) {
 
