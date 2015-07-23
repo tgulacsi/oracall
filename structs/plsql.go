@@ -441,7 +441,15 @@ func (arg Argument) getConvSimple(
 		if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
 		}
-		convIn = append(convIn, fmt.Sprintf(`%s = &output.%s`, paramName, name))
+		got := arg.goType(types)
+		if got[0] == '*' {
+			if !arg.IsInput() {
+				convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
+			}
+			convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
+		} else {
+			convIn = append(convIn, fmt.Sprintf(`%s = &output.%s`, paramName, name))
+		}
 	} else {
 		convIn = append(convIn, fmt.Sprintf("%s = input.%s", paramName, name))
 	}
@@ -506,7 +514,7 @@ func (arg Argument) getConvRec(
 	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
-			fmt.Sprintf("%s = &output.%s", paramName, name))
+			fmt.Sprintf("%s = output.%s", paramName, name))
 	}
 	return convIn, convOut
 }
