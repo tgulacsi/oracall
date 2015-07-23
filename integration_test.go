@@ -52,7 +52,7 @@ func TestGenSimple(t *testing.T) {
 		{"simple_char_in", `{"txt": "abraka dabra"}`, `{}`},
 		{"simple_char_out", `{}`, `{"ret":"A"}`},
 		{"simple_num_in", `{"num": 33}`, `{}`},
-		{"simple_num_out", `{}`, `{"ret":0.6666666666666666}`},
+		{"simple_num_out", `{}`, `{"ret":0.6666666666666665}`},
 		{"simple_date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
 		{"simple_date_out", `{}`, `{"ret":"{{NOW}}"}`}, // 5.
 		{"simple_char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},

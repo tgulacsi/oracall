@@ -377,14 +377,29 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 			}
 			return "ora.String" // NULL is the same as the empty string for Oracle
 		case "NUMBER":
+			if arg.IsOutput() {
+				return "*float64"
+			}
 			return "ora.Float64"
 		case "INTEGER":
+			if arg.IsOutput() {
+				return "*int64"
+			}
 			return "ora.Int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
+			if arg.IsOutput() {
+				return "*int32"
+			}
 			return "ora.Int32"
 		case "BOOLEAN", "PL/SQL BOOLEAN":
+			if arg.IsOutput() {
+				return "*bool"
+			}
 			return "sql.NullBool"
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
+			if arg.IsOutput() {
+				return "*time.Time"
+			}
 			return "ora.Time"
 		case "REF CURSOR":
 			return "*ora.Ses"

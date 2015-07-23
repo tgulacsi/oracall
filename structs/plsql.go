@@ -38,35 +38,6 @@ var (
 	stringTypes = make(map[string]struct{}, 16)
 )
 
-func oracleVarTypeName(typ string) string {
-	switch typ {
-	case "BINARY_INTEGER", "PLS_INTEGER":
-		return "ora.Int32"
-	case "BINARY_FLOAT":
-		return "ora.Float32"
-	case "BINARY_DOUBLE", "NUMBER":
-		return "ora.Float64"
-	case "STRING", "VARCHAR2", "ROWID", "CHAR":
-		return "ora.String"
-	case "INTEGER":
-		return "ora.Int64"
-	case "REF CURSOR":
-		return "*ora.Ses"
-	case "DATE", "TIMESTAMP":
-		return "ora.Time"
-	case "BLOB", "CLOB":
-		return "ora.Lob"
-	case "BFILE":
-		return "ora.Bfile"
-	case "BOOLEAN", "PL/SQL BOOLEAN":
-		return "ora.Int8"
-	default:
-		Log.Crit("oracleVarTypeName: unknown variable type", "type", typ)
-		os.Exit(1)
-	}
-	return ""
-}
-
 // SavePlsqlBlock saves the plsql block definition into writer
 func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
@@ -357,10 +328,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 									"WHILE i1 IS NOT NULL LOOP")
 							}
 						}
-						//name := aname + "." + capitalize(goName(k))
+						name := aname + "." + capitalize(goName(k))
 
 						convIn, convOut = v.getConvRec(
-							convIn, convOut, fun.types, aname, addParam(tmp),
+							convIn, convOut, fun.types, name, addParam(tmp),
 							MaxTableSize,
 							v, k)
 
@@ -444,7 +415,12 @@ func (arg Argument) getConvSimple(
 		got := arg.goType(types)
 		if got[0] == '*' {
 			if !arg.IsInput() {
-				convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
+				if got == "*string" {
+					convIn = append(convIn, fmt.Sprintf(`{ // maybe this is unneeded!
+s := strings.Repeat("\x00", 4000); output.%s = &s; }`, name))
+				} else {
+					convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
+				}
 			}
 			convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
 		} else {
