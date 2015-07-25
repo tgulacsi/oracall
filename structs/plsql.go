@@ -328,12 +328,14 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 									"WHILE i1 IS NOT NULL LOOP")
 							}
 						}
-						name := aname + "." + capitalize(goName(k))
+						//name := aname + "." + capitalize(goName(k))
 
-						convIn, convOut = v.getConvRec(
-							convIn, convOut, fun.types, name, addParam(tmp),
+						convIn, convOut = v.getConvTableRec(
+							convIn, convOut, fun.types,
+							[2]string{aname, capitalize(goName(k))},
+							addParam(tmp),
 							MaxTableSize,
-							v, k)
+							k, *arg.TableOf)
 
 						if arg.IsInput() {
 							pre = append(pre,
@@ -414,13 +416,18 @@ func (arg Argument) getConvSimple(
 		}
 		got := arg.goType(types)
 		if got[0] == '*' {
-			if !arg.IsInput() {
-				if got == "*string" {
-					convIn = append(convIn, fmt.Sprintf(`{ // maybe this is unneeded!
-s := strings.Repeat("\x00", 4000); output.%s = &s; }`, name))
-				} else {
-					convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
-				}
+			if got == "*string" {
+				convIn = append(convIn, fmt.Sprintf(`{
+						// maybe this is unneeded!
+						if output.%s == nil {
+							s := strings.Repeat("\x00", 1000)
+							output.%s = &s
+						} else {
+							*output.%s += strings.Repeat("\x00", 1000-len(*output.%s))
+						}
+					}`, name, name, name, name))
+			} else {
+				convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
 			}
 			convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
 		} else {
@@ -491,6 +498,53 @@ func (arg Argument) getConvRec(
 	if arg.IsOutput() {
 		convIn = append(convIn,
 			fmt.Sprintf("%s = output.%s", paramName, name))
+	}
+	return convIn, convOut
+}
+
+func (arg Argument) getConvTableRec(
+	convIn, convOut []string,
+	types map[string]string,
+	name [2]string,
+	paramName string,
+	tableSize uint,
+	key string,
+	parent Argument,
+) ([]string, []string) {
+	lengthS := fmt.Sprintf("%d", tableSize)
+	absName := "x__" + name[0] + "__" + name[1]
+	typ := arg.goType(types)
+	if arg.IsInput() {
+		if !arg.IsOutput() {
+			lengthS = "len(input." + name[0] + ")"
+		}
+		convIn = append(convIn, fmt.Sprintf(`
+			%s := make([]%s, %s)
+			for i,v := range input.%s { %s[i] = v.%s; }
+			%s = %s`,
+			absName,
+			typ, lengthS,
+			name[0], absName, name[1],
+			paramName, absName))
+	}
+	if arg.IsOutput() {
+		if !arg.IsInput() {
+			convIn = append(convIn,
+				fmt.Sprintf(`%s := make([]%s, %s)
+			%s = %s`,
+					absName, typ, lengthS,
+					paramName, absName))
+		}
+		convOut = append(convOut,
+			fmt.Sprintf(`if m := len(%s)-cap(output.%s); m > 0{
+			output.%s = append(output.%s, make([]%s, m)...)
+		}
+		output.%s = output.%s[:len(%s)]
+		for i, v := range %s { output.%s[i].%s = v; }`,
+				absName, name[0],
+				name[0], name[0], parent.goType(types),
+				name[0], name[0], absName,
+				absName, name[0], name[1]))
 	}
 	return convIn, convOut
 }

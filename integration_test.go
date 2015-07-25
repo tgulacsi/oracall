@@ -36,6 +36,8 @@ import (
 	"gopkg.in/rana/ora.v2"
 )
 
+var finish = false
+
 func init() {
 	flag.Parse()
 }
@@ -54,7 +56,7 @@ func TestGenSimple(t *testing.T) {
 		{"simple_num_in", `{"num": 33}`, `{}`},
 		{"simple_num_out", `{}`, `{"ret":0.6666666666666665}`},
 		{"simple_date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
-		{"simple_date_out", `{}`, `{"ret":"{{NOW}}"}`}, // 5.
+		{"simple_date_out", `{}`, `{"ret":"{{TODAY}}"}`}, // 5.
 		{"simple_char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
 		{"simple_all_inout",
 			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
@@ -66,7 +68,13 @@ func TestGenSimple(t *testing.T) {
 		withTime := false
 		todo[2] = strings.TrimSpace(todo[2])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
-			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
+			todo[2] = strings.Replace(todo[2],
+				"{{NOW}}", time.Now().In(time.FixedZone("", 7200)).Format(time.RFC3339), -1)
+			withTime = true
+		}
+		if strings.Index(todo[2], "{{TODAY}}") >= 0 {
+			todo[2] = strings.Replace(todo[2],
+				"{{TODAY}}", time.Now().In(time.FixedZone("", 7200)).Truncate(24*time.Hour).Format(time.RFC3339), -1)
 			withTime = true
 		}
 		gotS := strings.TrimSpace(got)
@@ -85,11 +93,13 @@ func TestGenSimple(t *testing.T) {
 			}
 		}
 		t.Errorf("%d. awaited\n\t%s\ngot (distance=%d)\n\t%s", i, todo[2], dist, got)
-		return
 	}
 }
 
 func TestGenRec(t *testing.T) {
+	if finish {
+		t.FailNow()
+	}
 	build(t)
 	outFn := generateAndBuild(t, "REC_")
 
@@ -299,7 +309,7 @@ BEGIN
   RETURN v_ret;
 END simple_char_in_char_ret;
 
-FUNCTION simple_date_out RETURN DATE IS BEGIN RETURN SYSDATE; END simple_date_out;
+FUNCTION simple_date_out RETURN DATE IS BEGIN RETURN TRUNC(SYSDATE); END simple_date_out;
 FUNCTION simple_num_out RETURN NUMBER IS BEGIN RETURN 2/3; END simple_num_out;
 
 PROCEDURE simple_all_inout(
@@ -308,10 +318,31 @@ PROCEDURE simple_all_inout(
     txt3 IN OUT VARCHAR2,
     int3 IN OUT PLS_INTEGER, num3 IN OUT NUMBER, dt3 IN OUT DATE) IS
 BEGIN
-  txt2 := txt1||'#'; int2 := NVL(int1, 0) + 1;
-  num2 := NVL(num1, 0) + 1/3; dt2 := ADD_MONTHS(NVL(dt1, SYSDATE), 1);
-  txt3 := txt3||'#'; int3 := NVL(int3, 0) + 1;
-  num3 := NVL(num3, 0) + 1; dt3 := ADD_MONTHS(NVL(dt3, SYSDATE), 1);
+
+  txt2 := txt1||'#';
+
+
+  int2 := NVL(int1, 0) + 1;
+
+
+  num2 := NVL(num1, 0) + 1/3;
+
+
+  dt2 := ADD_MONTHS(NVL(dt1, SYSDATE), 1);
+
+
+  txt3 := txt3||'#';  -- line 45
+
+
+  int3 := NVL(int3, 0) + 1;
+
+
+  num3 := NVL(num3, 0) + 1;
+
+
+  dt3 := ADD_MONTHS(NVL(dt3, SYSDATE), 1);
+
+
 END simple_all_inout;
 
 FUNCTION simple_nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER IS
@@ -495,7 +526,8 @@ func runTest(t *testing.T, prog string, args ...string) string {
 	c.Stderr = errBuf
 	out, err := c.Output()
 	if err != nil {
-		t.Errorf("error '%q %s': %v\n%s", prog, args, err, errBuf)
+		t.Errorf("ERROR '%q %s': %v\n%s", prog, args, err, errBuf)
+		finish = true
 		t.FailNow()
 	} else {
 		t.Logf("%q %s:\n%s\n%s", prog, args, out, errBuf)

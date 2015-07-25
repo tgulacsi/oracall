@@ -98,7 +98,7 @@ func main() {
 	// call the function
 	out, err := fun(ses, inp)
 	if err != nil {
-		log.Fatalf("error calling %s(%s): %s", funName, inp, err)
+		log.Fatalf("error calling %s(%#v): %v", funName, inp, err)
 	}
 
 	// present the output as json
