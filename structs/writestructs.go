@@ -211,8 +211,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		got = arg.goType(f.types)
 		lName := strings.ToLower(arg.Name)
 		io.WriteString(w, "\t"+aName+" "+got+
-			"\t`json:\""+lName+",omitempty\""+
-			" xml:\""+lName+",omitempty\"`\n")
+			"\t`json:\""+lName+"\""+
+			" xml:\""+lName+"\"`\n")
 		if checks != nil {
 			checks = genChecks(checks, arg, f.types, "s")
 		}

@@ -32,6 +32,7 @@ import (
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/rana/ora/lg"
 	"github.com/tgulacsi/go/orahlp"
 	"gopkg.in/rana/ora.v2"
 )
@@ -72,8 +73,10 @@ func main() {
 	DebugLevel = 1
 	log.Printf("calling %s(%#v)", funName, inp)
 
+	ora.Cfg().Log = ora.NewLogDrvCfg()
+	ora.Cfg().Log.Logger = lg.Log
+
 	// get cursor
-	ora.Register(nil)
 	user, passw, sid := orahlp.SplitDSN(*flagConnect)
 	env, err := ora.OpenEnv(nil)
 	if err != nil {

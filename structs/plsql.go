@@ -411,28 +411,16 @@ func (arg Argument) getConvSimple(
 	name, paramName string,
 ) ([]string, []string) {
 	if arg.IsOutput() {
-		if arg.IsInput() {
-			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
-		}
 		got := arg.goType(types)
 		if got[0] == '*' {
-			if got == "*string" {
-				convIn = append(convIn, fmt.Sprintf(`{
-						// maybe this is unneeded!
-						if output.%s == nil {
-							s := strings.Repeat("\x00", 1000)
-							output.%s = &s
-						} else {
-							*output.%s += strings.Repeat("\x00", 1000-len(*output.%s))
-						}
-					}`, name, name, name, name))
-			} else {
-				convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
+			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
+			if arg.IsInput() {
+				convIn = append(convIn, fmt.Sprintf(`*output.%s = *input.%s`, name, name))
 			}
-			convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
-		} else {
-			convIn = append(convIn, fmt.Sprintf(`%s = &output.%s`, paramName, name))
+		} else if arg.IsInput() {
+			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
 		}
+		convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
 	} else {
 		convIn = append(convIn, fmt.Sprintf("%s = input.%s", paramName, name))
 	}

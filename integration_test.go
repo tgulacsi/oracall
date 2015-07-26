@@ -53,14 +53,16 @@ func TestGenSimple(t *testing.T) {
 	for i, todo := range [][3]string{
 		{"simple_char_in", `{"txt": "abraka dabra"}`, `{}`},
 		{"simple_char_out", `{}`, `{"ret":"A"}`},
+		{"simple_char_inout", `{"txt": "abraka dabra"}`, `{"txt": "ABRAKA DABRA#"}`},
 		{"simple_num_in", `{"num": 33}`, `{}`},
 		{"simple_num_out", `{}`, `{"ret":0.6666666666666665}`},
 		{"simple_date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
 		{"simple_date_out", `{}`, `{"ret":"{{TODAY}}"}`}, // 5.
 		{"simple_char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
+
 		{"simple_all_inout",
 			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
-			`{"txt2":"abraka#","int2":0,"num2":0.43333333333333335,"dt2":"0000-01-31T00:00:00+01:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
+			`{"txt2":"abraka#","int2":-2,"num2":0.4333333333333333,"dt2":"0000-02-01T00:00:00+02:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+02:00"}`},
 		{"simple_nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
 		{"simple_sum_nums", `{"nums":[1.1,2,3.3]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
 	} {
@@ -243,6 +245,7 @@ TYPE mix_tab_typ IS TABLE OF mix_rec_typ INDEX BY BINARY_INTEGER;
 
 PROCEDURE simple_char_in(txt IN VARCHAR2);
 FUNCTION simple_char_out RETURN VARCHAR2;
+PROCEDURE simple_char_inout(txt IN OUT VARCHAR2);
 PROCEDURE simple_num_in(num IN NUMBER);
 FUNCTION simple_num_out RETURN NUMBER;
 PROCEDURE simple_date_in(dat IN DATE);
@@ -292,6 +295,9 @@ PROCEDURE simple_char_in(txt IN VARCHAR2) IS
   v_txt VARCHAR2(1000) := SUBSTR(txt, 1, 100);
 BEGIN NULL; END simple_char_in;
 FUNCTION simple_char_out RETURN VArCHAR2 IS BEGIN RETURN('A'); END simple_char_out;
+PROCEDURE simple_char_inout(txt IN OUT VARCHAR2) IS BEGIN
+  txt := UPPER(txt)||'#';
+END simple_char_inout;
 
 PROCEDURE simple_num_in(num IN NUMBER) IS
   v_num NUMBER := num;
@@ -322,10 +328,10 @@ BEGIN
   txt2 := txt1||'#';
 
 
-  int2 := NVL(int1, 0) + 1;
+  int2 := int1 - 1;
 
 
-  num2 := NVL(num1, 0) + 1/3;
+  num2 := num1 + 1/3;
 
 
   dt2 := ADD_MONTHS(NVL(dt1, SYSDATE), 1);
@@ -334,10 +340,10 @@ BEGIN
   txt3 := txt3||'#';  -- line 45
 
 
-  int3 := NVL(int3, 0) + 1;
+  int3 := int3 + 1;
 
 
-  num3 := NVL(num3, 0) + 1;
+  num3 := num3 + 1;
 
 
   dt3 := ADD_MONTHS(NVL(dt3, SYSDATE), 1);
