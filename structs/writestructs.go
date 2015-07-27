@@ -429,7 +429,9 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 
 	if arg.Flavor == FLAVOR_TABLE {
 		Log.Info("TABLE", "arg", arg, "tableOf", arg.TableOf)
-		tn := "[]" + arg.TableOf.goType(typedefs)
+		targ := *arg.TableOf
+		targ.Direction = DIR_IN
+		tn := "[]" + targ.goType(typedefs)
 		if arg.Type != "REF CURSOR" {
 			return tn
 		}
