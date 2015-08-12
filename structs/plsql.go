@@ -19,10 +19,10 @@ package structs
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 	"io"
 	"os"
 	"strings"
+	"text/template"
 
 	"github.com/tgulacsi/go/orahlp"
 )
@@ -232,8 +232,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					os.Exit(1)
 				}
 				name := capitalize(goName(arg.Name))
-				convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types,
-					name, addParam(arg.Name))
+				convIn, convOut = arg.getConvSimpleTable(convIn, convOut, fun.types,
+					name, addParam(arg.Name), MaxTableSize)
 			} else {
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
@@ -267,8 +267,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							":"+arg.Name+" := "+arg.Name+";")
 					}
 					name := capitalize(goName(arg.Name))
-					convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types,
-						name, addParam(arg.Name))
+					convIn, convOut = arg.getConvSimpleTable(convIn, convOut, fun.types,
+						name, addParam(arg.Name), MaxTableSize)
 
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
@@ -419,6 +419,38 @@ func (arg Argument) getConvSimple(
 			}
 		} else if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
+		}
+		convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
+	} else {
+		convIn = append(convIn, fmt.Sprintf("%s = input.%s", paramName, name))
+	}
+	return convIn, convOut
+}
+
+func (arg Argument) getConvSimpleTable(
+	convIn, convOut []string,
+	types map[string]string,
+	name, paramName string,
+	tableSize int,
+) ([]string, []string) {
+	if arg.IsOutput() {
+		got := arg.goType(types)
+		convIn = append(convIn, fmt.Sprintf(`
+		if output.%s == nil {
+			x := make(%s, 0, %d)
+			output.%s = &x
+		} else if cap((*output.%s)) < %d { // simpletable
+			*output.%s = make(%s, 0, %d)
+		} else {
+			*(output.%s) = (*output.%s)[:0]
+		}`, name,
+			strings.TrimLeft(got, "*"), tableSize,
+			name,
+			name, tableSize,
+			name, strings.TrimLeft(got, "*"), tableSize,
+			name, name))
+		if arg.IsInput() {
+			convIn = append(convIn, fmt.Sprintf(`*output.%s = append(*output.%s, input.%s)`, name, name, name))
 		}
 		convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
 	} else {

@@ -104,10 +104,13 @@ FunLoop:
 		io.WriteString(w, plsBlock)
 		io.WriteString(w, "`\n\n")
 		if b, err = format.Source([]byte(callFun)); err != nil {
-			if !skipFormatting {
-				return fmt.Errorf("error saving function %s: %s\n%s", fun.Name(), err, callFun)
-			}
 			Log.Warn("saving function", "function", fun.Name(), "error", err)
+			os.Stderr.WriteString("\n\n---------------------8<--------------------\n")
+			os.Stderr.WriteString(callFun)
+			os.Stderr.WriteString("\n--------------------->8--------------------\n\n")
+			if !skipFormatting {
+				return fmt.Errorf("error saving function %s: %s", fun.Name(), err)
+			}
 			b = []byte(callFun)
 		}
 		w.Write(b)
@@ -432,6 +435,9 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
 		tn := "[]" + targ.goType(typedefs)
+		if arg.IsOutput() && targ.Flavor == FLAVOR_SIMPLE {
+			tn = "*" + tn
+		}
 		if arg.Type != "REF CURSOR" {
 			return tn
 		}
