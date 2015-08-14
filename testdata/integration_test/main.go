@@ -67,10 +67,10 @@ func main() {
 		input = []byte(flag.Arg(1))
 	}
 	inp := InputFactories[funName]()
+	DebugLevel = 1
 	if err = inp.FromJSON(input); err != nil {
 		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
 	}
-	DebugLevel = 1
 	log.Printf("calling %s(%#v)", funName, inp)
 
 	ora.Cfg().Log = ora.NewLogDrvCfg()

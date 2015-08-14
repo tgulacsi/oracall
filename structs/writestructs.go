@@ -224,7 +224,11 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 
 	if !out {
 		fmt.Fprintf(w, `func (s *%s) FromJSON(data []byte) error {
-    return json.Unmarshal(data, s)
+			err := json.Unmarshal(data, &s)
+			if DebugLevel > 0 {
+				log.Printf("Unmarshal %%s: %%#v (%%v)", data, s, err)
+			}
+			return err
 }`, structName)
 	}
 	if err != nil {

@@ -36,7 +36,11 @@ import (
 	"gopkg.in/rana/ora.v2"
 )
 
-var finish = false
+var (
+	finish = false
+
+	flagOnly = flag.String("only", "", "run only this specific test case, only")
+)
 
 func init() {
 	flag.Parse()
@@ -49,11 +53,13 @@ func TestGenSimple(t *testing.T) {
 	build(t)
 	outFn := generateAndBuild(t, "SIMPLE_")
 	var err error
+	fixedZone := time.FixedZone("", 7200)
+	now := time.Now().In(fixedZone)
 
 	for i, todo := range [][3]string{
 		{"simple_char_in", `{"txt": "abraka dabra"}`, `{}`},
 		{"simple_char_out", `{}`, `{"ret":"A"}`},
-		{"simple_char_inout", `{"txt": "abraka dabra"}`, `{"txt": "ABRAKA DABRA#"}`},
+		{"simple_char_inout", `{"txt": "abraka dabra"}`, `{"txt":"ABRAKA DABRA#"}`},
 		{"simple_num_in", `{"num": 33}`, `{}`},
 		{"simple_num_out", `{}`, `{"ret":0.6666666666666665}`},
 		{"simple_date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
@@ -62,16 +68,22 @@ func TestGenSimple(t *testing.T) {
 
 		{"simple_all_inout",
 			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
-			`{"txt2":"abraka#","int2":-2,"num2":0.4333333333333333,"dt2":"0000-02-01T00:00:00+02:00","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+02:00"}`},
+			`{"txt2":"abraka#","int2":-2,"num2":0.4333333333333333,"dt2":"` +
+				strings.Replace(now.Truncate(24*time.Hour).AddDate(0, 1, 0).Format(time.RFC3339), "T02:", "T00:", 1) +
+				`","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+02:00"}`},
 		{"simple_nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
 		{"simple_sum_nums", `{"nums":[1.1,2,3.3]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
 	} {
+		if *flagOnly != "" && todo[0] != *flagOnly {
+			t.Logf("SKIP " + todo[0])
+			continue
+		}
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		withTime := false
 		todo[2] = strings.TrimSpace(todo[2])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
 			todo[2] = strings.Replace(todo[2],
-				"{{NOW}}", time.Now().In(time.FixedZone("", 7200)).Format(time.RFC3339), -1)
+				"{{NOW}}", time.Now().In(fixedZone).Format(time.RFC3339), -1)
 			withTime = true
 		}
 		if strings.Index(todo[2], "{{TODAY}}") >= 0 {
@@ -113,6 +125,10 @@ func TestGenRec(t *testing.T) {
 		{"rec_sendpreoffer_31101", `{"p_vonalkod":1}`,
 			`{"p_vonalkod":1,"p_kotveny":{"szerkot":"0001-01-01T00:00:00Z","halaszt_kockezd":"0001-01-01T00:00:00Z","halaszt_dijfiz":"0001-01-01T00:00:00Z","szamlaszam":"","szamla_limit":0,"e_komm_email":"","evfordulo":"0001-01-01T00:00:00Z","evfordulo_tipus":"","dijbekerot_ker":"","ajanlati_evesdij":0,"kockezd":"0001-01-01T00:00:00Z","btkezd":"0001-01-01T00:00:00Z","dijkod":"","dijfizmod":"","dijfizgyak":"","szerlejar":"0001-01-01T00:00:00Z"},"p_kotveny_gfb":{"bm_tipus":0,"kotes_oka":0},"p_gepjarmu":{"jelleg":"","rendszam":"","gyartev":"","tulajdon_visz":"","teljesitmeny":0,"ossztomeg":0,"ferohely":0,"uzjelleg":"","alvazszam":"","gyartmany":"","tulajdon_ido":"0001-01-01T00:00:00Z"},"p_szerz_azon":0,"p_ajanlat_url":"","p_evesdij":0,"p_hiba_kod":0}`},
 	} {
+		if *flagOnly != "" && todo[0] != *flagOnly {
+			t.Logf("SKIP " + todo[0])
+			continue
+		}
 		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {
 			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
@@ -334,7 +350,7 @@ BEGIN
   num2 := num1 + 1/3;
 
 
-  dt2 := ADD_MONTHS(NVL(dt1, SYSDATE), 1);
+  dt2 := ADD_MONTHS(TRUNC(NVL(dt1, SYSDATE)), 1);
 
 
   txt3 := txt3||'#';  -- line 45
