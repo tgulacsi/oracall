@@ -512,8 +512,9 @@ func (arg Argument) getConvRec(
 ) ([]string, []string) {
 
 	if arg.IsInput() {
+		parts := strings.Split(name, ".")
 		convIn = append(convIn,
-			fmt.Sprintf("%s = input.%s", paramName, name))
+			fmt.Sprintf("if input.%s != nil { %s = input.%s }", parts[0], paramName, name))
 	}
 	if arg.IsOutput() {
 		convIn = append(convIn,

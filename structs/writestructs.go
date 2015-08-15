@@ -403,7 +403,12 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 				return "*bool"
 			}
 			return "sql.NullBool"
-		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
+		case "DATE", "DATETIME":
+			if arg.IsOutput() {
+				return "*ora.Date"
+			}
+			return "ora.Date"
+		case "TIME", "TIMESTAMP":
 			if arg.IsOutput() {
 				return "*time.Time"
 			}
