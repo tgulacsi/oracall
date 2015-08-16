@@ -211,7 +211,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 			return ErrMissingTableOf
 		}
 		aName = capitalize(goName(arg.Name))
-		got = arg.goType(f.types)
+		got = arg.goType(f.types, arg.Flavor == FLAVOR_TABLE)
 		lName := strings.ToLower(arg.Name)
 		io.WriteString(w, "\t"+aName+" "+got+
 			"\t`json:\""+lName+"\""+
@@ -262,7 +262,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 
 func genChecks(checks []string, arg Argument, types map[string]string, base string) []string {
 	aName := capitalize(goName(arg.Name))
-	got := arg.goType(types)
+	got := arg.goType(types, false)
 	var name string
 	if aName == "" {
 		name = base
@@ -361,7 +361,7 @@ func unocap(text string) string {
 }
 
 // returns a go type for the argument's type
-func (arg *Argument) goType(typedefs map[string]string) (typName string) {
+func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName string) {
 	defer func() {
 		if strings.HasPrefix(typName, "**") {
 			typName = typName[1:]
@@ -379,27 +379,27 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2", "ROWID":
-			if arg.IsOutput() {
+			if !isTable && arg.IsOutput() {
 				return "*string"
 			}
 			return "ora.String" // NULL is the same as the empty string for Oracle
 		case "NUMBER":
-			if arg.IsOutput() {
+			if !isTable && arg.IsOutput() {
 				return "*float64"
 			}
 			return "ora.Float64"
 		case "INTEGER":
-			if arg.IsOutput() {
+			if !isTable && arg.IsOutput() {
 				return "*int64"
 			}
 			return "ora.Int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
-			if arg.IsOutput() {
+			if !isTable && arg.IsOutput() {
 				return "*int32"
 			}
 			return "ora.Int32"
 		case "BOOLEAN", "PL/SQL BOOLEAN":
-			if arg.IsOutput() {
+			if !isTable && arg.IsOutput() {
 				return "*bool"
 			}
 			return "sql.NullBool"
@@ -409,7 +409,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 			}
 			return "ora.Date"
 		case "TIME", "TIMESTAMP":
-			if arg.IsOutput() {
+			if !isTable && arg.IsOutput() {
 				return "*time.Time"
 			}
 			return "ora.Time"
@@ -443,7 +443,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 		Log.Info("TABLE", "arg", arg, "tableOf", arg.TableOf)
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
-		tn := "[]" + targ.goType(typedefs)
+		tn := "[]" + targ.goType(typedefs, true)
 		if arg.IsOutput() && targ.Flavor == FLAVOR_SIMPLE {
 			tn = "*" + tn
 		}
@@ -473,7 +473,7 @@ func (arg *Argument) goType(typedefs map[string]string) (typName string) {
 	for k, v := range arg.RecordOf {
 		lName := strings.ToLower(k)
 		buf.WriteString("\t" + capitalize(goName(k)) + " " +
-			v.goType(typedefs) + "\t" +
+			v.goType(typedefs, isTable) + "\t" +
 			"`json:\"" + lName + ",omitempty\"" +
 			" xml:\"" + lName + ",omitempty\"`\t\n")
 	}

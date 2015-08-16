@@ -204,12 +204,14 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					convIn = append(convIn, fmt.Sprintf(`
 					if input.%s != nil { *output.%s = *input.%s
 					} else { output.%s = new(%s) }
-					`, aname, aname, aname, aname, arg.goType(fun.types)[1:]))
+					`, aname, aname, aname,
+						aname, arg.goType(fun.types, false)[1:]))
 				} else {
 					convOut = append(convOut, fmt.Sprintf(`
                     if output.%s == nil {
                         output.%s = new(%s)
-                    }`, aname, aname, arg.goType(fun.types)[1:]))
+                    }`, aname,
+						aname, arg.goType(fun.types, false)[1:]))
 				}
 			}
 			for k, v := range arg.RecordOf {
@@ -280,7 +282,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						convOut = append(convOut, fmt.Sprintf(`
                     if output.%s == nil {
                         output.%s = make([]%s, 0, %d)
-                    }`, aname, aname, arg.TableOf.goType(fun.types), MaxTableSize))
+                    }`, aname,
+							aname, arg.TableOf.goType(fun.types, true), MaxTableSize))
 					}
 					/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
 					if arg.IsOutput() {
@@ -392,7 +395,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 }
 
 func (arg Argument) getIsValidCheck(types map[string]string, name string) string {
-	got := arg.goType(types)
+	got := arg.goType(types, false)
 	if got[0] == '*' {
 		return name + " != nil"
 	}
@@ -411,7 +414,7 @@ func (arg Argument) getConvSimple(
 	name, paramName string,
 ) ([]string, []string) {
 	if arg.IsOutput() {
-		got := arg.goType(types)
+		got := arg.goType(types, false)
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
 			if arg.IsInput() {
@@ -434,7 +437,7 @@ func (arg Argument) getConvSimpleTable(
 	tableSize int,
 ) ([]string, []string) {
 	if arg.IsOutput() {
-		got := arg.goType(types)
+		got := arg.goType(types, true)
 		convIn = append(convIn, fmt.Sprintf(`
 		if output.%s == nil {
 			x := make(%s, 0, %d)
@@ -534,7 +537,7 @@ func (arg Argument) getConvTableRec(
 ) ([]string, []string) {
 	lengthS := fmt.Sprintf("%d", tableSize)
 	absName := "x__" + name[0] + "__" + name[1]
-	typ := arg.goType(types)
+	typ := arg.goType(types, true)
 	if arg.IsInput() {
 		if !arg.IsOutput() {
 			lengthS = "len(input." + name[0] + ")"
@@ -561,11 +564,17 @@ func (arg Argument) getConvTableRec(
 			output.%s = append(output.%s, make([]%s, m)...)
 		}
 		output.%s = output.%s[:len(%s)]
-		for i, v := range %s { output.%s[i].%s = v; }`,
+		for i, v := range %s {
+			if output.%s[i] != nil {
+				output.%s[i].%s = v
+			}
+		}`,
 				absName, name[0],
-				name[0], name[0], parent.goType(types),
+				name[0], name[0], parent.goType(types, true),
 				name[0], name[0], absName,
-				absName, name[0], name[1]))
+				absName,
+				name[0],
+				name[0], name[1]))
 	}
 	return convIn, convOut
 }
