@@ -24,7 +24,7 @@ import (
 
 	"github.com/tgulacsi/oracall/structs"
 	"gopkg.in/inconshreveable/log15.v2"
-	"gopkg.in/rana/ora.v2" // for Oracle-specific drivers
+	"gopkg.in/rana/ora.v3" // for Oracle-specific drivers
 )
 
 var Log = log15.New()

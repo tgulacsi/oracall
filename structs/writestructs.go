@@ -48,7 +48,7 @@ import (
 	"strconv"
     "time"    // for datetimes
 
-    "gopkg.in/rana/ora.v2"    // Oracle
+    "gopkg.in/rana/ora.v3"    // Oracle
 )
 
 var DebugLevel = uint(0)

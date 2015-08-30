@@ -33,7 +33,7 @@ import (
 
 	"github.com/antzucaro/matchr"
 	"github.com/kylelemons/godebug/pretty"
-	"gopkg.in/rana/ora.v2"
+	"gopkg.in/rana/ora.v3"
 )
 
 var (
