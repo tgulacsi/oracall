@@ -1,19 +1,10 @@
 #!/bin/sh
 set -e
-envfn=$(dirname $0)/../goracle/env
-if [ -e "$envfn" ]; then
-    . "$envfn"
+if [ -z "$CGO_CFLAGS" ]; then
+	export CGO_CFLAGS="$ORA_CGO_CFLAGS"
+	export "CGO_LDFLAGS=$ORA_CGO_LDFLAGS"
 fi
-dsn=${DSN}
-if [ -z "$dsn" ]; then
-    for fn in .dsn ../goracle/.dsn; do
-        if ! [ -e "$fn" ]; then
-            continue
-        fi
-        dsn=$(grep -v '^#' $fn | head -n 1)
-        break
-    done
-fi
+dsn=${DSN:-$(grep -v '^#' .dsn | head -n1)}
 echo "dsn=$dsn"
 if [ -z "$dsn" ]; then
     exit 3
@@ -21,7 +12,7 @@ fi
 
 echo go test -connect=${dsn} ./...
 go test -connect=${dsn} ./...
-go build
+go install
 
 {
 if echo "$dsn" | fgrep -q '@XE'; then
@@ -32,13 +23,13 @@ EXIT
 EOF
 	fi
 fi
-echo ./oracall -F -connect="$dsn" ${1:-DB_WEB.SENDPREOFFER_31101} >&2
+echo oracall -F -connect="$dsn" ${1:-DB_WEB.SENDPREOFFER_31101} >&2
 ./oracall -F -connect="$dsn" ${1:-DB_WEB.SENDPREOFFER_31101}
 } >examples/minimal/generated_functions.go
-go build ./examples/minimal
+go build -o /tmp/minimal ./examples/minimal
 echo
 echo '-----------------------------------------------'
-CMD='./minimal -connect='${dsn}" ${1:-DB_web.sendpreoffer_31101}"
+CMD='/tmp/minimal -connect='${dsn}" ${1:-DB_web.sendpreoffer_31101}"
 echo "$CMD"
 #$CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":"A", "telep_kod":"C"},{"telep_azon":"z", "telep_kod":"x"}]}'
 time $CMD '{"p_lang":"hu", "p_sessionid": "123", "p_kotveny_vagyon":{"teaor": "1233", "forgalom": 0}, "p_telep":[{"telep_azon":1, "telep_kod":0}], "p_kotveny": {"dijfizgyak":"N"}, "p_kedvezmenyek": ["KEDV01"]}'

@@ -423,9 +423,9 @@ func (arg Argument) getConvSimple(
 		} else if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
 		}
-		convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
+		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcs1`, paramName, name))
 	} else {
-		convIn = append(convIn, fmt.Sprintf("%s = input.%s", paramName, name))
+		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcs2", paramName, name))
 	}
 	return convIn, convOut
 }
@@ -438,26 +438,32 @@ func (arg Argument) getConvSimpleTable(
 ) ([]string, []string) {
 	if arg.IsOutput() {
 		got := arg.goType(types, true)
-		convIn = append(convIn, fmt.Sprintf(`
-		if output.%s == nil {
-			x := make(%s, 0, %d)
+		if got[0] == '*' {
+			convIn = append(convIn, fmt.Sprintf(`
+		if output.%s == nil { // %#v
+			x := make([]%s, 0, %d)
 			output.%s = &x
 		} else if cap((*output.%s)) < %d { // simpletable
 			*output.%s = make(%s, 0, %d)
 		} else {
 			*(output.%s) = (*output.%s)[:0]
-		}`, name,
-			strings.TrimLeft(got, "*"), tableSize,
-			name,
-			name, tableSize,
-			name, strings.TrimLeft(got, "*"), tableSize,
-			name, name))
-		if arg.IsInput() {
-			convIn = append(convIn, fmt.Sprintf(`*output.%s = append(*output.%s, input.%s)`, name, name, name))
+		}`, name, arg,
+				strings.TrimLeft(got, "*"), tableSize,
+				name,
+				name, tableSize,
+				name, strings.TrimLeft(got, "*"), tableSize,
+				name, name))
+			if arg.IsInput() {
+				convIn = append(convIn, fmt.Sprintf(`*output.%s = append(*output.%s, input.%s)`, name, name, name))
+			}
+		} else {
+			if arg.IsInput() {
+				convIn = append(convIn, fmt.Sprintf("output.%s = input.%s", name, name))
+			}
 		}
-		convIn = append(convIn, fmt.Sprintf(`%s = output.%s`, paramName, name))
+		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
 	} else {
-		convIn = append(convIn, fmt.Sprintf("%s = input.%s", paramName, name))
+		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
 	}
 	return convIn, convOut
 }
@@ -517,11 +523,11 @@ func (arg Argument) getConvRec(
 	if arg.IsInput() {
 		parts := strings.Split(name, ".")
 		convIn = append(convIn,
-			fmt.Sprintf("if input.%s != nil { %s = input.%s }", parts[0], paramName, name))
+			fmt.Sprintf("if input.%s != nil { %s = input.%s } // gcr1", parts[0], paramName, name))
 	}
 	if arg.IsOutput() {
 		convIn = append(convIn,
-			fmt.Sprintf("%s = output.%s", paramName, name))
+			fmt.Sprintf("%s = output.%s // gcr2", paramName, name))
 	}
 	return convIn, convOut
 }
@@ -544,7 +550,7 @@ func (arg Argument) getConvTableRec(
 		}
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s)
-			for i,v := range input.%s { %s[i] = v.%s; }
+			for i,v := range input.%s { %s[i] = v.%s; } // gctr1
 			%s = %s`,
 			absName,
 			typ, lengthS,
@@ -555,7 +561,7 @@ func (arg Argument) getConvTableRec(
 		if !arg.IsInput() {
 			convIn = append(convIn,
 				fmt.Sprintf(`%s := make([]%s, %s)
-			%s = %s`,
+			%s = %s // gctr2`,
 					absName, typ, lengthS,
 					paramName, absName))
 		}

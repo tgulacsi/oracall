@@ -61,6 +61,9 @@ func main() {
 			log.Fatalf("error connecting to %q: %s", *flagConnect, err)
 		}
 		defer cx.Close()
+		if err = cx.Ping(); err != nil {
+			log.Fatalf("error pinging %q: %v", *flagConnect, err)
+		}
 		qry := `
     SELECT object_id, subprogram_id, package_name, object_name,
            data_level, position, argument_name, in_out,

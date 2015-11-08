@@ -35,7 +35,9 @@ import (
 	"reflect"
 	"strings"
 
-	"gopkg.in/goracle.v1/oracle"
+	"github.com/tgulacsi/go/orahlp"
+	"gopkg.in/rana/ora.v3"
+	"gopkg.in/rana/ora.v3/lg15"
 )
 
 var (
@@ -62,29 +64,34 @@ func main() {
 	}
 	log.Printf("fun to be called is %s", funName)
 
-	// get cursor
-	user, passw, sid := oracle.SplitDSN(*flagConnect)
-	conn, err := oracle.NewConnection(user, passw, sid, false)
+	ora.Cfg().Log.Logger = lg15.Log
+	env, err := ora.OpenEnv(nil)
 	if err != nil {
-		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
+		log.Fatalf("open env: %v", err)
 	}
-	if err = conn.Connect(0, false); err != nil {
-		log.Fatalf("error connecting: %s", err)
+	defer env.Close()
+	user, passw, sid := orahlp.SplitDSN(*flagConnect)
+	srv, err := env.OpenSrv(&ora.SrvCfg{Dblink: sid})
+	if err != nil {
+		log.Fatalf("open srv for %q: %v", sid, err)
 	}
-	defer conn.Close()
-	cur := oracle.NewCursor(conn)
-	defer cur.Close()
+	defer srv.Close()
+	ses, err := srv.OpenSes(&ora.SesCfg{Username: user, Password: passw})
+	if err != nil {
+		log.Fatalf("open ses for %q: %v", user, err)
+	}
+	defer ses.Close()
 
 	userpass := strings.SplitN(*flagLogin, "/", 2)
 	if len(userpass) < 2 {
 		userpass = append(userpass, userpass[0])
 	}
-	sessionid, err := login(cur, userpass[0], userpass[1])
+	sessionid, err := login(ses, userpass[0], userpass[1])
 	if err != nil {
 		log.Fatalf("error logging in (%s): %v", userpass[0], err)
 	}
 	if !*flagSkipLogout {
-		defer logout(cur, sessionid)
+		defer logout(ses, sessionid)
 	}
 
 	// parse stdin as json into the proper input struct
@@ -115,7 +122,7 @@ func main() {
 	log.Printf("calling %s(%s)", funName, inp)
 
 	// call the function
-	out, err := fun(cur, inp)
+	out, err := fun(ses, inp)
 	if err != nil {
 		log.Fatalf("error calling %s(%#v): %s", funName, inp, err)
 	}
@@ -132,24 +139,24 @@ func main() {
 	log.Printf("output marshaled to XML: %s", b)
 }
 
-func login(cur *oracle.Cursor, username, password string) (string, error) {
+func login(ses *ora.Ses, username, password string) (string, error) {
 	lang, addr := "hu", "127.0.0.1"
-	out, err := Functions["DB_web.login"](cur, Db_web__login__input{
-		P_login_nev: username,
-		P_jelszo:    password,
-		P_lang:      lang,
-		P_addr匿:     addr,
+	out, err := Functions["DB_web.login"](ses, Db_web__login__input{
+		P_login_nev: ora.String{Value: username},
+		P_jelszo:    ora.String{Value: password},
+		P_lang:      ora.String{Value: lang},
+		P_addr匿:     ora.String{Value: addr},
 	})
 	if err != nil {
 		return "", fmt.Errorf("DB_web.login: %v", err)
 	}
 	log.Printf("Login(%q): %#v", username, out.(Db_web__login__output))
-	return (out.(Db_web__login__output).P_sessionid), nil
+	return *(out.(Db_web__login__output).P_sessionid), nil
 }
 
-func logout(cur *oracle.Cursor, sessionID string) error {
-	_, err := Functions["DB_web.logout"](cur, Db_web__logout__input{
-		P_sessionid: sessionID,
+func logout(ses *ora.Ses, sessionID string) error {
+	_, err := Functions["DB_web.logout"](ses, Db_web__logout__input{
+		P_sessionid: ora.String{Value: sessionID},
 	})
 	return err
 }

@@ -93,7 +93,7 @@ FunLoop:
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(w, dir); err != nil {
 				if err == ErrMissingTableOf {
-					Log.Warn("SKIP function, missing TableOf info", "function", fun.Name)
+					Log.Warn("SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
 				}
 				return err
