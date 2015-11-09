@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"gopkg.in/errgo.v1"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -91,8 +92,8 @@ FunLoop:
 	for _, fun := range functions {
 		fun.types = types
 		for _, dir := range []bool{false, true} {
-			if err = fun.SaveStruct(w, dir); err != nil {
-				if err == ErrMissingTableOf {
+			if err := fun.SaveStruct(w, dir); err != nil {
+				if errgo.Cause(err) == ErrMissingTableOf {
 					Log.Warn("SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
 				}
@@ -208,7 +209,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		"function", log15.Lazy{func() string { return fmt.Sprintf("%#v", f) }})
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return ErrMissingTableOf
+			return errgo.WithCausef(nil, ErrMissingTableOf, "no table of data for %s.%s (%v)", f.Name(), arg, arg)
 		}
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types, arg.Flavor == FLAVOR_TABLE)
@@ -217,7 +218,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 			"\t`json:\""+lName+"\""+
 			" xml:\""+lName+"\"`\n")
 		if checks != nil {
-			checks = genChecks(checks, arg, f.types, "s")
+			checks = genChecks(checks, arg, f.types, "s", false)
 		}
 	}
 	io.WriteString(w, "}\n")
@@ -260,9 +261,9 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	return nil
 }
 
-func genChecks(checks []string, arg Argument, types map[string]string, base string) []string {
+func genChecks(checks []string, arg Argument, types map[string]string, base string, parentIsTable bool) []string {
 	aName := capitalize(goName(arg.Name))
-	got := arg.goType(types, false)
+	got := arg.goType(types, parentIsTable || arg.Flavor == FLAVOR_TABLE)
 	var name string
 	if aName == "" {
 		name = base
@@ -327,16 +328,24 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 		}
 	case FLAVOR_RECORD:
 		//checks = append(checks, "if "+name+MarkValid+" {")
-		checks = append(checks, "if "+name+" != nil {")
-		for _, sub := range arg.RecordOf {
-			checks = genChecks(checks, sub, types, name)
+		if parentIsTable {
+			checks = append(checks, "if "+name+" != nil {")
 		}
-		checks = append(checks, "}")
+		for _, sub := range arg.RecordOf {
+			checks = genChecks(checks, sub, types, name, false) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
+		}
+		if parentIsTable {
+			checks = append(checks, "}")
+		}
 	case FLAVOR_TABLE:
-		plus := strings.Join(genChecks(nil, *arg.TableOf, types, "v"), "\n\t")
+		plus := strings.Join(
+			genChecks(nil, *arg.TableOf, types, "v", true),
+			"\n\t")
 		if len(strings.TrimSpace(plus)) > 0 {
 			checks = append(checks,
-				fmt.Sprintf("\tfor _, v := range %s.%s {\n\t%s\n}", base, aName, plus))
+				fmt.Sprintf("\tfor _, v := range %s.%s {\n\t%s\n}",
+					base, aName,
+					plus))
 		}
 	default:
 		Log.Crit("unknown flavor", "flavor", arg.Flavor)
@@ -444,9 +453,6 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
 		tn := "[]" + targ.goType(typedefs, true)
-		if arg.IsOutput() && targ.Flavor == FLAVOR_SIMPLE {
-			tn = "*" + tn
-		}
 		if arg.Type != "REF CURSOR" {
 			return tn
 		}
