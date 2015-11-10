@@ -18,9 +18,13 @@ package main
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"flag"
 	"log"
 	"os"
+	"strconv"
+	"strings"
+	"unicode"
 
 	"github.com/tgulacsi/oracall/structs"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -37,6 +41,7 @@ func main() {
 
 	flagSkipFormat := flag.Bool("F", false, "skip formatting")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
+	flagDump := flag.String("dump", "", "dump to this csv")
 
 	flag.Parse()
 	if !*flagVerbose {
@@ -78,6 +83,41 @@ func main() {
 		}
 		defer rows.Close()
 
+		var cw *csv.Writer
+		if *flagDump != "" {
+			fh, err := os.Create(*flagDump)
+			if err != nil {
+				log.Fatalf("error creating %q for csv dump: %v", *flagDump, err)
+			}
+			defer func() {
+				cw.Flush()
+				if err := cw.Error(); err != nil {
+					log.Printf("ERROR flushing csv %q: %v", fh.Name(), err)
+				}
+				if err := fh.Close(); err != nil {
+					log.Printf("ERROR closing dump file %q: %v", fh.Name(), err)
+				}
+			}()
+			cw = csv.NewWriter(fh)
+			if err = cw.Write(strings.Split(
+				strings.Map(
+					func(r rune) rune {
+						if 'A' <= r && r <= 'Z' || '0' <= r && r <= '9' || r == '_' || r == ',' {
+							return r
+						}
+						if 'a' <= r && r <= 'z' {
+							return unicode.ToUpper(r)
+						}
+						return -1
+					},
+					qry[strings.Index(qry, "SELECT ")+7:strings.Index(qry, "FROM ")],
+				),
+				",",
+			)); err != nil {
+				log.Fatalf("error writing header to csv: %v", err)
+			}
+		}
+
 		userArgs := make(chan structs.UserArgument, 16)
 		var readErr error
 		go func() {
@@ -93,6 +133,18 @@ func main() {
 				if err != nil {
 					readErr = err
 					log.Fatalf("error reading row %v: %v", rows, err)
+				}
+				if cw != nil {
+					N := i64ToString
+					if err = cw.Write([]string{
+						N(oid), N(subid), pn.String, on.String,
+						N(level), N(pos), an.String, ua.InOut,
+						ua.DataType, N(prec), N(scale), cs.String,
+						plsT.String, N(length),
+						tOwner.String, tName.String, tSub.String, tLink.String,
+					}); err != nil {
+						log.Printf("error writing csv: %v", err)
+					}
 				}
 				ua.PackageName, ua.ObjectName, ua.ArgumentName = "", "", ""
 				ua.ObjectID, ua.SubprogramID, ua.DataLevel = 0, 0, 0
@@ -163,4 +215,11 @@ func main() {
 		log.Printf("error saving functions: %s", err)
 		os.Exit(1)
 	}
+}
+
+func i64ToString(n sql.NullInt64) string {
+	if n.Valid {
+		return strconv.FormatInt(n.Int64, 10)
+	}
+	return ""
 }

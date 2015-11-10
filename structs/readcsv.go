@@ -85,7 +85,7 @@ func ParseCsv(r io.Reader) (functions []Function, err error) {
 			}
 		}
 	}()
-	go func() { errch <- ReadCsv(r, userArgs) }()
+	go func() { errch <- ReadCsv(userArgs, r) }()
 	functions, err = ParseArguments(userArgs)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func MustOpenCsv(filename string) *os.File {
 }
 
 // ReadCsv reads the csv from the Reader, and sends the arguments to the given channel
-func ReadCsv(r io.Reader, userArgs chan<- UserArgument) error {
+func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	defer close(userArgs)
 
 	var err error
