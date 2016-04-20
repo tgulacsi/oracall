@@ -117,19 +117,19 @@ func demap(plsql, callFun string) (string, string) {
 	//fmt.Fprintln(os.Stderr, callFun)
 	if err := template.Must(template.New("callFun").
 		Funcs(
-		map[string]interface{}{
-			"paramsIdx": func(key string) int {
-				arr := paramsMap[key]
-				if len(arr) == 0 {
-					Log.Error("paramsIdx", "key", key, "val", arr, "map", paramsMap)
-				} else {
-					Log.Debug("paramsIdx", "key", key, "val", paramsMap[key])
-				}
-				i = arr[0]
-				paramsMap[key] = arr[1:]
-				return i
-			},
-		}).
+			map[string]interface{}{
+				"paramsIdx": func(key string) int {
+					arr := paramsMap[key]
+					if len(arr) == 0 {
+						Log.Error("paramsIdx", "key", key, "val", arr, "map", paramsMap)
+					} else {
+						Log.Debug("paramsIdx", "key", key, "val", paramsMap[key])
+					}
+					i = arr[0]
+					paramsMap[key] = arr[1:]
+					return i
+				},
+			}).
 		Parse(callFun)).
 		Execute(&callBuf, opts); err != nil {
 		panic(err)
@@ -459,6 +459,8 @@ func (arg Argument) getConvSimpleTable(
 		} else {
 			if arg.IsInput() {
 				convIn = append(convIn, fmt.Sprintf("output.%s = input.%s", name, name))
+			} else {
+				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d)", name, got, tableSize))
 			}
 		}
 		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))

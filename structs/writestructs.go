@@ -327,17 +327,22 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			}
 		}
 	case FLAVOR_RECORD:
+		checks = append(checks, fmt.Sprintf("// parentIsTable=%t got=%q", parentIsTable, got))
 		//checks = append(checks, "if "+name+MarkValid+" {")
-		if parentIsTable {
+		if parentIsTable || got[0] == '*' {
 			checks = append(checks, "if "+name+" != nil {")
 		}
 		for _, sub := range arg.RecordOf {
-			checks = genChecks(checks, sub, types, name, false) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
+			checks = genChecks(checks, sub, types, name, arg.Flavor == FLAVOR_TABLE) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
 		}
-		if parentIsTable {
+		if parentIsTable || got[0] == '*' {
 			checks = append(checks, "}")
 		}
 	case FLAVOR_TABLE:
+		checks = append(checks, "// got="+got)
+		if got[0] == '*' {
+			checks = append(checks, "if "+name+" != nil {")
+		}
 		plus := strings.Join(
 			genChecks(nil, *arg.TableOf, types, "v", true),
 			"\n\t")
@@ -346,6 +351,9 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 				fmt.Sprintf("\tfor _, v := range %s.%s {\n\t%s\n}",
 					base, aName,
 					plus))
+		}
+		if got[0] == '*' {
+			checks = append(checks, "}")
 		}
 	default:
 		Log.Crit("unknown flavor", "flavor", arg.Flavor)

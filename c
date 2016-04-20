@@ -10,8 +10,8 @@ if [ -z "$dsn" ]; then
     exit 3
 fi
 
-echo go test -connect=${dsn} ./...
-go test -connect=${dsn} ./...
+echo go test -connect=${dsn} ./... $TESTARGS
+go test -connect=${dsn} ./... $TESTARGS
 go install
 
 {
