@@ -103,11 +103,13 @@ func demap(plsql, callFun string) (string, string) {
 
 	var i int
 	old := plsql
-	plsql, paramsArr := orahlp.MapToSlice(plsql, func(key string) interface{} {
-		paramsMap[key] = append(paramsMap[key], i)
-		i++
-		return key
-	})
+	plsql, paramsArr := orahlp.MapToSlice(
+		plsql,
+		func(key string) interface{} {
+			paramsMap[key] = append(paramsMap[key], i)
+			i++
+			return key
+		})
 	Log.Debug("MapToSlice", "old", old, "new", plsql, "params", paramsMap, "arr", paramsArr)
 
 	opts := repl{
@@ -115,7 +117,7 @@ func demap(plsql, callFun string) (string, string) {
 	}
 	var callBuf bytes.Buffer
 	//fmt.Fprintln(os.Stderr, callFun)
-	if err := template.Must(template.New("callFun").
+	tpl, err := template.New("callFun").
 		Funcs(
 			map[string]interface{}{
 				"paramsIdx": func(key string) int {
@@ -126,12 +128,18 @@ func demap(plsql, callFun string) (string, string) {
 						Log.Debug("paramsIdx", "key", key, "val", paramsMap[key])
 					}
 					i = arr[0]
-					paramsMap[key] = arr[1:]
+					if len(arr) > 1 {
+						paramsMap[key] = arr[1:]
+					}
 					return i
 				},
 			}).
-		Parse(callFun)).
-		Execute(&callBuf, opts); err != nil {
+		Parse(callFun)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, callFun)
+		panic(err)
+	}
+	if err := tpl.Execute(&callBuf, opts); err != nil {
 		panic(err)
 	}
 	return plsql, callBuf.String()
@@ -438,6 +446,9 @@ func (arg Argument) getConvSimpleTable(
 ) ([]string, []string) {
 	if arg.IsOutput() {
 		got := arg.goType(types, true)
+		convOut = append(convOut, `fmt.Printf("params=%#v\n", params)`)
+		convOut = append(convOut, fmt.Sprintf("output.%s = %s.(%s)", name, paramName, got))
+		convOut = append(convOut, fmt.Sprintf(`fmt.Printf("output.%s=%%#v\n", output.%s)`, name, name))
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf(`
 		if output.%s == nil { // %#v

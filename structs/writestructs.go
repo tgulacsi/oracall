@@ -327,8 +327,6 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			}
 		}
 	case FLAVOR_RECORD:
-		checks = append(checks, fmt.Sprintf("// parentIsTable=%t got=%q", parentIsTable, got))
-		//checks = append(checks, "if "+name+MarkValid+" {")
 		if parentIsTable || got[0] == '*' {
 			checks = append(checks, "if "+name+" != nil {")
 		}
@@ -339,7 +337,6 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			checks = append(checks, "}")
 		}
 	case FLAVOR_TABLE:
-		checks = append(checks, "// got="+got)
 		if got[0] == '*' {
 			checks = append(checks, "if "+name+" != nil {")
 		}

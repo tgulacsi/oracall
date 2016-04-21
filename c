@@ -1,17 +1,14 @@
 #!/bin/sh
 set -e
-if [ -z "$CGO_CFLAGS" ]; then
-	export CGO_CFLAGS="$ORA_CGO_CFLAGS"
-	export "CGO_LDFLAGS=$ORA_CGO_LDFLAGS"
-fi
 dsn=${DSN:-$(grep -v '^#' .dsn | head -n1)}
 echo "dsn=$dsn"
 if [ -z "$dsn" ]; then
     exit 3
 fi
 
-echo go test -connect=${dsn} ./... $TESTARGS
-go test -connect=${dsn} ./... $TESTARGS
+set -x
+go test $TESTARGS -connect=${dsn} ./... $TESTARGS
+exit 1
 go install
 
 {
