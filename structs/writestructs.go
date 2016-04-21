@@ -459,7 +459,7 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 		targ.Direction = DIR_IN
 		tn := "[]" + targ.goType(typedefs, true)
 		if arg.Type != "REF CURSOR" {
-			if arg.IsOutput() {
+			if arg.IsOutput() && arg.TableOf.Flavor == FLAVOR_SIMPLE {
 				return "*" + tn
 			}
 			return tn

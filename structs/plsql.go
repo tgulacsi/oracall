@@ -288,7 +288,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					aname := capitalize(goName(arg.Name))
 					if arg.IsOutput() {
 						convOut = append(convOut, fmt.Sprintf(`
-                    if output.%s == nil {
+                    if output.%s == nil { // _
                         output.%s = make([]%s, 0, %d)
                     }`, aname,
 							aname, arg.TableOf.goType(fun.types, true), MaxTableSize))
@@ -551,7 +551,7 @@ func (arg Argument) getConvTableRec(
 	key string,
 	parent Argument,
 ) ([]string, []string) {
-	lengthS := fmt.Sprintf("%d", tableSize)
+	lengthS := "0"
 	absName := "x__" + name[0] + "__" + name[1]
 	typ := arg.goType(types, true)
 	if arg.IsInput() {
@@ -559,20 +559,20 @@ func (arg Argument) getConvTableRec(
 			lengthS = "len(input." + name[0] + ")"
 		}
 		convIn = append(convIn, fmt.Sprintf(`
-			%s := make([]%s, %s)
+			%s := make([]%s, %s, %d)
 			for i,v := range input.%s { %s[i] = v.%s; } // gctr1
 			%s = %s`,
 			absName,
-			typ, lengthS,
+			typ, lengthS, tableSize,
 			name[0], absName, name[1],
 			paramName, absName))
 	}
 	if arg.IsOutput() {
 		if !arg.IsInput() {
 			convIn = append(convIn,
-				fmt.Sprintf(`%s := make([]%s, %s)
+				fmt.Sprintf(`%s := make([]%s, %s, %d)
 			%s = %s // gctr2`,
-					absName, typ, lengthS,
+					absName, typ, lengthS, tableSize,
 					paramName, absName))
 		}
 		convOut = append(convOut,
