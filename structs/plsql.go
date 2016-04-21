@@ -446,13 +446,10 @@ func (arg Argument) getConvSimpleTable(
 ) ([]string, []string) {
 	if arg.IsOutput() {
 		got := arg.goType(types, true)
-		convOut = append(convOut, `fmt.Printf("params=%#v\n", params)`)
-		convOut = append(convOut, fmt.Sprintf("output.%s = %s.(%s)", name, paramName, got))
-		convOut = append(convOut, fmt.Sprintf(`fmt.Printf("output.%s=%%#v\n", output.%s)`, name, name))
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf(`
 		if output.%s == nil { // %#v
-			x := make([]%s, 0, %d)
+			x := make(%s, 0, %d)
 			output.%s = &x
 		} else if cap((*output.%s)) < %d { // simpletable
 			*output.%s = make(%s, 0, %d)
