@@ -32,7 +32,7 @@ import (
 	"log"
 	"os"
 
-	"gopkg.in/goracle.v1/oracle"
+	"gopkg.in/rana/ora.v3"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")
@@ -79,22 +79,16 @@ func main() {
 	log.Printf("calling %s(%#v)", funName, inp)
 
 	// get cursor
-	user, passw, sid := oracle.SplitDSN(*flagConnect)
-	conn, err := oracle.NewConnection(user, passw, sid, false)
+	env, srv, ses, err := ora.NewEnvSrvSes(*flagConnect, nil)
 	if err != nil {
 		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
 	}
-	if err = conn.Connect(0, false); err != nil {
-		log.Fatalf("error connecting: %s", err)
-	}
-	defer conn.Close()
-	cur := oracle.NewCursor(conn)
-	defer cur.Close()
-
-	oracle.BypassMultipleArgs = *flagBypassMultipleArgs
+	defer env.Close()
+	defer srv.Close()
+	defer ses.Close()
 
 	// call the function
-	out, err := fun(cur, inp)
+	out, err := fun(ses, inp)
 	if err != nil {
 		log.Fatalf("error calling %s(%s): %s", funName, inp, err)
 	}

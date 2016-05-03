@@ -26,10 +26,17 @@ import (
 	"strings"
 	"unicode"
 
+	"go4.org/syncutil"
+
 	"github.com/tgulacsi/oracall/structs"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/inconshreveable/log15.v2"
 	"gopkg.in/rana/ora.v3" // for Oracle-specific drivers
 )
+
+//go:generate go get github.com/golang/protobuf/protoc-gen-go
+// Should install protobuf-compiler to use it, like
+// curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
 var Log = log15.New()
 
@@ -38,10 +45,17 @@ var flagConnect = flag.String("connect", "", "connect to DB for retrieving funct
 func main() {
 	Log.SetHandler(log15.StderrHandler)
 	structs.Log.SetHandler(log15.StderrHandler)
+	os.Exit(Main(os.Args))
+}
+
+func Main(args []string) int {
+	os.Args = args
 
 	flagSkipFormat := flag.Bool("F", false, "skip formatting")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
 	flagDump := flag.String("dump", "", "dump to this csv")
+	flagPackage := flag.String("package", "main", "package name of the generated functions")
+	flagProto := flag.String("proto", "", "dump protocol buffers .proto")
 
 	flag.Parse()
 	if !*flagVerbose {
@@ -63,11 +77,13 @@ func main() {
 		ora.Register(nil)
 		cx, err := sql.Open("ora", *flagConnect)
 		if err != nil {
-			log.Fatalf("error connecting to %q: %s", *flagConnect, err)
+			log.Printf("error connecting to %q: %s", *flagConnect, err)
+			return 1
 		}
 		defer cx.Close()
 		if err = cx.Ping(); err != nil {
-			log.Fatalf("error pinging %q: %v", *flagConnect, err)
+			log.Printf("error pinging %q: %v", *flagConnect, err)
+			return 1
 		}
 		qry := `
     SELECT object_id, subprogram_id, package_name, object_name,
@@ -79,7 +95,8 @@ func main() {
       ORDER BY object_id, subprogram_id, SEQUENCE`
 		rows, err := cx.Query(qry, pattern)
 		if err != nil {
-			log.Fatalf("error querying %q: %s", qry, err)
+			log.Printf("error querying %q: %s", qry, err)
+			return 2
 		}
 		defer rows.Close()
 
@@ -87,7 +104,8 @@ func main() {
 		if *flagDump != "" {
 			fh, err := os.Create(*flagDump)
 			if err != nil {
-				log.Fatalf("error creating %q for csv dump: %v", *flagDump, err)
+				log.Printf("error creating %q for csv dump: %v", *flagDump, err)
+				return 3
 			}
 			defer func() {
 				cw.Flush()
@@ -114,13 +132,15 @@ func main() {
 				),
 				",",
 			)); err != nil {
-				log.Fatalf("error writing header to csv: %v", err)
+				log.Printf("error writing header to csv: %v", err)
+				return 3
 			}
 		}
 
 		userArgs := make(chan structs.UserArgument, 16)
 		var readErr error
-		go func() {
+		var grp syncutil.Group
+		grp.Go(func() error {
 			defer close(userArgs)
 			var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString
 			var oid, subid, level, pos, prec, scale, length sql.NullInt64
@@ -132,7 +152,7 @@ func main() {
 					&plsT, &length, &tOwner, &tName, &tSub, &tLink)
 				if err != nil {
 					readErr = err
-					log.Fatalf("error reading row %v: %v", rows, err)
+					return errgo.Notef(err, "reading row=%v", rows)
 				}
 				if cw != nil {
 					N := i64ToString
@@ -143,7 +163,7 @@ func main() {
 						plsT.String, N(length),
 						tOwner.String, tName.String, tSub.String, tLink.String,
 					}); err != nil {
-						log.Printf("error writing csv: %v", err)
+						return errgo.Notef(err, "writing csv")
 					}
 				}
 				ua.PackageName, ua.ObjectName, ua.ArgumentName = "", "", ""
@@ -201,20 +221,43 @@ func main() {
 			}
 			if err = rows.Err(); err != nil {
 				readErr = err
-				log.Fatalf("error walking rows: %s", err)
+				return errgo.Notef(err, "walking rows")
 			}
-		}()
+			return nil
+		})
 		functions, err = structs.ParseArguments(userArgs)
+		if grpErr := grp.Err(); grpErr != nil && err == nil {
+			err = grpErr
+		}
 	}
 	if err != nil {
-		log.Fatalf("error reading %q: %s", flag.Arg(0), err)
+		log.Printf("error reading %q: %s", flag.Arg(0), err)
+		return 3
 	}
 
 	defer os.Stdout.Sync()
-	if err = structs.SaveFunctions(os.Stdout, functions, "main", *flagSkipFormat); err != nil {
+	if err = structs.SaveFunctions(os.Stdout, functions, *flagPackage, *flagSkipFormat); err != nil {
 		log.Printf("error saving functions: %s", err)
-		os.Exit(1)
+		return 1
 	}
+
+	if *flagProto != "" {
+		fh, err := os.Create(*flagProto)
+		if err != nil {
+			log.Printf("error createing %q: %v", *flagProto, err)
+			return 1
+		}
+		defer func() {
+			if err := fh.Close(); err != nil {
+				log.Printf("error closing %q: %v", *flagProto, err)
+			}
+		}()
+		if err := structs.SaveProtobuf(fh, functions, *flagPackage); err != nil {
+			log.Printf("error saving protobuf: %v", err)
+			return 1
+		}
+	}
+	return 0
 }
 
 func i64ToString(n sql.NullInt64) string {

@@ -7,8 +7,8 @@ if [ -z "$dsn" ]; then
 fi
 
 set -x
+set +e
 go test $TESTARGS -connect=${dsn} ./... $TESTARGS
-exit 1
 go install
 
 {
@@ -20,8 +20,8 @@ EXIT
 EOF
 	fi
 fi
-echo oracall -F -connect="$dsn" ${1:-DB_WEB.SENDPREOFFER_31101} >&2
-./oracall -F -connect="$dsn" ${1:-DB_WEB.SENDPREOFFER_31101}
+set -x
+oracall -F -connect="$dsn" -proto=examples/minimal/generated.proto ${1:-DB_WEB.SENDPREOFFER_31101}
 } >examples/minimal/generated_functions.go
 go build -o /tmp/minimal ./examples/minimal
 echo
