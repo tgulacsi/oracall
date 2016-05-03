@@ -19,6 +19,7 @@ package structs
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -77,14 +78,11 @@ func (f Function) SaveProtobuf(dst io.Writer, out bool) error {
 		args = append(args, *f.Returns)
 	}
 
-	buf := buffers.Get()
-	defer buffers.Put(buf)
-	w := errWriter{Writer: buf, err: &err}
+	w := errWriter{Writer: dst, err: &err}
 
 	fmt.Fprintf(w, `
-	// %s %s
-	message %s {
-		`, f.Name(), dirname,
+message %s__%s {
+	`, f.Name(), dirname,
 	)
 
 	Log.Debug("SaveProtobuf",
@@ -96,13 +94,9 @@ func (f Function) SaveProtobuf(dst io.Writer, out bool) error {
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types, arg.Flavor == FLAVOR_TABLE)
 		//lName := strings.ToLower(arg.Name)
-		fmt.Fprintf(w, "\t%s %s = %d;\n", got, aName, i)
+		fmt.Fprintf(w, "\t%s %s = %d;\n", strings.TrimPrefix(got, "*"), aName, i)
 	}
 	io.WriteString(w, "}\n")
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
