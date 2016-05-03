@@ -87,7 +87,7 @@ func (f Function) SaveProtobuf(dst io.Writer, out bool) error {
 		`, f.Name(), dirname,
 	)
 
-	Log.Debug("SaveStruct",
+	Log.Debug("SaveProtobuf",
 		"function", log15.Lazy{func() string { return fmt.Sprintf("%#v", f) }})
 	for i, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {

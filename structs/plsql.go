@@ -210,10 +210,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			if arg.IsOutput() {
 				if arg.IsInput() {
 					convIn = append(convIn, fmt.Sprintf(`
-					if input.%s != nil { *output.%s = *input.%s
-					} else { output.%s = new(%s) }
-					`, aname, aname, aname,
-						aname, arg.goType(fun.types, false)[1:]))
+					output.%s = new(%s)
+					if input.%s != nil { *output.%s = *input.%s }
+					`, aname, arg.goType(fun.types, false)[1:],
+						aname, aname, aname))
 				} else {
 					convOut = append(convOut, fmt.Sprintf(`
                     if output.%s == nil {
@@ -426,7 +426,7 @@ func (arg Argument) getConvSimple(
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
 			if arg.IsInput() {
-				convIn = append(convIn, fmt.Sprintf(`*output.%s = *input.%s`, name, name))
+				convIn = append(convIn, fmt.Sprintf(`if input.%s != nil { *output.%s = *input.%s }`, name, name, name))
 			}
 		} else if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
