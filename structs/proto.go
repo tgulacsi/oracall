@@ -17,7 +17,6 @@ limitations under the License.
 package structs
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -35,15 +34,22 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	io.WriteString(w, `syntax = "proto3";`+"\n\n")
 
 	if pkg != "" {
-		fmt.Fprintf(w, "package %s;", pkg)
+		fmt.Fprintf(w, "package %s;\n", pkg)
 	}
 	types := make(map[string]string, 16)
+	seen := make(map[string]struct{}, 16)
 
 FunLoop:
 	for _, fun := range functions {
+		name := dot2D.Replace(fun.Name())
+		fmt.Fprintf(w, `
+service %s {
+	rpc %s (%s) returns (%s) {}
+}
+`, name, name, strings.ToLower(fun.getStructName(false)), strings.ToLower(fun.getStructName(true)))
 		fun.types = types
 		for _, dir := range []bool{false, true} {
-			if err := fun.SaveProtobuf(w, dir); err != nil {
+			if err := fun.SaveProtobuf(w, seen, dir); err != nil {
 				if errgo.Cause(err) == ErrMissingTableOf {
 					Log.Warn("SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
@@ -51,18 +57,12 @@ FunLoop:
 				return err
 			}
 		}
-		name := dot2D.Replace(fun.Name())
-		fmt.Fprintf(w, `
-service %s {
-	rpc %s (%s) returns (%s) {}
-}
-`, name, name, strings.ToLower(fun.getStructName(false)), strings.ToLower(fun.getStructName(true)))
 	}
 
 	return nil
 }
 
-func (f Function) SaveProtobuf(dst io.Writer, out bool) error {
+func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}, out bool) error {
 	dirmap, dirname := uint8(DIR_IN), "input"
 	if out {
 		dirmap, dirname = DIR_OUT, "output"
@@ -78,18 +78,17 @@ func (f Function) SaveProtobuf(dst io.Writer, out bool) error {
 		args = append(args, *f.Returns)
 	}
 
-	return protoWriteMessageTyp(dst, dot2D.Replace(strings.ToLower(f.Name()))+"__"+dirname, f.types, args...)
+	return protoWriteMessageTyp(dst, dot2D.Replace(strings.ToLower(f.Name()))+"__"+dirname, f.types, seen, args...)
 }
 
 var dot2D = strings.NewReplacer(".", "__")
 
-func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string, args ...Argument) error {
+func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string, seen map[string]struct{}, args ...Argument) error {
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
 	fmt.Fprintf(w, "\nmessage %s {\n", msgName)
 
-	seen := make(map[string]struct{}, 16)
 	buf := buffers.Get()
 	defer buffers.Put(buf)
 	for i, arg := range args {
@@ -130,16 +129,15 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 					subArgs = append(subArgs, v)
 				}
 			}
-			buf.Reset()
-			if err := protoWriteMessageTyp(buf, typ, types, subArgs...); err != nil {
+			if err := protoWriteMessageTyp(buf, typ, types, seen, subArgs...); err != nil {
 				return err
 			}
-			w.Write(bytes.Replace(buf.Bytes(), []byte("\n"), []byte("\n\t"), -1))
 			seen[typ] = struct{}{}
 		}
-		fmt.Fprintf(w, "\n\t%s%s %s = %d;\n", rule, typ, aName, i+1)
+		fmt.Fprintf(w, "\t%s%s %s = %d;\n", rule, typ, aName, i+1)
 	}
-	io.WriteString(w, "}")
+	io.WriteString(w, "}\n")
+	w.Write(buf.Bytes())
 
 	return err
 }
