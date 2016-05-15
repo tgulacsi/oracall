@@ -14,6 +14,9 @@ go install
 	else
 		gzip -dc examples/db_web/cig.db_web.csv.gz
 	fi
-} | oracall -F - >examples/db_web/generated_functions.go
+} | oracall -proto examples/db_web/generated.proto -F - >examples/db_web/generated_functions.go
+
+protoc examples/db_web/generated.proto --go_out=.
+
 
 go build -o /tmp/db_web ./examples/db_web

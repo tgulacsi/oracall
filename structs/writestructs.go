@@ -25,6 +25,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"unicode"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -115,7 +116,7 @@ FunLoop:
 			b = []byte(callFun)
 		}
 		w.Write(b)
-		inpstruct := fun.getStructName(false)
+		inpstruct := goName(fun.getStructName(false))
 		inits = append(inits,
 			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *ora.Ses, input interface{}) (interface{}, error) {
         var inp %s
@@ -193,7 +194,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	if dirmap == uint8(DIR_IN) {
 		checks = make([]string, 0, len(args)+1)
 	}
-	structName = f.getStructName(out)
+	structName = goName(f.getStructName(out))
 	buf := buffers.Get()
 	defer buffers.Put(buf)
 	w := errWriter{Writer: buf, err: &err}
@@ -445,7 +446,7 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 	default:
 		typName = strings.Join(chunks[1:], "__") + "__" + chunks[0]
 	}
-	typName = capitalize(typName)
+	typName = goName(capitalize(typName))
 	if td := typedefs[typName]; td != "" {
 		return "*" + typName
 	}
@@ -502,9 +503,28 @@ func goName(text string) string {
 		return text
 	}
 	if text[len(text)-1] == '#' {
-		return text[:len(text)-1] + MarkHidden
+		text = text[:len(text)-1] + MarkHidden
 	}
-	return text
+	var last rune
+	return strings.Map(func(r rune) rune {
+		if r == '_' {
+			if last != '_' {
+				last = '_'
+				return -1
+			}
+			return '_'
+		}
+		if last == '_' {
+			last = r
+			return unicode.ToUpper(r)
+		}
+		if last == 0 {
+			return r
+		}
+		return unicode.ToLower(r)
+	},
+		text,
+	)
 }
 
 type errWriter struct {

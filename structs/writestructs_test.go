@@ -89,3 +89,15 @@ func TestWriteStruct(t *testing.T) {
 		}
 	}
 }
+
+func TestGoName(t *testing.T) {
+	for eltNum, elt := range [][2]string{
+		{"a", "a"},
+		{"a_b", "aB"},
+		{"a__b", "a_B"},
+	} {
+		if got := goName(elt[0]); got != elt[1] {
+			t.Errorf("%d. %q => got %q, awaited %q.", eltNum, elt[0], got, elt[1])
+		}
+	}
+}

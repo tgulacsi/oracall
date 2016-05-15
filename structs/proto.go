@@ -19,6 +19,7 @@ package structs
 import (
 	"fmt"
 	"io"
+	"log"
 	"strings"
 
 	"gopkg.in/errgo.v1"
@@ -84,9 +85,17 @@ func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}, out bool
 var dot2D = strings.NewReplacer(".", "__")
 
 func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string, seen map[string]struct{}, args ...Argument) error {
+	for _, arg := range args {
+		if strings.HasSuffix(arg.Name, "#") {
+			continue
+		}
+		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
+			return errgo.WithCausef(nil, ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
+		}
+	}
+
 	var err error
 	w := errWriter{Writer: dst, err: &err}
-
 	fmt.Fprintf(w, "\nmessage %s {\n", msgName)
 
 	buf := buffers.Get()
@@ -130,6 +139,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 				}
 			}
 			if err := protoWriteMessageTyp(buf, typ, types, seen, subArgs...); err != nil {
+				log.Printf("protoWriteMessage: %v", err)
 				return err
 			}
 			seen[typ] = struct{}{}
