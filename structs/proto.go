@@ -22,6 +22,7 @@ import (
 	"log"
 	"strings"
 
+	fstructs "github.com/fatih/structs"
 	"gopkg.in/errgo.v1"
 )
 
@@ -169,4 +170,21 @@ func protoType(got string) string {
 	default:
 		return strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*"))
 	}
+}
+
+func CopyStruct(dest interface{}, src interface{}) error {
+	ds := fstructs.New(dest)
+	ss := fstructs.New(src)
+	names := ss.Names()
+	for _, df := range ds.Fields() {
+		dnm := df.Name()
+		for _, snm := range names {
+			if snm == dnm || dnm == goName(snm) || goName(dnm) == snm {
+				if err := df.Set(ss.Value()); err != nil {
+					return errgo.Notef(err, "set %q to %q (%v %T)", dnm, snm, ss.Value(), ss.Value())
+				}
+			}
+		}
+	}
+	return nil
 }
