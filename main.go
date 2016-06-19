@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"flag"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -28,9 +27,9 @@ import (
 
 	"go4.org/syncutil"
 
+	"github.com/pkg/errors"
+	"github.com/tgulacsi/go/loghlp/kitloghlp"
 	"github.com/tgulacsi/oracall/structs"
-	"gopkg.in/errgo.v1"
-	"gopkg.in/inconshreveable/log15.v2"
 	"gopkg.in/rana/ora.v3" // for Oracle-specific drivers
 )
 
@@ -38,13 +37,12 @@ import (
 // Should install protobuf-compiler to use it, like
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
-var Log = log15.New()
+var logger = kitloghlp.New(os.Stderr)
 
 var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
 
 func main() {
-	Log.SetHandler(log15.StderrHandler)
-	structs.Log.SetHandler(log15.StderrHandler)
+	structs.Log = logger.With("lib", "structs").Log
 	os.Exit(Main(os.Args))
 }
 
@@ -52,17 +50,13 @@ func Main(args []string) int {
 	os.Args = args
 
 	flagSkipFormat := flag.Bool("F", false, "skip formatting")
-	flagVerbose := flag.Bool("v", false, "verbose logging")
+	//flagVerbose := flag.Bool("v", false, "verbose logging")
 	flagDump := flag.String("dump", "", "dump to this csv")
 	flagPackage := flag.String("package", "main", "package name of the generated functions")
 	flagProto := flag.String("proto", "", "dump protocol buffers .proto")
 
 	flag.Parse()
-	if !*flagVerbose {
-		hndl := log15.LvlFilterHandler(log15.LvlInfo, log15.StderrHandler)
-		Log.SetHandler(hndl)
-		structs.Log.SetHandler(hndl)
-	}
+	Log := logger.Log
 
 	var functions []structs.Function
 	var err error
@@ -77,12 +71,12 @@ func Main(args []string) int {
 		ora.Register(nil)
 		cx, err := sql.Open("ora", *flagConnect)
 		if err != nil {
-			log.Printf("error connecting to %q: %s", *flagConnect, err)
+			Log("msg", "connecting to", "dsn", *flagConnect, "error", err)
 			return 1
 		}
 		defer cx.Close()
 		if err = cx.Ping(); err != nil {
-			log.Printf("error pinging %q: %v", *flagConnect, err)
+			Log("msg", "pinging", "dsn", *flagConnect, "error", err)
 			return 1
 		}
 		qry := `
@@ -95,7 +89,7 @@ func Main(args []string) int {
       ORDER BY object_id, subprogram_id, SEQUENCE`
 		rows, err := cx.Query(qry, pattern)
 		if err != nil {
-			log.Printf("error querying %q: %s", qry, err)
+			Log("qry", qry, "error", err)
 			return 2
 		}
 		defer rows.Close()
@@ -104,16 +98,16 @@ func Main(args []string) int {
 		if *flagDump != "" {
 			fh, err := os.Create(*flagDump)
 			if err != nil {
-				log.Printf("error creating %q for csv dump: %v", *flagDump, err)
+				Log("msg", "create", "dump", *flagDump, "error", err)
 				return 3
 			}
 			defer func() {
 				cw.Flush()
 				if err := cw.Error(); err != nil {
-					log.Printf("ERROR flushing csv %q: %v", fh.Name(), err)
+					Log("msg", "flush", "csv", fh.Name(), "error", err)
 				}
 				if err := fh.Close(); err != nil {
-					log.Printf("ERROR closing dump file %q: %v", fh.Name(), err)
+					Log("msg", "close", "dump", fh.Name(), "error", err)
 				}
 			}()
 			cw = csv.NewWriter(fh)
@@ -132,7 +126,7 @@ func Main(args []string) int {
 				),
 				",",
 			)); err != nil {
-				log.Printf("error writing header to csv: %v", err)
+				Log("msg", "write header to csv", "error", err)
 				return 3
 			}
 		}
@@ -152,7 +146,7 @@ func Main(args []string) int {
 					&plsT, &length, &tOwner, &tName, &tSub, &tLink)
 				if err != nil {
 					readErr = err
-					return errgo.Notef(err, "reading row=%v", rows)
+					return errors.Wrapf(err, "reading row=%v", rows)
 				}
 				if cw != nil {
 					N := i64ToString
@@ -163,7 +157,7 @@ func Main(args []string) int {
 						plsT.String, N(length),
 						tOwner.String, tName.String, tSub.String, tLink.String,
 					}); err != nil {
-						return errgo.Notef(err, "writing csv")
+						return errors.Wrapf(err, "writing csv")
 					}
 				}
 				ua.PackageName, ua.ObjectName, ua.ArgumentName = "", "", ""
@@ -221,7 +215,7 @@ func Main(args []string) int {
 			}
 			if err = rows.Err(); err != nil {
 				readErr = err
-				return errgo.Notef(err, "walking rows")
+				return errors.Wrapf(err, "walking rows")
 			}
 			return nil
 		})
@@ -231,29 +225,29 @@ func Main(args []string) int {
 		}
 	}
 	if err != nil {
-		log.Printf("error reading %q: %s", flag.Arg(0), err)
+		Log("msg", "reade", "file", flag.Arg(0), "error", err)
 		return 3
 	}
 
 	defer os.Stdout.Sync()
 	if err = structs.SaveFunctions(os.Stdout, functions, *flagPackage, *flagSkipFormat); err != nil {
-		log.Printf("error saving functions: %s", err)
+		Log("msg", "save functions", "error", err)
 		return 1
 	}
 
 	if *flagProto != "" {
 		fh, err := os.Create(*flagProto)
 		if err != nil {
-			log.Printf("error createing %q: %v", *flagProto, err)
+			Log("msg", "create", "proto", *flagProto, "error", err)
 			return 1
 		}
 		defer func() {
 			if err := fh.Close(); err != nil {
-				log.Printf("error closing %q: %v", *flagProto, err)
+				Log("msg", "close", "proto", *flagProto, "error", err)
 			}
 		}()
 		if err := structs.SaveProtobuf(fh, functions, *flagPackage); err != nil {
-			log.Printf("error saving protobuf: %v", err)
+			Log("msg", "save", "error", err)
 			return 1
 		}
 	}

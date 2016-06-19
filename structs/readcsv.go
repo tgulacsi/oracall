@@ -109,7 +109,7 @@ func OpenCsv(filename string) (*os.File, error) {
 func MustOpenCsv(filename string) *os.File {
 	fh, err := OpenCsv(filename)
 	if err != nil {
-		Log.Crit("MustOpenCsv", "file", filename, "error", err)
+		Log("msg", "MustOpenCsv", "file", filename, "error", err)
 		os.Exit(1)
 	}
 	return fh
@@ -152,7 +152,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			csvFields[h] = i
 		}
 	}
-	Log.Info("field order", "fields", csvFields)
+	Log("msg", "field order", "fields", csvFields)
 
 	for {
 		if rec, err = csvr.Read(); err != nil {
@@ -209,13 +209,13 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		nameFun := Function{Package: ua.PackageName, name: ua.ObjectName}
 		funName = nameFun.Name()
 		if seen[funName] > 1 {
-			Log.Warn("function " + funName + " already seen! skipping...")
+			Log("msg", "function "+funName+" already seen! skipping...")
 			continue
 		}
 		if fun.Name() == "" || funName != fun.Name() { //new (differs from prev record
 			seen[funName]++
-			Log.Debug("ParseArguments", "old", fun.Name(), "new", funName, "seen", seen[funName])
-			Log.Debug("New function " + funName)
+			Log("msg", "ParseArguments", "old", fun.Name(), "new", funName, "seen", seen[funName])
+			Log("msg", "New function "+funName)
 			if fun.name != "" {
 				x := fun // copy
 				x.Args = append(make([]Argument, 0, len(args)), args...)
@@ -245,7 +245,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		// 2. RECORD at level 0
 		// 3. TABLE OF simple
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-		Log.Debug("ParseArguments", "level", level, "arg", arg)
+		Log("msg", "ParseArguments", "level", level, "arg", arg)
 		if level == 0 {
 			if len(args) == 0 && arg.Name == "" {
 				arg.Name = "ret"
@@ -257,7 +257,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 			lastArgs = lastArgs[:level]
 			lastArg := lastArgs[level-1]
 			if lastArg == nil {
-				Log.Crit("lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
+				Log("msg", "lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
 				os.Exit(1)
 			}
 			if lastArg.Flavor == FLAVOR_TABLE {
@@ -293,7 +293,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		fun.Args = args
 		functions = append(functions, fun)
 	}
-	Log.Info(fmt.Sprintf("found %d functions.", len(functions)))
+	Log("msg", fmt.Sprintf("found %d functions.", len(functions)))
 	return
 }
 

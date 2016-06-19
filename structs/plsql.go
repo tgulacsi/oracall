@@ -42,7 +42,7 @@ var (
 func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
-		Log.Crit("error preparing", "function", fun, "error", err)
+		Log("msg", "error preparing", "function", fun, "error", err)
 		os.Exit(1)
 	}
 	fn := strings.Replace(fun.Name(), ".", "__", -1)
@@ -58,7 +58,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	}
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
-	Log.Debug("PlsqlBlock", "i", i, "j", j, "call", call)
+	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%s`, params) }"+`
     if _, err = ses.PrepAndExeP(%s, params...); err != nil { return }
     `, call[i:j], fun.getPlsqlConstName())
@@ -102,7 +102,7 @@ func demap(plsql, callFun string) (string, string) {
 	paramsMap := make(map[string][]int, 16)
 
 	var i int
-	old := plsql
+	//old := plsql
 	plsql, paramsArr := orahlp.MapToSlice(
 		plsql,
 		func(key string) interface{} {
@@ -110,7 +110,7 @@ func demap(plsql, callFun string) (string, string) {
 			i++
 			return key
 		})
-	Log.Debug("MapToSlice", "old", old, "new", plsql, "params", paramsMap, "arr", paramsArr)
+	//Log("msg","MapToSlice", "old", old, "new", plsql, "params", paramsMap, "arr", paramsArr)
 
 	opts := repl{
 		ParamsArrLen: len(paramsArr),
@@ -123,9 +123,9 @@ func demap(plsql, callFun string) (string, string) {
 				"paramsIdx": func(key string) int {
 					arr := paramsMap[key]
 					if len(arr) == 0 {
-						Log.Error("paramsIdx", "key", key, "val", arr, "map", paramsMap)
+						Log("msg", "paramsIdx", "key", key, "val", arr, "map", paramsMap)
 					} else {
-						Log.Debug("paramsIdx", "key", key, "val", paramsMap[key])
+						//Log("msg","paramsIdx", "key", key, "val", paramsMap[key])
 					}
 					i = arr[0]
 					if len(arr) > 1 {
@@ -147,7 +147,7 @@ func demap(plsql, callFun string) (string, string) {
 
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
 	if fun.types == nil {
-		Log.Info("nil types", "function", fun)
+		Log("msg", "nil types", "function", fun)
 		fun.types = make(map[string]string, 4)
 	}
 	tableTypes := make(map[string]string, 4)
@@ -238,7 +238,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
-					Log.Crit("cannot use IN cursor variables", "arg", arg)
+					Log("msg", "cannot use IN cursor variables", "arg", arg)
 					os.Exit(1)
 				}
 				name := capitalize(goName(arg.Name))
@@ -372,12 +372,12 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						}
 					}
 				default:
-					Log.Crit("Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
+					Log("msg", "Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
 					os.Exit(1)
 				}
 			}
 		default:
-			Log.Crit("unkown flavor", "flavor", arg.Flavor)
+			Log("msg", "unkown flavor", "flavor", arg.Flavor)
 			os.Exit(1)
 		}
 	}
@@ -386,7 +386,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
 	}
-	Log.Debug("prepareCall", "callArgs", callArgs)
+	//Log("msg","prepareCall", "callArgs", callArgs)
 	callb.WriteString(fun.Name() + "(")
 	for i, arg := range fun.Args {
 		if i > 0 {

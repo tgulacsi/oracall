@@ -18,7 +18,6 @@ package structs
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"go/format"
 	"io"
@@ -27,8 +26,7 @@ import (
 	"sync"
 	"unicode"
 
-	"gopkg.in/errgo.v1"
-	"gopkg.in/inconshreveable/log15.v2"
+	"github.com/pkg/errors"
 )
 
 var ErrMissingTableOf = errors.New("missing TableOf info")
@@ -94,8 +92,8 @@ FunLoop:
 		fun.types = types
 		for _, dir := range []bool{false, true} {
 			if err := fun.SaveStruct(w, dir); err != nil {
-				if errgo.Cause(err) == ErrMissingTableOf {
-					Log.Warn("SKIP function, missing TableOf info", "function", fun.Name())
+				if errors.Cause(err) == ErrMissingTableOf {
+					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
 				}
 				return err
@@ -106,7 +104,7 @@ FunLoop:
 		io.WriteString(w, plsBlock)
 		io.WriteString(w, "`\n\n")
 		if b, err = format.Source([]byte(callFun)); err != nil {
-			Log.Warn("saving function", "function", fun.Name(), "error", err)
+			Log("msg", "saving function", "function", fun.Name(), "error", err)
 			os.Stderr.WriteString("\n\n---------------------8<--------------------\n")
 			os.Stderr.WriteString(callFun)
 			os.Stderr.WriteString("\n--------------------->8--------------------\n\n")
@@ -206,11 +204,10 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		`, f.Name(), dirname, structName, strings.ToLower(structName[:1])+structName[1:],
 	)
 
-	Log.Debug("SaveStruct",
-		"function", log15.Lazy{func() string { return fmt.Sprintf("%#v", f) }})
+	//Log("msg","SaveStruct", "function", fmt.Sprintf("%#v", f) )
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return errgo.WithCausef(nil, ErrMissingTableOf, "no table of data for %s.%s (%v)", f.Name(), arg, arg)
+			return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", f.Name(), arg, arg)
 		}
 		aName = capitalize(goName(arg.Name))
 		got = arg.goType(f.types, arg.Flavor == FLAVOR_TABLE)
@@ -354,7 +351,7 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			checks = append(checks, "}")
 		}
 	default:
-		Log.Crit("unknown flavor", "flavor", arg.Flavor)
+		Log("msg", "unknown flavor", "flavor", arg.Flavor)
 		os.Exit(1)
 	}
 	return checks
@@ -433,7 +430,7 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 		case "CLOB", "BLOB":
 			return "ora.Lob"
 		default:
-			Log.Crit("unknown simple type", "type", arg.Type, "arg", arg)
+			Log("msg", "unknown simple type", "type", arg.Type, "arg", arg)
 			os.Exit(1)
 		}
 	}
@@ -455,7 +452,7 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 	defer buffers.Put(buf)
 
 	if arg.Flavor == FLAVOR_TABLE {
-		Log.Info("TABLE", "arg", arg, "tableOf", arg.TableOf)
+		Log("msg", "TABLE", "arg", arg, "tableOf", arg.TableOf)
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
 		tn := "[]" + targ.goType(typedefs, true)
@@ -481,7 +478,7 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 
 	// FLAVOR_RECORD
 	if arg.TypeName == "" {
-		Log.Warn("arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
+		Log("msg", "arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
 	buf.WriteString("\ntype " + typName + " struct {\n")

@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	fstructs "github.com/fatih/structs"
-	"gopkg.in/errgo.v1"
+	"github.com/pkg/errors"
 )
 
 //go:generate go get github.com/golang/protobuf/protoc-gen-go
@@ -52,8 +52,8 @@ service %s {
 		fun.types = types
 		for _, dir := range []bool{false, true} {
 			if err := fun.SaveProtobuf(w, seen, dir); err != nil {
-				if errgo.Cause(err) == ErrMissingTableOf {
-					Log.Warn("SKIP function, missing TableOf info", "function", fun.Name())
+				if errors.Cause(err) == ErrMissingTableOf {
+					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
 				}
 				return err
@@ -91,7 +91,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 			continue
 		}
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return errgo.WithCausef(nil, ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
+			return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
 		}
 	}
 
@@ -106,7 +106,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 			continue
 		}
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return errgo.WithCausef(nil, ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
+			return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
 		}
 		aName := arg.Name
 		got := arg.goType(types, false)
@@ -175,13 +175,15 @@ func protoType(got string) string {
 func CopyStruct(dest interface{}, src interface{}) error {
 	ds := fstructs.New(dest)
 	ss := fstructs.New(src)
-	names := ss.Names()
+	snames := ss.Names()
+	svalues := ss.Values()
 	for _, df := range ds.Fields() {
 		dnm := df.Name()
-		for _, snm := range names {
+		for i, snm := range snames {
 			if snm == dnm || dnm == goName(snm) || goName(dnm) == snm {
-				if err := df.Set(ss.Value()); err != nil {
-					return errgo.Notef(err, "set %q to %q (%v %T)", dnm, snm, ss.Value(), ss.Value())
+				svalue := svalues[i]
+				if err := df.Set(svalue); err != nil {
+					return errors.Wrapf(err, "set %q to %q (%v %T)", dnm, snm, svalue, svalue)
 				}
 			}
 		}
