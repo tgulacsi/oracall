@@ -198,7 +198,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	for _, arg := range args {
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
-			name := capitalize(goName(arg.Name))
+			//name := capitalize(goName(arg.Name))
+			name := capitalize(replHidden(arg.Name))
 			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types,
 				name, addParam(arg.Name))
 
@@ -206,7 +207,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			vn = getInnerVarName(fun.Name(), arg.Name)
 			decls = append(decls, vn+" "+arg.TypeName+";")
 			callArgs[arg.Name] = vn
-			aname := capitalize(goName(arg.Name))
+			//aname := capitalize(goName(arg.Name))
+			aname := capitalize(replHidden(arg.Name))
 			if arg.IsOutput() {
 				if arg.IsInput() {
 					convIn = append(convIn, fmt.Sprintf(`
@@ -224,7 +226,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			}
 			for k, v := range arg.RecordOf {
 				tmp = getParamName(fun.Name(), vn+"."+k)
-				name := aname + "." + capitalize(goName(k))
+				//kName := capitalize(goName(k))
+				kName := capitalize(replHidden(k))
+				name := aname + "." + kName
 				if arg.IsInput() {
 					pre = append(pre, vn+"."+k+" := :"+tmp+";")
 				}
@@ -241,7 +245,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					Log("msg", "cannot use IN cursor variables", "arg", arg)
 					os.Exit(1)
 				}
-				name := capitalize(goName(arg.Name))
+				//name := capitalize(goName(arg.Name))
+				name := capitalize(replHidden(arg.Name))
 				convIn, convOut = arg.getConvSimpleTable(convIn, convOut, fun.types,
 					name, addParam(arg.Name), MaxTableSize)
 			} else {
@@ -276,7 +281,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							"END LOOP;",
 							":"+arg.Name+" := "+arg.Name+";")
 					}
-					name := capitalize(goName(arg.Name))
+					//name := capitalize(goName(arg.Name))
+					name := capitalize(replHidden(arg.Name))
 					convIn, convOut = arg.getConvSimpleTable(convIn, convOut, fun.types,
 						name, addParam(arg.Name), MaxTableSize)
 
@@ -285,7 +291,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					callArgs[arg.Name] = vn
 					decls = append(decls, vn+" "+arg.TypeName+";")
 
-					aname := capitalize(goName(arg.Name))
+					//aname := capitalize(goName(arg.Name))
+					aname := capitalize(replHidden(arg.Name))
 					if arg.IsOutput() {
 						convOut = append(convOut, fmt.Sprintf(`
                     if output.%s == nil { // _
@@ -339,11 +346,13 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 									"WHILE i1 IS NOT NULL LOOP")
 							}
 						}
-						//name := aname + "." + capitalize(goName(k))
+						//kName := capitalize(goName(k))
+						kName := capitalize(replHidden(k))
+						//name := aname + "." + kName
 
 						convIn, convOut = v.getConvTableRec(
 							convIn, convOut, fun.types,
-							[2]string{aname, capitalize(goName(k))},
+							[2]string{aname, kName},
 							addParam(tmp),
 							MaxTableSize,
 							k, *arg.TableOf)

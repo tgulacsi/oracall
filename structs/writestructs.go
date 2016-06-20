@@ -114,7 +114,8 @@ FunLoop:
 			b = []byte(callFun)
 		}
 		w.Write(b)
-		inpstruct := goName(fun.getStructName(false))
+		//inpstruct := goName(fun.getStructName(false))
+		inpstruct := fun.getStructName(false)
 		inits = append(inits,
 			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *ora.Ses, input interface{}) (interface{}, error) {
         var inp %s
@@ -192,7 +193,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	if dirmap == uint8(DIR_IN) {
 		checks = make([]string, 0, len(args)+1)
 	}
-	structName = goName(f.getStructName(out))
+	//structName = goName(f.getStructName(out))
+	structName = f.getStructName(out)
 	buf := buffers.Get()
 	defer buffers.Put(buf)
 	w := errWriter{Writer: buf, err: &err}
@@ -209,7 +211,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", f.Name(), arg, arg)
 		}
-		aName = capitalize(goName(arg.Name))
+		//aName = capitalize(goName(arg.Name))
+		aName = capitalize(replHidden(arg.Name))
 		got = arg.goType(f.types, arg.Flavor == FLAVOR_TABLE)
 		lName := strings.ToLower(arg.Name)
 		io.WriteString(w, "\t"+aName+" "+got+
@@ -260,7 +263,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 }
 
 func genChecks(checks []string, arg Argument, types map[string]string, base string, parentIsTable bool) []string {
-	aName := capitalize(goName(arg.Name))
+	//aName := capitalize(goName(arg.Name))
+	aName := capitalize(replHidden(arg.Name))
 	got := arg.goType(types, parentIsTable || arg.Flavor == FLAVOR_TABLE)
 	var name string
 	if aName == "" {
@@ -415,18 +419,13 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 				return "*bool"
 			}
 			return "sql.NullBool"
-		case "DATE", "DATETIME":
-			if arg.IsOutput() {
-				return "*ora.Date"
-			}
-			return "ora.Date"
-		case "TIME", "TIMESTAMP":
+		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
 			if !isTable && arg.IsOutput() {
 				return "*time.Time"
 			}
 			return "ora.Time"
 		case "REF CURSOR":
-			return "*ora.Ses"
+			return "*ora.Rset"
 		case "CLOB", "BLOB":
 			return "ora.Lob"
 		default:
@@ -443,7 +442,8 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 	default:
 		typName = strings.Join(chunks[1:], "__") + "__" + chunks[0]
 	}
-	typName = goName(capitalize(typName))
+	//typName = goName(capitalize(typName))
+	typName = capitalize(typName)
 	if td := typedefs[typName]; td != "" {
 		return "*" + typName
 	}
@@ -484,7 +484,9 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 	buf.WriteString("\ntype " + typName + " struct {\n")
 	for k, v := range arg.RecordOf {
 		lName := strings.ToLower(k)
-		buf.WriteString("\t" + capitalize(goName(k)) + " " +
+		//kName := capitalize(goName(k))
+		kName := capitalize(replHidden(k))
+		buf.WriteString("\t" + kName + " " +
 			v.goType(typedefs, isTable) + "\t" +
 			"`json:\"" + lName + ",omitempty\"" +
 			" xml:\"" + lName + ",omitempty\"`\t\n")
@@ -495,12 +497,20 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 	return "*" + typName
 }
 
-func goName(text string) string {
+func replHidden(text string) string {
 	if text == "" {
 		return text
 	}
 	if text[len(text)-1] == '#' {
-		text = text[:len(text)-1] + MarkHidden
+		return text[:len(text)-1] + MarkHidden
+	}
+	return text
+}
+
+func goName(text string) string {
+	text = replHidden(text)
+	if text == "" {
+		return text
 	}
 	var last rune
 	return strings.Map(func(r rune) rune {
