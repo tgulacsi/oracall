@@ -38,12 +38,31 @@ import (
 
 var (
 	finish = false
+	TOff   = "Z"
 
 	flagOnly = flag.String("only", "", "run only this specific test case, only")
 )
 
 func init() {
 	flag.Parse()
+
+	now := time.Now()
+	f := "2006-01-02T15:04:05"
+	m, err := time.ParseInLocation(f, now.UTC().Format(f), time.Local)
+	if err != nil {
+		panic(err)
+	}
+	d := now.Sub(m)
+	if -time.Second < d && d < time.Second {
+		TOff = "Z"
+	} else {
+		sign := "+"
+		if d < 0 {
+			sign = "-"
+			d *= -1
+		}
+		TOff = fmt.Sprintf("%s%02d:%02d", sign, d/time.Hour, (d%time.Hour)/time.Minute)
+	}
 }
 
 // TestGen tests the generation - for this, it needs a dsn with privileges
@@ -70,7 +89,7 @@ func TestGenSimple(t *testing.T) {
 			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
 			`{"txt2":"abraka#","int2":-2,"num2":0.4333333333333333,"dt2":"` +
 				strings.Replace(now.Truncate(24*time.Hour).AddDate(0, 1, 0).Format(time.RFC3339), "T02:", "T00:", 1) +
-				`","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00+01:00"}`},
+				`","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00` + TOff + `"}`},
 		{"simple_nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
 		{"simple_sum_nums", `{"nums":[1.1,2,3.3]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
 	} {
