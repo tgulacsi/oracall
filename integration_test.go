@@ -509,7 +509,7 @@ func build(t *testing.T) {
 
 func generateAndBuild(t *testing.T, prefix string) (outFn string) {
 	runCommand(t, "sh", "-c",
-		"./oracall -F -connect='"+*flagConnect+
+		"oracall -F -connect='"+*flagConnect+
 			"' TST_ORACALL."+strings.ToUpper(prefix)+"%"+
 			" >./testdata/integration_test/generated_functions.go")
 

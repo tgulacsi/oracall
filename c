@@ -21,6 +21,7 @@ EOF
 	fi
 fi
 set -x
+find ./examples/minimal -name 'generated*' -delete
 oracall -F -connect="$dsn" -proto=examples/minimal/generated.proto ${1:-DB_WEB.SENDPREOFFER_31101}
 } >examples/minimal/generated_functions.go
 go build -o /tmp/minimal ./examples/minimal
