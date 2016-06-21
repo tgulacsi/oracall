@@ -55,8 +55,8 @@ var DebugLevel = uint(0)
 
 // against "unused import" error
 var _ ora.Ses
-var _ time.Time
 var _ strconv.NumError
+var _ time.Time
 var _ strings.Reader
 var _ = errors.New
 var _ json.Marshaler
@@ -421,9 +421,9 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 			return "sql.NullBool"
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
 			if !isTable && arg.IsOutput() {
-				return "*time.Time"
+				return "*ora.Date"
 			}
-			return "ora.Time"
+			return "ora.Date"
 		case "REF CURSOR":
 			return "*ora.Rset"
 		case "CLOB", "BLOB":
