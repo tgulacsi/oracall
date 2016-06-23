@@ -43,7 +43,7 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 
 FunLoop:
 	for _, fun := range functions {
-		name := fun.Name() //dot2D.Replace(fun.Name())
+		name := dot2D.Replace(fun.Name())
 		fmt.Fprintf(w, `
 service %s {
 	rpc %s (%s) returns (%s) {}
@@ -81,8 +81,7 @@ func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}, out bool
 	}
 
 	return protoWriteMessageTyp(dst,
-		//dot2D.Replace(strings.ToLower(f.Name()))+"__"+dirname,
-		strings.ToLower(f.Name())+"__"+dirname,
+		dot2D.Replace(strings.ToLower(f.Name()))+"__"+dirname,
 		f.types, seen, args...)
 }
 
