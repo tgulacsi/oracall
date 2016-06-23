@@ -26,8 +26,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate go get github.com/golang/protobuf/protoc-gen-go
-// https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip
+//go:generate sh download-protoc.sh
+//go:generate go get -u github.com/golang/protobuf/protoc-gen-go
 
 func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	var err error
