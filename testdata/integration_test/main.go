@@ -32,9 +32,9 @@ import (
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/rana/ora/lg"
 	"github.com/tgulacsi/go/orahlp"
 	"gopkg.in/rana/ora.v3"
+	"gopkg.in/rana/ora.v3/lg"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")
@@ -83,15 +83,13 @@ func main() {
 		panic(err)
 	}
 	defer env.Close()
-	srvCfg := ora.NewSrvCfg()
-	srvCfg.Dblink = sid
+	srvCfg := &ora.SrvCfg{Dblink: sid}
 	srv, err := env.OpenSrv(srvCfg)
 	if err != nil {
 		log.Fatalf("connect to %s: %v", sid, err)
 	}
 	defer srv.Close()
-	sesCfg := ora.NewSesCfg()
-	sesCfg.Username, sesCfg.Password = user, passw
+	sesCfg := &ora.SesCfg{Username: user, Password: passw}
 	ses, err := srv.OpenSes(sesCfg)
 	if err != nil {
 		log.Fatalf("auth %s: %v", user, err)
