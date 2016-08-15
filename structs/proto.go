@@ -42,6 +42,9 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	if pkg != "" {
 		fmt.Fprintf(w, "package %s;\n", pkg)
 	}
+	io.WriteString(w, `
+	import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+`)
 	types := make(map[string]string, 16)
 	seen := make(map[string]struct{}, 16)
 
@@ -162,8 +165,8 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 func protoType(got string) (string, protoOptions) {
 	switch strings.ToLower(got) {
 	case "ora.date":
-		return "string", protoOptions(map[string]string{
-			"gogoproto.nullable":   "false",
+		return "string", protoOptions(map[string]interface{}{
+			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Date",
 		})
 	case "ora.time", "time.time":
@@ -179,13 +182,13 @@ func protoType(got string) (string, protoOptions) {
 	case "ora.float64":
 		return "double", nil
 	case "n", "ora.n":
-		return "string", protoOptions(map[string]string{
-			"gogoproto.nullable":   "false",
+		return "string", protoOptions(map[string]interface{}{
+			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Number",
 		})
 	case "ora.lob":
-		return "bytes", protoOptions(map[string]string{
-			"gogoproto.nullable":   "false",
+		return "bytes", protoOptions(map[string]interface{}{
+			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Lob",
 		})
 	default:
@@ -193,7 +196,7 @@ func protoType(got string) (string, protoOptions) {
 	}
 }
 
-type protoOptions map[string]string
+type protoOptions map[string]interface{}
 
 func (opts protoOptions) String() string {
 	if len(opts) == 0 {
@@ -205,7 +208,13 @@ func (opts protoOptions) String() string {
 		if buf.Len() != 1 {
 			buf.WriteString(", ")
 		}
-		fmt.Fprintf(&buf, `(%s)="%s"`, k, v)
+		fmt.Fprintf(&buf, "(%s)=", k)
+		switch v.(type) {
+		case bool:
+			fmt.Fprintf(&buf, "%s", v)
+		default:
+			fmt.Fprintf(&buf, "%q", v)
+		}
 	}
 	buf.WriteByte(']')
 	return buf.String()

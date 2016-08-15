@@ -16,7 +16,7 @@ go install
 	fi
 } | oracall -proto examples/db_web/generated.proto -F - >examples/db_web/generated_functions.go
 
-protoc examples/db_web/generated.proto --gofast_out=plugins=grpc:.
+protoc --proto_path=$GOPATH/src:. --gofast_out=plugins=grpc:. examples/db_web/generated.proto
 
 
 go build -o /tmp/db_web ./examples/db_web

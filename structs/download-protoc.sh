@@ -12,7 +12,8 @@ dst=${TMPDIR:-/tmp}/protoc-linux_x86_64.zip
 if ! [ -e "$dst" ]; then
 	curl -L -sS $(curl -sS https://github.com/google/protobuf/releases/ \
 		| sed -n -e 's/^.* href="\([^"]*linux-x86_64.zip\)".*$/https:\/\/github.com\1/p' \
+		| fgrep -v java \
 		| sort -ur \
 		| head -n 1) -o "$dst"
 fi
-cd $HOME/bin && unzip "$dst"
+cd $HOME/bin && unzip -o "$dst"
