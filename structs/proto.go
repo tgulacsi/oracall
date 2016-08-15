@@ -17,6 +17,7 @@ limitations under the License.
 package structs
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -26,8 +27,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate sh download-protoc.sh
-//go:generate go get -u github.com/golang/protobuf/protoc-gen-go
+//go:generate sh ./download-protoc.sh
+//   go:generate go get -u github.com/golang/protobuf/protoc-gen-go
+//go:generate go get -u github.com/gogo/protobuf/protoc-gen-gofast
+
+// build: protoc --gofast_out=plugins=grpc:. my.proto
 
 func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	var err error
@@ -43,7 +47,7 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 
 FunLoop:
 	for _, fun := range functions {
-		name := dot2D.Replace(fun.Name())
+		name := strings.ToLower(dot2D.Replace(fun.Name()))
 		fmt.Fprintf(w, `
 service %s {
 	rpc %s (%s) returns (%s) {}
@@ -120,9 +124,9 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 		if strings.HasPrefix(got, "*") {
 			got = got[1:]
 		}
-		typ := protoType(got)
+		typ, opts := protoType(got)
 		if arg.Flavor == FLAVOR_SIMPLE || arg.Flavor == FLAVOR_TABLE && arg.TableOf.Flavor == FLAVOR_SIMPLE {
-			fmt.Fprintf(w, "\t%s%s %s = %d;\n", rule, typ, aName, i+1)
+			fmt.Fprintf(w, "\t%s%s %s = %d %s;\n", rule, typ, aName, i+1, opts)
 			continue
 		}
 		if _, ok := seen[typ]; !ok {
@@ -147,7 +151,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 			}
 			seen[typ] = struct{}{}
 		}
-		fmt.Fprintf(w, "\t%s%s %s = %d;\n", rule, typ, aName, i+1)
+		fmt.Fprintf(w, "\t%s%s %s = %d %s;\n", rule, typ, aName, i+1, opts)
 	}
 	io.WriteString(w, "}\n")
 	w.Write(buf.Bytes())
@@ -155,23 +159,56 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 	return err
 }
 
-func protoType(got string) string {
+func protoType(got string) (string, protoOptions) {
 	switch strings.ToLower(got) {
-	case "ora.date", "ora.time", "time.time":
-		return "string"
+	case "ora.date":
+		return "string", protoOptions(map[string]string{
+			"gogoproto.nullable":   "false",
+			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Date",
+		})
+	case "ora.time", "time.time":
+		return "string", nil
 	case "ora.string":
-		return "string"
+		return "string", nil
 	case "int32":
-		return "sint32"
+		return "sint32", nil
 	case "ora.int32":
-		return "sint32"
+		return "sint32", nil
 	case "float64":
-		return "double"
+		return "double", nil
 	case "ora.float64":
-		return "double"
+		return "double", nil
+	case "n", "ora.n":
+		return "string", protoOptions(map[string]string{
+			"gogoproto.nullable":   "false",
+			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Number",
+		})
+	case "ora.lob":
+		return "bytes", protoOptions(map[string]string{
+			"gogoproto.nullable":   "false",
+			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Lob",
+		})
 	default:
-		return strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*"))
+		return strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")), nil
 	}
+}
+
+type protoOptions map[string]string
+
+func (opts protoOptions) String() string {
+	if len(opts) == 0 {
+		return ""
+	}
+	var buf bytes.Buffer
+	buf.WriteByte('[')
+	for k, v := range opts {
+		if buf.Len() != 1 {
+			buf.WriteString(", ")
+		}
+		fmt.Fprintf(&buf, `(%s)="%s"`, k, v)
+	}
+	buf.WriteByte(']')
+	return buf.String()
 }
 
 func CopyStruct(dest interface{}, src interface{}) error {

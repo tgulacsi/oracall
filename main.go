@@ -33,7 +33,7 @@ import (
 	"gopkg.in/rana/ora.v3" // for Oracle-specific drivers
 )
 
-//go:generate go get github.com/golang/protobuf/protoc-gen-go
+//go:generate go generate ./structs
 // Should install protobuf-compiler to use it, like
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
