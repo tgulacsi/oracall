@@ -50,28 +50,37 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 
 FunLoop:
 	for _, fun := range functions {
+		fun.types = types
+		if err := fun.SaveProtobuf(w, seen); err != nil {
+			if errors.Cause(err) == ErrMissingTableOf {
+				Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
+				continue FunLoop
+			}
+			return err
+		}
 		name := strings.ToLower(dot2D.Replace(fun.Name()))
 		fmt.Fprintf(w, `
 service %s {
 	rpc %s (%s) returns (%s) {}
 }
 `, name, name, strings.ToLower(fun.getStructName(false)), strings.ToLower(fun.getStructName(true)))
-		fun.types = types
-		for _, dir := range []bool{false, true} {
-			if err := fun.SaveProtobuf(w, seen, dir); err != nil {
-				if errors.Cause(err) == ErrMissingTableOf {
-					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
-					continue FunLoop
-				}
-				return err
-			}
-		}
 	}
 
 	return nil
 }
 
-func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}, out bool) error {
+func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}) error {
+	var buf bytes.Buffer
+	if err := f.saveProtobufDir(&buf, seen, false); err != nil {
+		return errors.Wrap(err, "input")
+	}
+	if err := f.saveProtobufDir(&buf, seen, true); err != nil {
+		return errors.Wrap(err, "output")
+	}
+	_, err := dst.Write(buf.Bytes())
+	return err
+}
+func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out bool) error {
 	dirmap, dirname := uint8(DIR_IN), "input"
 	if out {
 		dirmap, dirname = DIR_OUT, "output"
@@ -163,12 +172,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 }
 
 func protoType(got string) (string, protoOptions) {
-	switch strings.ToLower(got) {
-	case "ora.date":
-		return "string", protoOptions(map[string]interface{}{
-			"gogoproto.nullable":   false,
-			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Date",
-		})
+	switch trimmed := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")); trimmed {
 	case "ora.time", "time.time":
 		return "string", nil
 	case "ora.string":
@@ -181,8 +185,14 @@ func protoType(got string) (string, protoOptions) {
 		return "double", nil
 	case "ora.float64":
 		return "double", nil
+
+	case "ora.date":
+		return "bytes", protoOptions(map[string]interface{}{
+			"gogoproto.nullable":   false,
+			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Date",
+		})
 	case "n", "ora.n":
-		return "string", protoOptions(map[string]interface{}{
+		return "bytes", protoOptions(map[string]interface{}{
 			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Number",
 		})
@@ -192,7 +202,7 @@ func protoType(got string) (string, protoOptions) {
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Lob",
 		})
 	default:
-		return strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")), nil
+		return trimmed, nil
 	}
 }
 
@@ -211,7 +221,7 @@ func (opts protoOptions) String() string {
 		fmt.Fprintf(&buf, "(%s)=", k)
 		switch v.(type) {
 		case bool:
-			fmt.Fprintf(&buf, "%s", v)
+			fmt.Fprintf(&buf, "%t", v)
 		default:
 			fmt.Fprintf(&buf, "%q", v)
 		}
