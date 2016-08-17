@@ -37,7 +37,7 @@ import (
 
 	"github.com/tgulacsi/go/orahlp"
 	"gopkg.in/rana/ora.v3"
-	"gopkg.in/rana/ora.v3/lg15"
+	"gopkg.in/rana/ora.v3/lg"
 )
 
 var (
@@ -64,7 +64,7 @@ func main() {
 	}
 	log.Printf("fun to be called is %s", funName)
 
-	ora.Cfg().Log.Logger = lg15.Log
+	ora.Cfg().Log.Logger = lg.Std
 	env, err := ora.OpenEnv(nil)
 	if err != nil {
 		log.Fatalf("open env: %v", err)

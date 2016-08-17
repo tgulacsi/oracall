@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
 	fstructs "github.com/fatih/structs"
@@ -123,12 +122,21 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 		if strings.HasSuffix(arg.Name, "#") {
 			continue
 		}
-		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
+		var rule string
+		if arg.Flavor == FLAVOR_TABLE {
+			if arg.TableOf == nil {
+				return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
+			}
+			rule = "repeated "
 		}
 		aName := arg.Name
 		got := arg.goType(types, false)
-		var rule string
+		if strings.HasSuffix(got, "_cur") || strings.HasSuffix(got, "_Cur") {
+			Log("msg", "CUR", "got", got, "rule", rule, "arg", arg)
+		}
+		if strings.HasPrefix(got, "*") {
+			got = got[1:]
+		}
 		if strings.HasPrefix(got, "[]") {
 			rule = "repeated "
 			got = got[2:]
@@ -158,7 +166,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 				}
 			}
 			if err := protoWriteMessageTyp(buf, typ, types, seen, subArgs...); err != nil {
-				log.Printf("protoWriteMessage: %v", err)
+				Log("msg", "protoWriteMessageTyp", "error", err)
 				return err
 			}
 			seen[typ] = struct{}{}

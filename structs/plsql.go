@@ -245,8 +245,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					Log("msg", "cannot use IN cursor variables", "arg", arg)
 					os.Exit(1)
 				}
-				//name := capitalize(goName(arg.Name))
-				name := capitalize(replHidden(arg.Name))
+				name := capitalize(goName(arg.Name))
+				//name := capitalize(replHidden(arg.Name))
 				convIn, convOut = arg.getConvSimpleTable(convIn, convOut, fun.types,
 					name, addParam(arg.Name), MaxTableSize)
 			} else {
@@ -477,7 +477,8 @@ func (arg Argument) getConvSimpleTable(
 			if arg.IsInput() {
 				convIn = append(convIn, fmt.Sprintf("output.%s = input.%s", name, name))
 			} else {
-				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d)", name, got, tableSize))
+				got = goName(got)
+				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
 			}
 		}
 		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
