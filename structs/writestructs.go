@@ -96,7 +96,7 @@ FunLoop:
 			structW = ioutil.Discard
 		}
 		for _, dir := range []bool{false, true} {
-			if err := fun.SaveStruct(structW, dir); err != nil {
+			if err := fun.SaveStruct(structW, dir, saveStructs); err != nil {
 				if errors.Cause(err) == ErrMissingTableOf {
 					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
@@ -104,7 +104,7 @@ FunLoop:
 				return err
 			}
 		}
-		plsBlock, callFun := fun.PlsqlBlock()
+		plsBlock, callFun := fun.PlsqlBlock(saveStructs)
 		fmt.Fprintf(w, "\nconst %s = `", fun.getPlsqlConstName())
 		io.WriteString(w, plsBlock)
 		io.WriteString(w, "`\n\n")
@@ -174,7 +174,7 @@ func (f Function) getStructName(out bool) string {
 
 var buffers = newBufPool(1 << 16)
 
-func (f Function) SaveStruct(dst io.Writer, out bool) error {
+func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 	dirmap, dirname := uint8(DIR_IN), "input"
 	if out {
 		dirmap, dirname = DIR_OUT, "output"
@@ -223,7 +223,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		io.WriteString(w, "\t"+aName+" "+got+
 			"\t`json:\""+lName+"\""+
 			" xml:\""+lName+"\"`\n")
-		if checks != nil {
+		if generateChecks && checks != nil {
 			checks = genChecks(checks, arg, f.types, "s", false)
 		}
 	}

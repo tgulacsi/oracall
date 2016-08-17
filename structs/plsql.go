@@ -39,7 +39,7 @@ var (
 )
 
 // SavePlsqlBlock saves the plsql block definition into writer
-func (fun Function) PlsqlBlock() (plsql, callFun string) {
+func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
 		Log("msg", "error preparing", "function", fun, "error", err)
@@ -49,10 +49,15 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
 	callBuf := buffers.Get()
 	defer buffers.Put(callBuf)
 	fmt.Fprintf(callBuf, `func Call_%s(ses *ora.Ses, input %s) (output %s, err error) {
-    if err = input.Check(); err != nil {
+    `, fn, goName(fun.getStructName(false)), goName(fun.getStructName(true)))
+	if haveChecks {
+		callBuf.WriteString(
+			`
+	if err = input.Check(); err != nil {
         return
     }
-    `, fn, goName(fun.getStructName(false)), goName(fun.getStructName(true)))
+	`)
+	}
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
