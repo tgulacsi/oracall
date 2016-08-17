@@ -7,47 +7,31 @@ import (
 	"gopkg.in/rana/ora.v3"
 )
 
-type Number struct {
-	ora.OCINum
+type Number string
+
+func (n *Number) Set(num ora.OCINum) {
+	*n = Number(num.String())
+}
+func (n Number) Get() ora.OCINum {
+	var num ora.OCINum
+	num.SetString(string(n))
+	return num
 }
 
-func (n Number) Size() int {
-	return len(n.OCINum.OCINum)
-}
-func (n Number) MarshalTo(p []byte) (int, error) {
-	p = n.Print(p)
-	return len(p), nil
-}
-func (n Number) Marshal() ([]byte, error) {
-	return []byte(n.String()), nil
-}
-func (n *Number) Unmarshal(p []byte) error {
-	return n.OCINum.SetString(string(p))
-}
-
-type Date struct {
-	ora.Date
-}
+type Date string
 
 const timeFormat = "2006-01-02 15:04:05 -0700"
 
-func (d Date) Size() int {
-	return 7
+func (d *Date) Set(date ora.Date) {
+	*d = Date(date.Get().Format(timeFormat))
 }
-func (d Date) MarshalTo(p []byte) (int, error) {
-	i := copy(p, d.Get().Format(timeFormat))
-	return i, nil
-}
-func (d Date) Marshal() ([]byte, error) {
-	return []byte(d.Get().Format(timeFormat)), nil
-}
-func (d *Date) Unmarshal(p []byte) error {
-	t, err := time.Parse(timeFormat, string(p))
-	if err != nil {
-		return err
+func (d Date) Get() ora.Date {
+	t, err := time.Parse(timeFormat, string(d)) // TODO(tgulacsi): more robust parser
+	var od ora.Date
+	if err == nil {
+		od.Set(t)
 	}
-	d.Set(t)
-	return nil
+	return od
 }
 
 type Lob struct {

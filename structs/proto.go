@@ -187,12 +187,12 @@ func protoType(got string) (string, protoOptions) {
 		return "double", nil
 
 	case "ora.date":
-		return "bytes", protoOptions(map[string]interface{}{
+		return "string", protoOptions(map[string]interface{}{
 			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Date",
 		})
 	case "n", "ora.n":
-		return "bytes", protoOptions(map[string]interface{}{
+		return "string", protoOptions(map[string]interface{}{
 			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Number",
 		})
