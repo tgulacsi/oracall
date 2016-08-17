@@ -52,7 +52,7 @@ func (fun Function) PlsqlBlock() (plsql, callFun string) {
     if err = input.Check(); err != nil {
         return
     }
-    `, fn, fun.getStructName(false), fun.getStructName(true))
+    `, fn, goName(fun.getStructName(false)), goName(fun.getStructName(true)))
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}

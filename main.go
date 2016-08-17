@@ -230,7 +230,7 @@ func Main(args []string) int {
 	}
 
 	defer os.Stdout.Sync()
-	if err = structs.SaveFunctions(os.Stdout, functions, *flagPackage, *flagSkipFormat); err != nil {
+	if err = structs.SaveFunctions(os.Stdout, functions, *flagPackage, *flagSkipFormat, *flagProto == ""); err != nil {
 		Log("msg", "save functions", "error", err)
 		return 1
 	}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"go/format"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -31,7 +32,7 @@ import (
 
 var ErrMissingTableOf = errors.New("missing TableOf info")
 
-func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatting bool) error {
+func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatting, saveStructs bool) error {
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
@@ -90,8 +91,12 @@ var InputFactories = make(map[string](func() Unmarshaler), %d)
 FunLoop:
 	for _, fun := range functions {
 		fun.types = types
+		structW := io.Writer(w)
+		if !saveStructs {
+			structW = ioutil.Discard
+		}
 		for _, dir := range []bool{false, true} {
-			if err := fun.SaveStruct(w, dir); err != nil {
+			if err := fun.SaveStruct(structW, dir); err != nil {
 				if errors.Cause(err) == ErrMissingTableOf {
 					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
@@ -114,8 +119,8 @@ FunLoop:
 			b = []byte(callFun)
 		}
 		w.Write(b)
-		//inpstruct := goName(fun.getStructName(false))
-		inpstruct := fun.getStructName(false)
+		inpstruct := goName(fun.getStructName(false))
+		//inpstruct := fun.getStructName(false)
 		inits = append(inits,
 			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *ora.Ses, input interface{}) (interface{}, error) {
         var inp %s
@@ -193,8 +198,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	if dirmap == uint8(DIR_IN) {
 		checks = make([]string, 0, len(args)+1)
 	}
-	//structName = goName(f.getStructName(out))
-	structName = f.getStructName(out)
+	structName = goName(f.getStructName(out))
+	//structName = f.getStructName(out)
 	buf := buffers.Get()
 	defer buffers.Put(buf)
 	w := errWriter{Writer: buf, err: &err}
@@ -507,11 +512,25 @@ func replHidden(text string) string {
 	return text
 }
 
+var digitUnder = strings.NewReplacer(
+	"_0", "__0",
+	"_1", "__1",
+	"_2", "__2",
+	"_3", "__3",
+	"_4", "__4",
+	"_5", "__5",
+	"_6", "__6",
+	"_7", "__7",
+	"_8", "__8",
+	"_9", "__9",
+)
+
 func goName(text string) string {
 	text = replHidden(text)
 	if text == "" {
 		return text
 	}
+	text = digitUnder.Replace(text)
 	var last rune
 	return strings.Map(func(r rune) rune {
 		if r == '_' {
@@ -521,7 +540,7 @@ func goName(text string) string {
 			}
 			return '_'
 		}
-		if last == '_' {
+		if last == '_' || '0' <= last && last <= '9' {
 			last = r
 			return unicode.ToUpper(r)
 		}

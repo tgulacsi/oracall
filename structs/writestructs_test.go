@@ -67,7 +67,7 @@ func TestWriteStruct(t *testing.T) {
 			t.Skipf("cannot create temp file in %q: %v", dn, err)
 			return
 		}
-		err = SaveFunctions(fh, functions, "main", false)
+		err = SaveFunctions(fh, functions, "main", false, true)
 		if err != nil {
 			_ = fh.Close()
 			t.Errorf("%d. Saving functions: %v", i, err)
@@ -95,6 +95,8 @@ func TestGoName(t *testing.T) {
 		{"a", "a"},
 		{"a_b", "aB"},
 		{"a__b", "a_B"},
+		{"db_web__calculate_31101__input", "dbWeb_Calculate_31101_Input"},
+		{"db_web__calculate_242xx__output", "dbWeb_Calculate_242Xx_Output"},
 	} {
 		if got := goName(elt[0]); got != elt[1] {
 			t.Errorf("%d. %q => got %q, awaited %q.", eltNum, elt[0], got, elt[1])
