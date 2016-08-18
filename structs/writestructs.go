@@ -402,7 +402,8 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 		switch arg.Type {
 		case "CHAR", "VARCHAR2", "ROWID":
 			if !isTable && arg.IsOutput() {
-				return "*string"
+				//return "*string"
+				return "string"
 			}
 			return "ora.String" // NULL is the same as the empty string for Oracle
 		case "NUMBER":
@@ -417,7 +418,8 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 			return "ora.Int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
 			if !isTable && arg.IsOutput() {
-				return "*int32"
+				//return "*int32"
+				return "int32"
 			}
 			return "ora.Int32"
 		case "BOOLEAN", "PL/SQL BOOLEAN":

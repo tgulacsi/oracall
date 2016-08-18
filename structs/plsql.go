@@ -438,7 +438,7 @@ func (arg Argument) getConvSimple(
 	if arg.IsOutput() {
 		got := arg.goType(types, false)
 		if got[0] == '*' {
-			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s)", name, got[1:]))
+			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s) // %s", name, got[1:], got))
 			if arg.IsInput() {
 				convIn = append(convIn, fmt.Sprintf(`if input.%s != nil { *output.%s = *input.%s }`, name, name, name))
 			}
