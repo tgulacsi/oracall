@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/pkg/errors"
 )
@@ -96,7 +97,7 @@ FunLoop:
 			structW = ioutil.Discard
 		}
 		for _, dir := range []bool{false, true} {
-			if err := fun.SaveStruct(structW, dir, saveStructs); err != nil {
+			if err := fun.SaveStruct(structW, dir, true); err != nil {
 				if errors.Cause(err) == ErrMissingTableOf {
 					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
@@ -268,8 +269,8 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 }
 
 func genChecks(checks []string, arg Argument, types map[string]string, base string, parentIsTable bool) []string {
-	//aName := capitalize(goName(arg.Name))
-	aName := capitalize(replHidden(arg.Name))
+	aName := (goName(arg.Name))
+	//aName := capitalize(replHidden(arg.Name))
 	got := arg.goType(types, parentIsTable || arg.Flavor == FLAVOR_TABLE)
 	var name string
 	if aName == "" {
@@ -530,6 +531,8 @@ func goName(text string) string {
 	if text == "" {
 		return text
 	}
+	r, size := utf8.DecodeRuneInString(text)
+	text = string([]rune{unicode.ToUpper(r)}) + text[size:]
 	text = digitUnder.Replace(text)
 	var last rune
 	return strings.Map(func(r rune) rune {
