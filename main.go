@@ -21,6 +21,8 @@ import (
 	"encoding/csv"
 	"flag"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
@@ -52,22 +54,21 @@ func Main(args []string) int {
 	flagSkipFormat := flag.Bool("F", false, "skip formatting")
 	//flagVerbose := flag.Bool("v", false, "verbose logging")
 	flagDump := flag.String("dump", "", "dump to this csv")
+	flagPattern := flag.String("pattern", "%", "input filter pattern")
 	flagPackage := flag.String("package", "main", "package name of the generated functions")
-	flagProto := flag.String("proto", "", "dump protocol buffers .proto")
+	flagOut := flag.String("out", "generated_functions.go", "generated functions file name")
+	flagProto := flag.String("proto", "oracall.proto", "protocol buffers file name")
 
 	flag.Parse()
 	Log := logger.Log
+	outPath := flag.Arg(0)
 
 	var functions []structs.Function
 	var err error
 
 	if *flagConnect == "" {
-		functions, err = structs.ParseCsvFile(flag.Arg(0))
+		functions, err = structs.ParseCsvFile("")
 	} else {
-		pattern := "%"
-		if flag.NArg() >= 1 {
-			pattern = flag.Arg(0)
-		}
 		ora.Register(nil)
 		cx, err := sql.Open("ora", *flagConnect)
 		if err != nil {
@@ -87,7 +88,7 @@ func Main(args []string) int {
       FROM user_arguments
 	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
       ORDER BY object_id, subprogram_id, SEQUENCE`
-		rows, err := cx.Query(qry, pattern)
+		rows, err := cx.Query(qry, *flagPattern)
 		if err != nil {
 			Log("qry", qry, "error", err)
 			return 2
@@ -230,28 +231,62 @@ func Main(args []string) int {
 	}
 
 	defer os.Stdout.Sync()
-	if err = structs.SaveFunctions(os.Stdout, functions, *flagPackage, *flagSkipFormat, *flagProto == ""); err != nil {
+	out := os.Stdout
+	if *flagOut != "" && *flagOut != "-" {
+		*flagOut = maybeJoinPath(outPath, *flagOut)
+		if out, err = os.Create(*flagOut); err != nil {
+			Log("msg", "create", "file", *flagOut, "error", err)
+			return 1
+		}
+		defer func() {
+			if err := out.Close(); err != nil {
+				Log("msg", "close", "file", out.Name(), "error", err)
+			}
+		}()
+	}
+
+	if err = structs.SaveFunctions(out, functions, *flagPackage, *flagSkipFormat, *flagProto == ""); err != nil {
 		Log("msg", "save functions", "error", err)
 		return 1
 	}
 
-	if *flagProto != "" {
-		fh, err := os.Create(*flagProto)
-		if err != nil {
-			Log("msg", "create", "proto", *flagProto, "error", err)
-			return 1
-		}
-		defer func() {
-			if err := fh.Close(); err != nil {
-				Log("msg", "close", "proto", *flagProto, "error", err)
-			}
-		}()
-		if err := structs.SaveProtobuf(fh, functions, *flagPackage); err != nil {
-			Log("msg", "save", "error", err)
-			return 1
-		}
+	if *flagProto == "" {
+		return 0
+	}
+
+	*flagProto = maybeJoinPath(outPath, *flagProto)
+	fh, err := os.Create(*flagProto)
+	if err != nil {
+		Log("msg", "create", "proto", *flagProto, "error", err)
+		return 1
+	}
+	err = structs.SaveProtobuf(fh, functions, *flagPackage)
+	if closeErr := fh.Close(); closeErr != nil && err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		Log("msg", "save protobuf", "proto", *flagProto, "error", err)
+		return 1
+	}
+
+	cmd := exec.Command("protoc", os.ExpandEnv("--proto_path=$GOPATH/src:."), "--gofast_out=plugins=grpc:.", *flagProto)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		Log("msg", "protoc", "args", cmd.Args, "error", err)
+		return 1
 	}
 	return 0
+}
+
+func maybeJoinPath(path, file string) string {
+	if path == "" {
+		return file
+	}
+	if strings.Contains(file, string([]rune{os.PathSeparator})) {
+		return file
+	}
+	return filepath.Join(path, file)
 }
 
 func i64ToString(n sql.NullInt64) string {
