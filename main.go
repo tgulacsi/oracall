@@ -27,6 +27,8 @@ import (
 	"strings"
 	"unicode"
 
+	"golang.org/x/sync/errgroup"
+
 	"go4.org/syncutil"
 
 	"github.com/pkg/errors"
@@ -245,35 +247,41 @@ func Main(args []string) int {
 		}()
 	}
 
-	if err = structs.SaveFunctions(out, functions, *flagPackage, *flagSkipFormat, *flagProto == ""); err != nil {
-		Log("msg", "save functions", "error", err)
-		return 1
+	var grp errgroup.Group
+	grp.Go(func() error {
+		if err := structs.SaveFunctions(out, functions, *flagPackage, *flagSkipFormat, *flagProto == ""); err != nil {
+			return errors.Wrap(err, "save functions")
+		}
+		return nil
+	})
+
+	if *flagProto != "" {
+		grp.Go(func() error {
+			*flagProto = maybeJoinPath(outPath, *flagProto)
+			fh, err := os.Create(*flagProto)
+			if err != nil {
+				return errors.Wrap(err, "create proto")
+			}
+			err = structs.SaveProtobuf(fh, functions, *flagPackage)
+			if closeErr := fh.Close(); closeErr != nil && err == nil {
+				err = closeErr
+			}
+			if err != nil {
+				return errors.Wrap(err, "SaveProtobuf")
+			}
+
+			cmd := exec.Command("protoc", os.ExpandEnv("--proto_path=$GOPATH/src:."), "--gofast_out=plugins=grpc:.", *flagProto)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return errors.Wrapf(err, "%q", cmd.Args)
+			}
+			return nil
+		})
 	}
 
-	if *flagProto == "" {
-		return 0
-	}
-
-	*flagProto = maybeJoinPath(outPath, *flagProto)
-	fh, err := os.Create(*flagProto)
-	if err != nil {
-		Log("msg", "create", "proto", *flagProto, "error", err)
-		return 1
-	}
-	err = structs.SaveProtobuf(fh, functions, *flagPackage)
-	if closeErr := fh.Close(); closeErr != nil && err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		Log("msg", "save protobuf", "proto", *flagProto, "error", err)
-		return 1
-	}
-
-	cmd := exec.Command("protoc", os.ExpandEnv("--proto_path=$GOPATH/src:."), "--gofast_out=plugins=grpc:.", *flagProto)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		Log("msg", "protoc", "args", cmd.Args, "error", err)
+	if err := grp.Wait(); err != nil {
+		Log("error", err)
 		return 1
 	}
 	return 0
