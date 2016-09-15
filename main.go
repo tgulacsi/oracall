@@ -249,7 +249,9 @@ func Main(args []string) int {
 
 	var grp errgroup.Group
 	grp.Go(func() error {
-		if err := structs.SaveFunctions(out, functions, *flagPackage, *flagSkipFormat, *flagProto == ""); err != nil {
+		if err := structs.SaveFunctions(out, functions,
+			*flagPackage, *flagSkipFormat, *flagProto == "",
+		); err != nil {
 			return errors.Wrap(err, "save functions")
 		}
 		return nil
@@ -270,7 +272,12 @@ func Main(args []string) int {
 				return errors.Wrap(err, "SaveProtobuf")
 			}
 
-			cmd := exec.Command("protoc", os.ExpandEnv("--proto_path=$GOPATH/src:."), "--gofast_out=plugins=grpc:.", *flagProto)
+			cmd := exec.Command(
+				"protoc",
+				os.ExpandEnv("--proto_path=$GOPATH/src:."),
+				"--gofast_out=plugins=grpc:.",
+				*flagProto,
+			)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {

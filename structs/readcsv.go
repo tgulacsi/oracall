@@ -152,7 +152,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			csvFields[h] = i
 		}
 	}
-	Log("msg", "field order", "fields", csvFields)
+	//Log("msg", "field order", "fields", csvFields)
 
 	for {
 		if rec, err = csvr.Read(); err != nil {
@@ -214,8 +214,8 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		}
 		if fun.Name() == "" || funName != fun.Name() { //new (differs from prev record
 			seen[funName]++
-			Log("msg", "ParseArguments", "old", fun.Name(), "new", funName, "seen", seen[funName])
-			Log("msg", "New function "+funName)
+			//Log("msg", "ParseArguments", "old", fun.Name(), "new", funName, "seen", seen[funName])
+			//Log("msg", "New function "+funName)
 			if fun.name != "" {
 				x := fun // copy
 				x.Args = append(make([]Argument, 0, len(args)), args...)
@@ -245,7 +245,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		// 2. RECORD at level 0
 		// 3. TABLE OF simple
 		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-		Log("msg", "ParseArguments", "level", level, "arg", arg)
+		//Log("msg", "ParseArguments", "level", level, "arg", arg)
 		if level == 0 {
 			if len(args) == 0 && arg.Name == "" {
 				arg.Name = "ret"

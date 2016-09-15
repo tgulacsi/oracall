@@ -460,7 +460,7 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 	defer buffers.Put(buf)
 
 	if arg.Flavor == FLAVOR_TABLE {
-		Log("msg", "TABLE", "arg", arg, "tableOf", arg.TableOf)
+		//Log("msg", "TABLE", "arg", arg, "tableOf", arg.TableOf)
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
 		tn := "[]" + targ.goType(typedefs, true)
