@@ -14,6 +14,6 @@ go install
 	else
 		gzip -dc examples/db_web/cig.db_web.csv.gz
 	fi
-} | oracall -F examples/db_web
+} | oracall -F -pattern DB_web.listval examples/db_web
 
 go build -o /tmp/db_web ./examples/db_web

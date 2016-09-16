@@ -184,15 +184,15 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
 	convIn = append(convIn, "params := make([]interface{}, {{.ParamsArrLen}})", "var x, v interface{}\n _,_ = x,v")
 
-	var args []Argument
-	if fun.Returns != nil {
-		args = make([]Argument, 0, len(fun.Args)+1)
-		for _, arg := range fun.Args {
-			args = append(args, arg)
+	args := make([]Argument, 0, len(fun.Args)+1)
+	for _, arg := range fun.Args {
+		if strings.Contains(arg.Name, "#") {
+			continue
 		}
+		args = append(args, arg)
+	}
+	if fun.Returns != nil {
 		args = append(args, *fun.Returns)
-	} else {
-		args = fun.Args
 	}
 	addParam := func(paramName string) string {
 		if paramName == "" {
@@ -245,7 +245,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					0, arg, k)
 			}
 		case FLAVOR_TABLE:
-			if arg.Type == "REF CURSOR" {
+			if false && arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
 					Log("msg", "cannot use IN cursor variables", "arg", arg)
 					os.Exit(1)
@@ -303,7 +303,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
                     if output.%s == nil { // _
                         output.%s = make([]%s, 0, %d)
                     }`, aname,
-							aname, arg.TableOf.goType(fun.types, true), MaxTableSize))
+							aname, goName(arg.TableOf.goType(fun.types, true)), MaxTableSize))
 					}
 					/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
 					if arg.IsOutput() {

@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -69,7 +70,14 @@ func Main(args []string) int {
 	var err error
 
 	if *flagConnect == "" {
-		functions, err = structs.ParseCsvFile("")
+		var filter func(string) bool
+		if *flagPattern != "" && *flagPattern != "%" {
+			rPattern := regexp.MustCompile("(?i)" + strings.Replace(strings.Replace(*flagPattern, ".", "[.]", -1), "%", ".*", -1))
+			filter = func(s string) bool {
+				return rPattern.MatchString(s)
+			}
+		}
+		functions, err = structs.ParseCsvFile("", filter)
 	} else {
 		ora.Register(nil)
 		cx, err := sql.Open("ora", *flagConnect)

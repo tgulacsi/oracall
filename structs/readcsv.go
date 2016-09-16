@@ -64,17 +64,17 @@ type UserArgument struct {
      FROM user_arguments
      ORDER BY object_id, subprogram_id, SEQUENCE;
 */
-func ParseCsvFile(filename string) (functions []Function, err error) {
+func ParseCsvFile(filename string, filter func(string) bool) (functions []Function, err error) {
 	fh, err := OpenCsv(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer fh.Close()
-	return ParseCsv(fh)
+	return ParseCsv(fh, filter)
 }
 
 // ParseCsv parses the csv
-func ParseCsv(r io.Reader) (functions []Function, err error) {
+func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err error) {
 	userArgs := make(chan UserArgument, 16)
 	errch := make(chan error, 2)
 	defer close(errch)
@@ -86,7 +86,19 @@ func ParseCsv(r io.Reader) (functions []Function, err error) {
 		}
 	}()
 	go func() { errch <- ReadCsv(userArgs, r) }()
-	functions, err = ParseArguments(userArgs)
+	filteredArgs := userArgs
+	if filter != nil {
+		filteredArgs = make(chan UserArgument, 16)
+		go func() {
+			defer close(filteredArgs)
+			for ua := range userArgs {
+				if filter(ua.PackageName + "." + ua.ObjectName) {
+					filteredArgs <- ua
+				}
+			}
+		}()
+	}
+	functions, err = ParseArguments(filteredArgs)
 	if err != nil {
 		return nil, err
 	}
