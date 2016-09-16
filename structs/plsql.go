@@ -151,10 +151,6 @@ func demap(plsql, callFun string) (string, string) {
 }
 
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
-	if fun.types == nil {
-		Log("msg", "nil types", "function", fun)
-		fun.types = make(map[string]string, 4)
-	}
 	tableTypes := make(map[string]string, 4)
 	callArgs := make(map[string]string, 16)
 
@@ -205,7 +201,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		case FLAVOR_SIMPLE:
 			name := (goName(arg.Name))
 			//name := capitalize(replHidden(arg.Name))
-			convIn, convOut = arg.getConvSimple(convIn, convOut, fun.types,
+			convIn, convOut = arg.getConvSimple(convIn, convOut,
 				name, addParam(arg.Name))
 
 		case FLAVOR_RECORD:
@@ -219,14 +215,14 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					convIn = append(convIn, fmt.Sprintf(`
 					output.%s = new(%s)
 					if input.%s != nil { *output.%s = *input.%s }
-					`, aname, arg.goType(fun.types, false)[1:],
+					`, aname, goName(arg.goType(false)[1:]),
 						aname, aname, aname))
 				} else {
 					convOut = append(convOut, fmt.Sprintf(`
                     if output.%s == nil {
                         output.%s = new(%s)
                     }`, aname,
-						aname, arg.goType(fun.types, false)[1:]))
+						aname, goName(arg.goType(false)[1:])))
 				}
 			}
 			for k, v := range arg.RecordOf {
@@ -240,7 +236,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				if arg.IsOutput() {
 					post = append(post, ":"+tmp+" := "+vn+"."+k+";")
 				}
-				convIn, convOut = v.getConvRec(convIn, convOut, fun.types,
+				convIn, convOut = v.getConvRec(convIn, convOut,
 					name, addParam(tmp),
 					0, arg, k)
 			}
@@ -252,7 +248,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 				name := (goName(arg.Name))
 				//name := capitalize(replHidden(arg.Name))
-				convIn, convOut = arg.getConvSimpleTable(convIn, convOut, fun.types,
+				convIn, convOut = arg.getConvSimpleTable(convIn, convOut,
 					name, addParam(arg.Name), MaxTableSize)
 			} else {
 				switch arg.TableOf.Flavor {
@@ -288,7 +284,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					}
 					name := (goName(arg.Name))
 					//name := capitalize(replHidden(arg.Name))
-					convIn, convOut = arg.getConvSimpleTable(convIn, convOut, fun.types,
+					convIn, convOut = arg.getConvSimpleTable(convIn, convOut,
 						name, addParam(arg.Name), MaxTableSize)
 
 				case FLAVOR_RECORD:
@@ -303,7 +299,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
                     if output.%s == nil { // _
                         output.%s = make([]%s, 0, %d)
                     }`, aname,
-							aname, goName(arg.TableOf.goType(fun.types, true)), MaxTableSize))
+							aname, goName(arg.TableOf.goType(true)), MaxTableSize))
 					}
 					/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
 					if arg.IsOutput() {
@@ -356,7 +352,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						//name := aname + "." + kName
 
 						convIn, convOut = v.getConvTableRec(
-							convIn, convOut, fun.types,
+							convIn, convOut,
 							[2]string{aname, kName},
 							addParam(tmp),
 							MaxTableSize,
@@ -416,8 +412,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
-func (arg Argument) getIsValidCheck(types map[string]string, name string) string {
-	got := arg.goType(types, false)
+func (arg Argument) getIsValidCheck(name string) string {
+	got := arg.goType(false)
 	if got[0] == '*' {
 		return name + " != nil"
 	}
@@ -432,11 +428,10 @@ func (arg Argument) getIsValidCheck(types map[string]string, name string) string
 
 func (arg Argument) getConvSimple(
 	convIn, convOut []string,
-	types map[string]string,
 	name, paramName string,
 ) ([]string, []string) {
 	if arg.IsOutput() {
-		got := arg.goType(types, false)
+		got := arg.goType(false)
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s) // %s", name, got[1:], got))
 			if arg.IsInput() {
@@ -454,12 +449,14 @@ func (arg Argument) getConvSimple(
 
 func (arg Argument) getConvSimpleTable(
 	convIn, convOut []string,
-	types map[string]string,
 	name, paramName string,
 	tableSize int,
 ) ([]string, []string) {
 	if arg.IsOutput() {
-		got := arg.goType(types, true)
+		got := arg.goType(true)
+		if got == "*[]string" {
+			got = "[]string"
+		}
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf(`
 		if output.%s == nil { // %#v
@@ -538,7 +535,6 @@ func getOutConvTSwitch(name, pTyp string) string {
 
 func (arg Argument) getConvRec(
 	convIn, convOut []string,
-	types map[string]string,
 	name, paramName string,
 	tableSize uint,
 	parentArg Argument,
@@ -559,7 +555,6 @@ func (arg Argument) getConvRec(
 
 func (arg Argument) getConvTableRec(
 	convIn, convOut []string,
-	types map[string]string,
 	name [2]string,
 	paramName string,
 	tableSize uint,
@@ -568,7 +563,7 @@ func (arg Argument) getConvTableRec(
 ) ([]string, []string) {
 	lengthS := "0"
 	absName := "x__" + name[0] + "__" + name[1]
-	typ := arg.goType(types, true)
+	typ := arg.goType(true)
 	if arg.IsInput() {
 		if !arg.IsOutput() {
 			lengthS = "len(input." + name[0] + ")"
@@ -601,7 +596,7 @@ func (arg Argument) getConvTableRec(
 			}
 		}`,
 				absName, name[0],
-				name[0], name[0], parent.goType(types, true),
+				name[0], name[0], goName(parent.goType(true)),
 				name[0], name[0], absName,
 				absName,
 				name[0],

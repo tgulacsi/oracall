@@ -140,23 +140,22 @@ func main() {
 }
 
 func login(ses *ora.Ses, username, password string) (string, error) {
-	lang, addr := "hu", "127.0.0.1"
-	out, err := Functions["DB_web.login"](ses, Db_web__login__input{
-		P_login_nev: ora.String{Value: username},
-		P_jelszo:    ora.String{Value: password},
-		P_lang:      ora.String{Value: lang},
-		P_addr匿:     ora.String{Value: addr},
+	lang := "hu"
+	out, err := Functions["DB_web.login"](ses, DbWeb_Login_Input{
+		PLoginNev: username,
+		PJelszo:   password,
+		PLang:     lang,
 	})
 	if err != nil {
 		return "", fmt.Errorf("DB_web.login: %v", err)
 	}
-	log.Printf("Login(%q): %#v", username, out.(Db_web__login__output))
-	return *(out.(Db_web__login__output).P_sessionid), nil
+	log.Printf("Login(%q): %#v", username, out.(DbWeb_Login_Output))
+	return out.(DbWeb_Login_Output).PSessionid, nil
 }
 
 func logout(ses *ora.Ses, sessionID string) error {
-	_, err := Functions["DB_web.logout"](ses, Db_web__logout__input{
-		P_sessionid: ora.String{Value: sessionID},
+	_, err := Functions["DB_web.logout"](ses, DbWeb_Logout_Input{
+		PSessionid: sessionID,
 	})
 	return err
 }

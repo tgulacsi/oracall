@@ -51,12 +51,14 @@ import (
     "time"    // for datetimes
 
     "gopkg.in/rana/ora.v3"    // Oracle
+	"github.com/tgulacsi/oracall/custom"	// custom.Date
 )
 
 var DebugLevel = uint(0)
 
 // against "unused import" error
 var _ ora.Ses
+var _ custom.Date
 var _ strconv.NumError
 var _ time.Time
 var _ strings.Reader
@@ -91,7 +93,6 @@ var InputFactories = make(map[string](func() Unmarshaler), %d)
 
 FunLoop:
 	for _, fun := range functions {
-		fun.types = types
 		structW := io.Writer(w)
 		if !saveStructs {
 			structW = ioutil.Discard
@@ -223,13 +224,13 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 		}
 		//aName = capitalize(goName(arg.Name))
 		aName = capitalize(replHidden(arg.Name))
-		got = arg.goType(f.types, arg.Flavor == FLAVOR_TABLE)
+		got = arg.goType(arg.Flavor == FLAVOR_TABLE)
 		lName := strings.ToLower(arg.Name)
 		io.WriteString(w, "\t"+aName+" "+got+
 			"\t`json:\""+lName+"\""+
 			" xml:\""+lName+"\"`\n")
 		if generateChecks && checks != nil {
-			checks = genChecks(checks, arg, f.types, "s", false)
+			checks = genChecks(checks, arg, "s", false)
 		}
 	}
 	io.WriteString(w, "}\n")
@@ -272,10 +273,10 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 	return nil
 }
 
-func genChecks(checks []string, arg Argument, types map[string]string, base string, parentIsTable bool) []string {
+func genChecks(checks []string, arg Argument, base string, parentIsTable bool) []string {
 	aName := (goName(arg.Name))
 	//aName := capitalize(replHidden(arg.Name))
-	got := arg.goType(types, parentIsTable || arg.Flavor == FLAVOR_TABLE)
+	got := arg.goType(parentIsTable || arg.Flavor == FLAVOR_TABLE)
 	var name string
 	if aName == "" {
 		name = base
@@ -343,7 +344,7 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			checks = append(checks, "if "+name+" != nil {")
 		}
 		for _, sub := range arg.RecordOf {
-			checks = genChecks(checks, sub, types, name, arg.Flavor == FLAVOR_TABLE) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
+			checks = genChecks(checks, sub, name, arg.Flavor == FLAVOR_TABLE) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
 		}
 		if parentIsTable || got[0] == '*' {
 			checks = append(checks, "}")
@@ -353,7 +354,7 @@ func genChecks(checks []string, arg Argument, types map[string]string, base stri
 			checks = append(checks, "if "+name+" != nil {")
 		}
 		plus := strings.Join(
-			genChecks(nil, *arg.TableOf, types, "v", true),
+			genChecks(nil, *arg.TableOf, "v", true),
 			"\n\t")
 		if len(strings.TrimSpace(plus)) > 0 {
 			checks = append(checks,
@@ -387,7 +388,7 @@ func unocap(text string) string {
 }
 
 // returns a go type for the argument's type
-func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName string) {
+func (arg *Argument) goType(isTable bool) (typName string) {
 	defer func() {
 		if strings.HasPrefix(typName, "**") {
 			typName = typName[1:]
@@ -409,33 +410,31 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 				//return "*string"
 				return "string"
 			}
-			return "ora.String" // NULL is the same as the empty string for Oracle
+			return "string" // NULL is the same as the empty string for Oracle
 		case "NUMBER":
+			return "float64"
 			if !isTable && arg.IsOutput() {
 				return "*float64"
 			}
-			return "ora.Float64"
+			return "float64"
 		case "INTEGER":
 			if !isTable && arg.IsOutput() {
 				return "*int64"
 			}
-			return "ora.Int64"
+			return "int64"
 		case "PLS_INTEGER", "BINARY_INTEGER":
 			if !isTable && arg.IsOutput() {
 				//return "*int32"
 				return "int32"
 			}
-			return "ora.Int32"
+			return "int32"
 		case "BOOLEAN", "PL/SQL BOOLEAN":
 			if !isTable && arg.IsOutput() {
 				return "*bool"
 			}
-			return "sql.NullBool"
+			return "bool"
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
-			if !isTable && arg.IsOutput() {
-				return "*ora.Date"
-			}
-			return "ora.Date"
+			return "custom.Date"
 		case "REF CURSOR":
 			return "*ora.Rset"
 		case "CLOB", "BLOB":
@@ -456,35 +455,22 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 	}
 	//typName = goName(capitalize(typName))
 	typName = capitalize(typName)
-	if td := typedefs[typName]; td != "" {
-		return "*" + typName
-	}
-
-	buf := buffers.Get()
-	defer buffers.Put(buf)
 
 	if arg.Flavor == FLAVOR_TABLE {
 		Log("msg", "TABLE", "arg", arg, "tableOf", arg.TableOf)
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
-		tn := "[]" + targ.goType(typedefs, true)
+		tn := "[]" + targ.goType(true)
 		if arg.Type != "REF CURSOR" {
 			if arg.IsOutput() && arg.TableOf.Flavor == FLAVOR_SIMPLE {
 				return "*" + tn
 			}
 			return tn
 		}
-		cn := tn[2:] + "__cur"
+		cn := tn[2:] //+ "__cur"
 		if cn[0] == '*' {
 			cn = cn[1:]
 		}
-		if _, ok := typedefs[cn]; !ok {
-			buf.WriteString("\ntype " + cn + " struct { *ora.Ses }\n")
-			buf.WriteString("func New" + cn + "(cur *ora.Ses) (" + cn + ", error) {\n return " + cn + "{cur}, nil\n }")
-			typedefs[cn] = buf.String()
-			buf.Reset()
-		}
-		//typedefs["+"+arg.TableOf.Name] = "REF CURSOR"
 		return cn
 	}
 
@@ -493,19 +479,6 @@ func (arg *Argument) goType(typedefs map[string]string, isTable bool) (typName s
 		Log("msg", "arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
-	buf.WriteString("\ntype " + typName + " struct {\n")
-	for k, v := range arg.RecordOf {
-		lName := strings.ToLower(k)
-		//kName := capitalize(goName(k))
-		kName := capitalize(replHidden(k))
-		buf.WriteString("\t" + kName + " " +
-			v.goType(typedefs, isTable) + "\t" +
-			"`json:\"" + lName + ",omitempty\"" +
-			" xml:\"" + lName + ",omitempty\"`\t\n")
-	}
-	buf.WriteString("}\n")
-
-	typedefs[typName] = buf.String()
 	return "*" + typName
 }
 

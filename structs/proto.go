@@ -44,12 +44,10 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	io.WriteString(w, `
 	import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 `)
-	types := make(map[string]string, 16)
 	seen := make(map[string]struct{}, 16)
 
 FunLoop:
 	for _, fun := range functions {
-		fun.types = types
 		if err := fun.SaveProtobuf(w, seen); err != nil {
 			if errors.Cause(err) == ErrMissingTableOf {
 				Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
@@ -97,12 +95,12 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 
 	return protoWriteMessageTyp(dst,
 		dot2D.Replace(strings.ToLower(f.Name()))+"__"+dirname,
-		f.types, seen, args...)
+		seen, args...)
 }
 
 var dot2D = strings.NewReplacer(".", "__")
 
-func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string, seen map[string]struct{}, args ...Argument) error {
+func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, args ...Argument) error {
 	for _, arg := range args {
 		if strings.HasSuffix(arg.Name, "#") {
 			continue
@@ -130,7 +128,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 			rule = "repeated "
 		}
 		aName := arg.Name
-		got := arg.goType(types, false)
+		got := arg.goType(false)
 		if strings.HasSuffix(got, "_cur") || strings.HasSuffix(got, "_Cur") {
 			Log("msg", "CUR", "got", got, "rule", rule, "arg", arg)
 		}
@@ -165,7 +163,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, types map[string]string
 					subArgs = append(subArgs, v)
 				}
 			}
-			if err := protoWriteMessageTyp(buf, typ, types, seen, subArgs...); err != nil {
+			if err := protoWriteMessageTyp(buf, typ, seen, subArgs...); err != nil {
 				Log("msg", "protoWriteMessageTyp", "error", err)
 				return err
 			}
@@ -194,7 +192,7 @@ func protoType(got string) (string, protoOptions) {
 	case "ora.float64":
 		return "double", nil
 
-	case "ora.date":
+	case "ora.date", "custom.date":
 		return "string", protoOptions(map[string]interface{}{
 			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Date",
