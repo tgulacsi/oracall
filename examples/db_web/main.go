@@ -64,7 +64,7 @@ func main() {
 	}
 	log.Printf("fun to be called is %s", funName)
 
-	ora.Cfg().Log.Logger = lg.Std
+	ora.Cfg().Log.Logger = lg.Log
 	env, err := ora.OpenEnv(nil)
 	if err != nil {
 		log.Fatalf("open env: %v", err)

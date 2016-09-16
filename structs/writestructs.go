@@ -133,11 +133,15 @@ FunLoop:
         }
         return Call_%s(cur, inp)
     }
-    InputFactories["%s"] = func() Unmarshaler { return new(%s) }
             `,
 				fun.Name(), inpstruct, inpstruct, inpstruct, fun.Name(), inpstruct,
 				strings.Replace(fun.Name(), ".", "__", -1),
-				fun.Name(), inpstruct))
+			))
+		if saveStructs {
+			fmt.Fprintf(w, `
+    InputFactories["%s"] = func() Unmarshaler { return new(%s) }
+	`, fun.Name(), inpstruct)
+		}
 	}
 	for tn, text := range types {
 		if tn[0] == '+' { // REF CURSOR skip
