@@ -102,9 +102,6 @@ var dot2D = strings.NewReplacer(".", "__")
 
 func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, args ...Argument) error {
 	for _, arg := range args {
-		if strings.HasSuffix(arg.Name, "#") {
-			continue
-		}
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
 		}
@@ -117,10 +114,10 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 	buf := buffers.Get()
 	defer buffers.Put(buf)
 	for i, arg := range args {
-		if strings.HasSuffix(arg.Name, "#") {
-			continue
-		}
 		var rule string
+		if strings.HasSuffix(arg.Name, "#") {
+			arg.Name = replHidden(arg.Name)
+		}
 		if arg.Flavor == FLAVOR_TABLE {
 			if arg.TableOf == nil {
 				return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)

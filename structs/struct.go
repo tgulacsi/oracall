@@ -27,8 +27,9 @@ var Log = func(...interface{}) error { return nil }
 const (
 	MarkNull = "␀" // 0x2400 = nul
 	//MarkValid  = "滿" // 0x6eff = fill; full, satisfied
-	MarkValid  = "Valid" // 0x6eff = fill; full, satisfied
-	MarkHidden = "匿"     // 0x533f = hide
+	MarkValid = "Valid" // 0x6eff = fill; full, satisfied
+	//MarkHidden = "匿"     // 0x533f = hide
+	MarkHidden = "_hidden"
 
 	DefaultMaxVARCHARLength = 32767
 	DefaultMaxCHARLength    = 10

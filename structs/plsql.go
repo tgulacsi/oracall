@@ -126,11 +126,12 @@ func demap(plsql, callFun string) (string, string) {
 		Funcs(
 			map[string]interface{}{
 				"paramsIdx": func(key string) int {
+					if strings.HasSuffix(key, MarkHidden) {
+						key = key[:len(key)-len(MarkHidden)] + "#"
+					}
 					arr := paramsMap[key]
 					if len(arr) == 0 {
 						Log("msg", "paramsIdx", "key", key, "val", arr, "map", paramsMap)
-					} else {
-						//Log("msg","paramsIdx", "key", key, "val", paramsMap[key])
 					}
 					i = arr[0]
 					if len(arr) > 1 {
@@ -182,9 +183,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 	args := make([]Argument, 0, len(fun.Args)+1)
 	for _, arg := range fun.Args {
-		if strings.Contains(arg.Name, "#") {
-			continue
-		}
+		arg.Name = replHidden(arg.Name)
 		args = append(args, arg)
 	}
 	if fun.Returns != nil {
