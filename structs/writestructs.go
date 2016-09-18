@@ -41,15 +41,15 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 		fmt.Fprintf(w,
 			"package "+pkg+`
 import (
-    "encoding/json"
+	"context"
 	"encoding/xml"
-    "errors"
     "log"
     "fmt"
 	"strings"
 	"strconv"
     "time"    // for datetimes
 
+	"github.com/pkg/errors"
     "gopkg.in/rana/ora.v3"    // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.Date
 )
@@ -58,34 +58,30 @@ var DebugLevel = uint(0)
 
 // against "unused import" error
 var _ ora.Ses
+var _ context.Context
 var _ custom.Date
 var _ strconv.NumError
 var _ time.Time
 var _ strings.Reader
-var _ = errors.New
-var _ json.Marshaler
 var _ xml.Name
 var _ log.Logger
+var _ = errors.Wrap
 var _ = fmt.Printf
 
-// FunctionCaller is a function which calls the stored procedure with
-// the input struct, and returns the output struct as an interface{}
-type FunctionCaller func(*ora.Ses, interface{}) (interface{}, error)
+type OraSesPool interface {
+	Get() (*ora.Ses, error)
+	Put(*ora.Ses)
+}
 
-// Functions is the map of function name -> function
-var Functions = make(map[string]FunctionCaller, %d)
-
-type Unmarshaler interface {
-    FromJSON([]byte) error
+type oracallServer struct {
+	OraSesPool
 }
 
 type Setter interface {
 	Set(key string, value string) error
 }
 
-// InputFactories is the map of function name -> input factory
-var InputFactories = make(map[string](func() Unmarshaler), %d)
-`, len(functions), len(functions))
+`)
 	}
 	types := make(map[string]string, 16)
 	inits := make([]string, 0, len(functions))
@@ -121,28 +117,6 @@ FunLoop:
 			b = []byte(callFun)
 		}
 		w.Write(b)
-		inpstruct := goName(fun.getStructName(false))
-		//inpstruct := fun.getStructName(false)
-		inits = append(inits,
-			fmt.Sprintf("\t"+`Functions["%s"] = func(cur *ora.Ses, input interface{}) (interface{}, error) {
-        var inp %s
-        switch x := input.(type) {
-        case *%s: inp = *x
-        case %s: inp = x
-        default:
-            return nil, fmt.Errorf("to call %s, the input must be %s, not %%T", input)
-        }
-        return Call_%s(cur, inp)
-    }
-            `,
-				fun.Name(), inpstruct, inpstruct, inpstruct, fun.Name(), inpstruct,
-				strings.Replace(fun.Name(), ".", "__", -1),
-			))
-		if saveStructs {
-			fmt.Fprintf(w, `
-    InputFactories["%s"] = func() Unmarshaler { return new(%s) }
-	`, fun.Name(), inpstruct)
-		}
 	}
 	for tn, text := range types {
 		if tn[0] == '+' { // REF CURSOR skip

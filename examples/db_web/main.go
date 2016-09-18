@@ -25,8 +25,9 @@ Package main for db_web is a db_web example for oracall usage
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
-	"encoding/xml"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -35,7 +36,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/tgulacsi/go/orahlp"
 	"gopkg.in/rana/ora.v3"
 	"gopkg.in/rana/ora.v3/lg"
 )
@@ -58,40 +58,27 @@ func main() {
 		log.Fatalf("login string (login/password) is needed")
 	}
 	funName := flag.Arg(0)
-	fun, ok := Functions[funName]
-	if !ok {
-		log.Fatalf("cannot find function named %q", funName)
-	}
-	log.Printf("fun to be called is %s", funName)
 
 	ora.Cfg().Log.Logger = lg.Log
-	env, err := ora.OpenEnv(nil)
+	pool, err := ora.NewPool(*flagConnect, 1)
 	if err != nil {
-		log.Fatalf("open env: %v", err)
+		log.Fatal(err)
 	}
-	defer env.Close()
-	user, passw, sid := orahlp.SplitDSN(*flagConnect)
-	srv, err := env.OpenSrv(&ora.SrvCfg{Dblink: sid})
-	if err != nil {
-		log.Fatalf("open srv for %q: %v", sid, err)
-	}
-	defer srv.Close()
-	ses, err := srv.OpenSes(&ora.SesCfg{Username: user, Password: passw})
-	if err != nil {
-		log.Fatalf("open ses for %q: %v", user, err)
-	}
-	defer ses.Close()
+	defer pool.Close()
+	s := oracallServer{OraSesPool: pool}
+	funV := reflect.ValueOf(&s).MethodByName(funName)
+	log.Printf("fun to be called is %s", funName)
 
 	userpass := strings.SplitN(*flagLogin, "/", 2)
 	if len(userpass) < 2 {
 		userpass = append(userpass, userpass[0])
 	}
-	sessionid, err := login(ses, userpass[0], userpass[1])
+	sessionid, err := login(&s, userpass[0], userpass[1])
 	if err != nil {
 		log.Fatalf("error logging in (%s): %v", userpass[0], err)
 	}
 	if !*flagSkipLogout {
-		defer logout(ses, sessionid)
+		defer logout(&s, sessionid)
 	}
 
 	// parse stdin as json into the proper input struct
@@ -103,45 +90,42 @@ func main() {
 	} else {
 		input = []byte(flag.Arg(1))
 	}
-	inp := InputFactories[funName]()
-	if err = inp.FromJSON(input); err != nil {
-		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
+
+	d := json.NewDecoder(bytes.NewReader(input))
+	funInputV := reflect.Zero(funV.Type().In(1))
+	inp := funInputV.Interface()
+	if err := d.Decode(inp); err != nil {
+		log.Fatalf("error unmarshaling %s into %T: %s", input, funInputV, err)
 	}
 
 	if err = StructSet(inp, "P_sessionid", sessionid); err != nil {
 		log.Fatalf("error setting sessionid on %v: %v", inp, err)
 	}
 
-	b, err := xml.Marshal(inp)
-	if err != nil {
-		log.Fatalf("error marshaling %v to xml: %s", inp, err)
-	}
-	log.Printf("input marshaled to xml: %s", b)
-
 	DebugLevel = 1
 	log.Printf("calling %s(%s)", funName, inp)
 
 	// call the function
-	out, err := fun(ses, inp)
-	if err != nil {
+	resV := funV.Call([]reflect.Value{
+		reflect.ValueOf(context.Background()),
+		reflect.ValueOf(inp),
+	})
+	if err := resV[1].Interface().(error); err != nil {
 		log.Fatalf("error calling %s(%#v): %s", funName, inp, err)
 	}
 
+	out := resV[0].Interface()
 	// present the output as json
-	if b, err = json.Marshal(out); err != nil {
+	b, err := json.Marshal(out)
+	if err != nil {
 		log.Fatalf("error marshaling output: %s", err)
 	}
 	log.Printf("output marshaled to JSON: %s", b)
-
-	if b, err = xml.Marshal(out); err != nil {
-		log.Fatalf("error marshaling output to XML: %s", err)
-	}
-	log.Printf("output marshaled to XML: %s", b)
 }
 
-func login(ses *ora.Ses, username, password string) (string, error) {
+func login(s *oracallServer, username, password string) (string, error) {
 	lang := "hu"
-	out, err := Functions["DB_web.login"](ses, DbWeb_Login_Input{
+	out, err := s.DBWeb_Login(context.Background(), &DbWeb_Login_Input{
 		PLoginNev: username,
 		PJelszo:   password,
 		PLang:     lang,
@@ -149,12 +133,12 @@ func login(ses *ora.Ses, username, password string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("DB_web.login: %v", err)
 	}
-	log.Printf("Login(%q): %#v", username, out.(DbWeb_Login_Output))
-	return out.(DbWeb_Login_Output).PSessionid, nil
+	log.Printf("Login(%q): %#v", username, out)
+	return out.PSessionid, nil
 }
 
-func logout(ses *ora.Ses, sessionID string) error {
-	_, err := Functions["DB_web.logout"](ses, DbWeb_Logout_Input{
+func logout(s *oracallServer, sessionID string) error {
+	_, err := s.DBWeb_Logout(context.Background(), &DbWeb_Logout_Input{
 		PSessionid: sessionID,
 	})
 	return err

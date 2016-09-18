@@ -48,8 +48,8 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	fn := strings.Replace(fun.Name(), ".", "__", -1)
 	callBuf := buffers.Get()
 	defer buffers.Put(callBuf)
-	fmt.Fprintf(callBuf, `func Call_%s(ses *ora.Ses, input %s) (output %s, err error) {
-    `, fn, goName(fun.getStructName(false)), goName(fun.getStructName(true)))
+	fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *%s) (output *%s, err error) {
+    `, goName(fn), goName(fun.getStructName(false)), goName(fun.getStructName(true)))
 	if haveChecks {
 		callBuf.WriteString(
 			`
@@ -65,7 +65,15 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%s`, params) }"+`
-    if _, err = ses.PrepAndExeP(%s, params...); err != nil { return }
+	ses, err := s.OraSesPool.Get()
+	if err != nil {
+		return nil, errors.Wrap(err, "Get")
+	}
+	defer s.OraSesPool.Put(ses)
+	qry := %s
+    if _, err = ses.PrepAndExeP(qry, params...); err != nil {
+		return nil, errors.Wrapf(err, "%%s %%#v", qry, params)
+	}
     `, call[i:j], fun.getPlsqlConstName())
 	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %s`, params) }\n")
 	for _, line := range convOut {
