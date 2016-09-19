@@ -77,8 +77,8 @@ type oracallServer struct {
 	OraSesPool
 }
 
-type Setter interface {
-	Set(key string, value string) error
+func NewServer(p OraSesPool) oracallServer {
+	return oracallServer{OraSesPool: p}
 }
 
 `)
