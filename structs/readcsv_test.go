@@ -26,7 +26,7 @@ var flagConnect = flag.String("connect", "", "database DSN to connect to")
 
 func TestParseCsv(t *testing.T) {
 	for i, tc := range testCases {
-		functions, err := ParseCsv(strings.NewReader(tc.Csv))
+		functions, err := ParseCsv(strings.NewReader(tc.Csv), nil)
 		if err != nil {
 			t.Errorf("%d. error parsing csv: %v", i, err)
 			t.FailNow()

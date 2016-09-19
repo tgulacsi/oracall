@@ -92,11 +92,11 @@ func TestWriteStruct(t *testing.T) {
 
 func TestGoName(t *testing.T) {
 	for eltNum, elt := range [][2]string{
-		{"a", "a"},
-		{"a_b", "aB"},
-		{"a__b", "a_B"},
-		{"db_web__calculate_31101__input", "dbWeb_Calculate_31101_Input"},
-		{"db_web__calculate_242xx__output", "dbWeb_Calculate_242Xx_Output"},
+		{"a", "A"},
+		{"a_b", "AB"},
+		{"a__b", "A_B"},
+		{"db_web__calculate_31101__input", "DbWeb_Calculate_31101_Input"},
+		{"db_web__calculate_242xx__output", "DbWeb_Calculate_242Xx_Output"},
 	} {
 		if got := goName(elt[0]); got != elt[1] {
 			t.Errorf("%d. %q => got %q, awaited %q.", eltNum, elt[0], got, elt[1])

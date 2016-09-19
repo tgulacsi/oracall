@@ -194,7 +194,7 @@ type testCase struct {
 }
 
 func (tc testCase) ParseCsv(t *testing.T, i int) []Function {
-	functions, err := ParseCsv(strings.NewReader(tc.Csv))
+	functions, err := ParseCsv(strings.NewReader(tc.Csv), nil)
 	if err != nil {
 		t.Errorf("%d. error parsing csv: %v", i, err)
 		t.FailNow()

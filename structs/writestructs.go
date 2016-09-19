@@ -77,8 +77,8 @@ type oracallServer struct {
 	OraSesPool
 }
 
-func NewServer(p OraSesPool) oracallServer {
-	return oracallServer{OraSesPool: p}
+func NewServer(p OraSesPool) *oracallServer {
+	return &oracallServer{OraSesPool: p}
 }
 
 `)
@@ -489,19 +489,15 @@ func goName(text string) string {
 	text = digitUnder.Replace(text)
 	var last rune
 	return strings.Map(func(r rune) rune {
+		defer func() { last = r }()
 		if r == '_' {
 			if last != '_' {
-				last = '_'
 				return -1
 			}
 			return '_'
 		}
-		if last == '_' || '0' <= last && last <= '9' {
-			last = r
+		if last == 0 || last == '_' || '0' <= last && last <= '9' {
 			return unicode.ToUpper(r)
-		}
-		if last == 0 {
-			return r
 		}
 		return unicode.ToLower(r)
 	},
