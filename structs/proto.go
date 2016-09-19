@@ -55,15 +55,29 @@ FunLoop:
 			}
 			return err
 		}
+		var streamQual string
+		if fun.ReturnsCursor() {
+			streamQual = "stream "
+		}
 		name := strings.ToLower(dot2D.Replace(fun.Name()))
 		fmt.Fprintf(w, `
 service %s {
-	rpc %s (%s) returns (%s) {}
+	rpc %s (%s) returns (%s%s) {}
 }
-`, name, name, strings.ToLower(fun.getStructName(false)), strings.ToLower(fun.getStructName(true)))
+`, name,
+			name, strings.ToLower(fun.getStructName(false)), streamQual, strings.ToLower(fun.getStructName(true)))
 	}
 
 	return nil
+}
+
+func (f Function) ReturnsCursor() bool {
+	for _, arg := range f.Args {
+		if arg.Direction&DIR_OUT != 0 && arg.Type == "REF CURSOR" {
+			return true
+		}
+	}
+	return false
 }
 
 func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}) error {
@@ -126,7 +140,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		aName := arg.Name
 		got := arg.goType(false)
-		if strings.HasSuffix(got, "_cur") || strings.HasSuffix(got, "_Cur") {
+		if arg.Type == "REF CURSOR" {
 			Log("msg", "CUR", "got", got, "rule", rule, "arg", arg)
 		}
 		if strings.HasPrefix(got, "*") {
@@ -139,9 +153,13 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		if strings.HasPrefix(got, "*") {
 			got = got[1:]
 		}
-		typ, opts := protoType(got)
+		typ, pOpts := protoType(got)
+		var optS string
+		if s := pOpts.String(); s != "" {
+			optS = " " + s
+		}
 		if arg.Flavor == FLAVOR_SIMPLE || arg.Flavor == FLAVOR_TABLE && arg.TableOf.Flavor == FLAVOR_SIMPLE {
-			fmt.Fprintf(w, "\t%s%s %s = %d %s;\n", rule, typ, aName, i+1, opts)
+			fmt.Fprintf(w, "\t%s%s %s = %d%s;\n", rule, typ, aName, i+1, optS)
 			continue
 		}
 		if _, ok := seen[typ]; !ok {
@@ -166,7 +184,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			}
 			seen[typ] = struct{}{}
 		}
-		fmt.Fprintf(w, "\t%s%s %s = %d %s;\n", rule, typ, aName, i+1, opts)
+		fmt.Fprintf(w, "\t%s%s %s = %d%s;\n", rule, typ, aName, i+1, optS)
 	}
 	io.WriteString(w, "}\n")
 	w.Write(buf.Bytes())

@@ -441,7 +441,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 			}
 			return tn
 		}
-		cn := tn[2:] //+ "__cur"
+		cn := tn[2:]
 		if cn[0] == '*' {
 			cn = cn[1:]
 		}
