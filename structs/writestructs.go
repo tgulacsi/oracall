@@ -40,13 +40,14 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 		fmt.Fprintf(w,
 			"package "+pkg+`
 import (
-	"context"
 	"encoding/xml"
     "log"
     "fmt"
 	"strings"
 	"strconv"
     "time"    // for datetimes
+
+	"golang.org/x/net/context"
 
 	"github.com/pkg/errors"
     "gopkg.in/rana/ora.v3"    // Oracle
