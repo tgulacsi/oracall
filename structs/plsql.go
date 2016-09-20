@@ -303,9 +303,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					//aname := capitalize(replHidden(arg.Name))
 					if arg.IsOutput() {
 						convOut = append(convOut, fmt.Sprintf(`
-                    if output.%s == nil { // _
+                    if output.%s == nil { // %s
                         output.%s = make([]%s, 0, %d)
-                    }`, aname,
+                    }`, aname, arg.TableOf.goType(true),
 							aname, goName(arg.TableOf.goType(true)), MaxTableSize))
 					}
 					/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható

@@ -26,7 +26,6 @@ import (
 	"strings"
 	"sync"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/pkg/errors"
 )
@@ -353,14 +352,6 @@ func capitalize(text string) string {
 	return strings.ToUpper(text[:1]) + strings.ToLower(text[1:])
 }
 
-func unocap(text string) string {
-	i := strings.Index(text, "_")
-	if i == 0 {
-		return capitalize(text)
-	}
-	return strings.ToUpper(text[:i]) + "_" + strings.ToLower(text[i+1:])
-}
-
 // returns a go type for the argument's type
 func (arg *Argument) goType(isTable bool) (typName string) {
 	defer func() {
@@ -484,11 +475,14 @@ func goName(text string) string {
 	if text == "" {
 		return text
 	}
-	r, size := utf8.DecodeRuneInString(text)
-	text = string([]rune{unicode.ToUpper(r)}) + text[size:]
+	var prefix string
+	if text[0] == '*' {
+		prefix, text = "*", text[1:]
+	}
+
 	text = digitUnder.Replace(text)
 	var last rune
-	return strings.Map(func(r rune) rune {
+	return prefix + strings.Map(func(r rune) rune {
 		defer func() { last = r }()
 		if r == '_' {
 			if last != '_' {
