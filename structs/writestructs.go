@@ -144,10 +144,13 @@ func (f Function) getPlsqlConstName() string {
 	return capitalize(f.Package + "__" + f.name + "__plsql")
 }
 
-func (f Function) getStructName(out bool) string {
+func (f Function) getStructName(out, withPackage bool) string {
 	dirname := "input"
 	if out {
 		dirname = "output"
+	}
+	if !withPackage {
+		return f.name + "__" + dirname
 	}
 	return capitalize(f.Package + "__" + f.name + "__" + dirname)
 }
@@ -178,7 +181,7 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 	if dirmap == uint8(DIR_IN) {
 		checks = make([]string, 0, len(args)+1)
 	}
-	structName = GoName(f.getStructName(out))
+	structName = GoName(f.getStructName(out, true))
 	//structName = f.getStructName(out)
 	buf := buffers.Get()
 	defer buffers.Put(buf)

@@ -280,10 +280,14 @@ func Main(args []string) int {
 				return errors.Wrap(err, "SaveProtobuf")
 			}
 
+			goOut := "go_out"
+			if structs.Gogo {
+				goOut = "gofast_out"
+			}
 			cmd := exec.Command(
 				"protoc",
 				os.ExpandEnv("--proto_path=$GOPATH/src:."),
-				"--gofast_out=plugins=grpc:.",
+				"--"+goOut+"=plugins=grpc:.",
 				*flagProto,
 			)
 			cmd.Stdout = os.Stdout

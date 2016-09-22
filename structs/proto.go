@@ -26,11 +26,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+var Gogo bool
+
 //go:generate sh ./download-protoc.sh
-//   go:generate go get -u github.com/golang/protobuf/protoc-gen-go
-//go:generate go get -u github.com/gogo/protobuf/protoc-gen-gofast
+//go:generate go get -u github.com/golang/protobuf/protoc-gen-go
+//	go:generate go get -u github.com/gogo/protobuf/protoc-gen-gofast
 
 // build: protoc --gofast_out=plugins=grpc:. my.proto
+// build: protoc --go_out=plugins=grpc:. my.proto
 
 func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	var err error
@@ -41,16 +44,21 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	if pkg != "" {
 		fmt.Fprintf(w, "package %s;\n", pkg)
 	}
-	io.WriteString(w, `
+	if Gogo {
+		io.WriteString(w, `
 	import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 `)
+	}
 	seen := make(map[string]struct{}, 16)
+
+	services := make([]string, 0, len(functions))
 
 FunLoop:
 	for _, fun := range functions {
+		fName := strings.ToLower(fun.name)
 		if err := fun.SaveProtobuf(w, seen); err != nil {
 			if errors.Cause(err) == ErrMissingTableOf {
-				Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
+				Log("msg", "SKIP function, missing TableOf info", "function", fName)
 				continue FunLoop
 			}
 			return err
@@ -59,14 +67,16 @@ FunLoop:
 		if fun.ReturnsCursor() {
 			streamQual = "stream "
 		}
-		name := strings.ToLower(dot2D.Replace(fun.Name()))
-		fmt.Fprintf(w, `
-service %s {
-	rpc %s (%s) returns (%s%s) {}
-}
-`, name,
-			name, strings.ToLower(fun.getStructName(false)), streamQual, strings.ToLower(fun.getStructName(true)))
+		name := strings.ToLower(dot2D.Replace(fName))
+		services = append(services, fmt.Sprintf(`rpc %s (%s) returns (%s%s) {}`,
+			name, strings.ToLower(fun.getStructName(false, false)), streamQual, strings.ToLower(fun.getStructName(true, false))))
 	}
+
+	fmt.Fprintf(w, "\nservice %s {\n", pkg)
+	for _, s := range services {
+		fmt.Fprintf(w, "\t%s\n", s)
+	}
+	w.Write([]byte("}"))
 
 	return nil
 }
@@ -108,7 +118,7 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 	}
 
 	return protoWriteMessageTyp(dst,
-		dot2D.Replace(strings.ToLower(f.Name()))+"__"+dirname,
+		dot2D.Replace(strings.ToLower(f.name))+"__"+dirname,
 		seen, args...)
 }
 
@@ -208,16 +218,25 @@ func protoType(got string) (string, protoOptions) {
 		return "double", nil
 
 	case "ora.date", "custom.date":
+		if !Gogo {
+			return "string", nil
+		}
 		return "string", protoOptions(map[string]interface{}{
 			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Date",
 		})
 	case "n", "ora.n":
+		if !Gogo {
+			return "string", nil
+		}
 		return "string", protoOptions(map[string]interface{}{
 			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Number",
 		})
 	case "ora.lob":
+		if !Gogo {
+			return "bytes", nil
+		}
 		return "bytes", protoOptions(map[string]interface{}{
 			"gogoproto.nullable":   false,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Lob",

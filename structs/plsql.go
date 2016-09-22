@@ -45,11 +45,11 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 		Log("msg", "error preparing", "function", fun, "error", err)
 		os.Exit(1)
 	}
-	fn := strings.Replace(fun.Name(), ".", "__", -1)
+	fn := strings.Replace(fun.name, ".", "__", -1)
 	callBuf := buffers.Get()
 	defer buffers.Put(callBuf)
 	fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *%s) (output *%s, err error) {
-    `, GoName(fn), GoName(fun.getStructName(false)), GoName(fun.getStructName(true)))
+    `, GoName(fn), GoName(fun.getStructName(false, false)), GoName(fun.getStructName(true, false)))
 	if haveChecks {
 		callBuf.WriteString(
 			`
@@ -577,11 +577,11 @@ func (arg Argument) getConvTableRec(
 		}
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)
-			for i,v := range input.%s { %s[i] = v.%s; } // gctr1
+			for i,v := range input.%s { %s[i] = %s(v.%s); } // gctr1
 			%s = %s`,
 			absName,
 			typ, lengthS, tableSize,
-			name[0], absName, name[1],
+			name[0], absName, typ, name[1],
 			paramName, absName))
 	}
 	if arg.IsOutput() {
@@ -599,7 +599,7 @@ func (arg Argument) getConvTableRec(
 		output.%s = output.%s[:len(%s)]
 		for i, v := range %s {
 			if output.%s[i] != nil {
-				output.%s[i].%s = v
+				%s
 			}
 		}`,
 				absName, name[0],
@@ -607,7 +607,10 @@ func (arg Argument) getConvTableRec(
 				name[0], name[0], absName,
 				absName,
 				name[0],
-				name[0], name[1]))
+				Arg{ora: arg.PlsType}.FromOra(
+					fmt.Sprintf("output.%s[i].%s", name[0], name[1]),
+					"v",
+				)))
 	}
 	return convIn, convOut
 }

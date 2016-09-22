@@ -17,7 +17,9 @@ if ! protoc --version 2>/dev/null | fgrep 'libprotoc 3'; then
 fi
 
 
-which protoc-gen-gofast 2>/dev/null && exit 0
+if which protoc-gen-gofast 2>/dev/null || which protoc-gen-go 2>/dev/null; then
+	exit 0
+fi
 dst="$tmpdir/protoc-linux_x86_64.zip"
 if ! [ -e "$dst" ]; then
 	curl -L -sS $(curl -sS https://github.com/google/protobuf/releases/ \
