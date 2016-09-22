@@ -49,7 +49,7 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	callBuf := buffers.Get()
 	defer buffers.Put(callBuf)
 	fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *%s) (output *%s, err error) {
-    `, goName(fn), goName(fun.getStructName(false)), goName(fun.getStructName(true)))
+    `, GoName(fn), GoName(fun.getStructName(false)), GoName(fun.getStructName(true)))
 	if haveChecks {
 		callBuf.WriteString(
 			`
@@ -206,7 +206,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	for _, arg := range args {
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
-			name := (goName(arg.Name))
+			name := (GoName(arg.Name))
 			//name := capitalize(replHidden(arg.Name))
 			convIn, convOut = arg.getConvSimple(convIn, convOut,
 				name, addParam(arg.Name))
@@ -215,26 +215,26 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			vn = getInnerVarName(fun.Name(), arg.Name)
 			decls = append(decls, vn+" "+arg.TypeName+";")
 			callArgs[arg.Name] = vn
-			aname := (goName(arg.Name))
+			aname := (GoName(arg.Name))
 			//aname := capitalize(replHidden(arg.Name))
 			if arg.IsOutput() {
 				if arg.IsInput() {
 					convIn = append(convIn, fmt.Sprintf(`
 					output.%s = new(%s)
 					if input.%s != nil { *output.%s = *input.%s }
-					`, aname, goName(arg.goType(false)[1:]),
+					`, aname, GoName(arg.goType(false)[1:]),
 						aname, aname, aname))
 				} else {
 					convOut = append(convOut, fmt.Sprintf(`
                     if output.%s == nil {
                         output.%s = new(%s)
                     }`, aname,
-						aname, goName(arg.goType(false)[1:])))
+						aname, GoName(arg.goType(false)[1:])))
 				}
 			}
 			for k, v := range arg.RecordOf {
 				tmp = getParamName(fun.Name(), vn+"."+k)
-				kName := (goName(k))
+				kName := (GoName(k))
 				//kName := capitalize(replHidden(k))
 				name := aname + "." + kName
 				if arg.IsInput() {
@@ -253,7 +253,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					Log("msg", "cannot use IN cursor variables", "arg", arg)
 					os.Exit(1)
 				}
-				name := (goName(arg.Name))
+				name := (GoName(arg.Name))
 				//name := capitalize(replHidden(arg.Name))
 				convIn, convOut = arg.getConvSimpleTable(convIn, convOut,
 					name, addParam(arg.Name), MaxTableSize)
@@ -289,7 +289,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							"END LOOP;",
 							":"+arg.Name+" := "+arg.Name+";")
 					}
-					name := (goName(arg.Name))
+					name := (GoName(arg.Name))
 					//name := capitalize(replHidden(arg.Name))
 					convIn, convOut = arg.getConvSimpleTable(convIn, convOut,
 						name, addParam(arg.Name), MaxTableSize)
@@ -299,14 +299,14 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					callArgs[arg.Name] = vn
 					decls = append(decls, vn+" "+arg.TypeName+";")
 
-					aname := (goName(arg.Name))
+					aname := (GoName(arg.Name))
 					//aname := capitalize(replHidden(arg.Name))
 					if arg.IsOutput() {
 						convOut = append(convOut, fmt.Sprintf(`
                     if output.%s == nil { // %s
                         output.%s = make([]%s, 0, %d)
                     }`, aname, arg.TableOf.goType(true),
-							aname, goName(arg.TableOf.goType(true)), MaxTableSize))
+							aname, GoName(arg.TableOf.goType(true)), MaxTableSize))
 					}
 					/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
 					if arg.IsOutput() {
@@ -354,7 +354,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 									"WHILE i1 IS NOT NULL LOOP")
 							}
 						}
-						kName := (goName(k))
+						kName := (GoName(k))
 						//kName := capitalize(replHidden(k))
 						//name := aname + "." + kName
 
@@ -486,7 +486,7 @@ func (arg Argument) getConvSimpleTable(
 			if arg.IsInput() {
 				convIn = append(convIn, fmt.Sprintf("output.%s = input.%s", name, name))
 			} else {
-				got = goName(got)
+				got = GoName(got)
 				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
 			}
 		}
@@ -603,7 +603,7 @@ func (arg Argument) getConvTableRec(
 			}
 		}`,
 				absName, name[0],
-				name[0], name[0], goName(parent.goType(true)),
+				name[0], name[0], GoName(parent.goType(true)),
 				name[0], name[0], absName,
 				absName,
 				name[0],

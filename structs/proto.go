@@ -259,7 +259,7 @@ func CopyStruct(dest interface{}, src interface{}) error {
 	for _, df := range ds.Fields() {
 		dnm := df.Name()
 		for i, snm := range snames {
-			if snm == dnm || dnm == goName(snm) || goName(dnm) == snm {
+			if snm == dnm || dnm == GoName(snm) || GoName(dnm) == snm {
 				svalue := svalues[i]
 				if err := df.Set(svalue); err != nil {
 					return errors.Wrapf(err, "set %q to %q (%v %T)", dnm, snm, svalue, svalue)

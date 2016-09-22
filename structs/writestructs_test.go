@@ -100,7 +100,7 @@ func TestGoName(t *testing.T) {
 		{"Db_dealer__zaradek_rec_typ__bruno", "DbDealer_ZaradekRecTyp_Bruno"},
 		{"*Db_dealer__zaradek_rec_typ__bruno", "*DbDealer_ZaradekRecTyp_Bruno"},
 	} {
-		if got := goName(elt[0]); got != elt[1] {
+		if got := GoName(elt[0]); got != elt[1] {
 			t.Errorf("%d. %q => got %q, awaited %q.", eltNum, elt[0], got, elt[1])
 		}
 	}

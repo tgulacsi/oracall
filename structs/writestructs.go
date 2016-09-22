@@ -178,7 +178,7 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 	if dirmap == uint8(DIR_IN) {
 		checks = make([]string, 0, len(args)+1)
 	}
-	structName = goName(f.getStructName(out))
+	structName = GoName(f.getStructName(out))
 	//structName = f.getStructName(out)
 	buf := buffers.Get()
 	defer buffers.Put(buf)
@@ -248,7 +248,7 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 }
 
 func genChecks(checks []string, arg Argument, base string, parentIsTable bool) []string {
-	aName := (goName(arg.Name))
+	aName := (GoName(arg.Name))
 	//aName := capitalize(replHidden(arg.Name))
 	got := arg.goType(parentIsTable || arg.Flavor == FLAVOR_TABLE)
 	var name string
@@ -471,7 +471,7 @@ var digitUnder = strings.NewReplacer(
 	"_9", "__9",
 )
 
-func goName(text string) string {
+func GoName(text string) string {
 	text = replHidden(text)
 	if text == "" {
 		return text
