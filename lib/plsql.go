@@ -49,7 +49,13 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	callBuf := buffers.Get()
 	defer buffers.Put(callBuf)
 	fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *%s) (output *%s, err error) {
-    `, CamelCase(fn), CamelCase(fun.getStructName(false, false)), CamelCase(fun.getStructName(true, false)))
+		output = new(%s)
+    `,
+		CamelCase(fn),
+		CamelCase(fun.getStructName(false, false)),
+		CamelCase(fun.getStructName(true, false)),
+		CamelCase(fun.getStructName(true, false)),
+	)
 	if haveChecks {
 		callBuf.WriteString(
 			`
