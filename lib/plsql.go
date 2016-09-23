@@ -453,7 +453,7 @@ func (arg Argument) getConvSimple(
 		} else if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
 		}
-		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcs1`, paramName, name))
+		convIn = append(convIn, fmt.Sprintf(`%s = &output.%s // gcs1`, paramName, name))
 	} else {
 		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcs2", paramName, name))
 	}
