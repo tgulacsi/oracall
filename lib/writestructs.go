@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package structs
+package oracall
 
 import (
 	"bytes"
@@ -181,7 +181,7 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 	if dirmap == uint8(DIR_IN) {
 		checks = make([]string, 0, len(args)+1)
 	}
-	structName = GoName(f.getStructName(out, true))
+	structName = CamelCase(f.getStructName(out, true))
 	//structName = f.getStructName(out)
 	buf := buffers.Get()
 	defer buffers.Put(buf)
@@ -251,7 +251,7 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 }
 
 func genChecks(checks []string, arg Argument, base string, parentIsTable bool) []string {
-	aName := (GoName(arg.Name))
+	aName := (CamelCase(arg.Name))
 	//aName := capitalize(replHidden(arg.Name))
 	got := arg.goType(parentIsTable || arg.Flavor == FLAVOR_TABLE)
 	var name string
@@ -474,7 +474,7 @@ var digitUnder = strings.NewReplacer(
 	"_9", "__9",
 )
 
-func GoName(text string) string {
+func CamelCase(text string) string {
 	text = replHidden(text)
 	if text == "" {
 		return text

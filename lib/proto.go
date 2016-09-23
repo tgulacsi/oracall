@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package structs
+package oracall
 
 import (
 	"bytes"
@@ -278,7 +278,7 @@ func CopyStruct(dest interface{}, src interface{}) error {
 	for _, df := range ds.Fields() {
 		dnm := df.Name()
 		for i, snm := range snames {
-			if snm == dnm || dnm == GoName(snm) || GoName(dnm) == snm {
+			if snm == dnm || dnm == CamelCase(snm) || CamelCase(dnm) == snm {
 				svalue := svalues[i]
 				if err := df.Set(svalue); err != nil {
 					return errors.Wrapf(err, "set %q to %q (%v %T)", dnm, snm, svalue, svalue)

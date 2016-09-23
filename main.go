@@ -34,11 +34,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/tgulacsi/go/loghlp/kitloghlp"
-	"github.com/tgulacsi/oracall/structs"
+	oracall "github.com/tgulacsi/oracall/lib"
 	"gopkg.in/rana/ora.v3" // for Oracle-specific drivers
 )
 
-//go:generate go generate ./structs
+//go:generate go generate ./lib
 // Should install protobuf-compiler to use it, like
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
@@ -47,7 +47,7 @@ var logger = kitloghlp.New(os.Stderr)
 var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
 
 func main() {
-	structs.Log = logger.With("lib", "structs").Log
+	oracall.Log = logger.With("lib", "oracall").Log
 	os.Exit(Main(os.Args))
 }
 
@@ -66,7 +66,7 @@ func Main(args []string) int {
 	Log := logger.Log
 	outPath := flag.Arg(0)
 
-	var functions []structs.Function
+	var functions []oracall.Function
 	var err error
 
 	if *flagConnect == "" {
@@ -77,7 +77,7 @@ func Main(args []string) int {
 				return rPattern.MatchString(s)
 			}
 		}
-		functions, err = structs.ParseCsvFile("", filter)
+		functions, err = oracall.ParseCsvFile("", filter)
 	} else {
 		ora.Register(nil)
 		cx, err := sql.Open("ora", *flagConnect)
@@ -142,14 +142,14 @@ func Main(args []string) int {
 			}
 		}
 
-		userArgs := make(chan structs.UserArgument, 16)
+		userArgs := make(chan oracall.UserArgument, 16)
 		var readErr error
 		var grp syncutil.Group
 		grp.Go(func() error {
 			defer close(userArgs)
 			var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString
 			var oid, subid, level, pos, prec, scale, length sql.NullInt64
-			ua := structs.UserArgument{}
+			ua := oracall.UserArgument{}
 			for rows.Next() {
 				err = rows.Scan(&oid, &subid, &pn, &on,
 					&level, &pos, &an, &ua.InOut,
@@ -230,7 +230,7 @@ func Main(args []string) int {
 			}
 			return nil
 		})
-		functions, err = structs.ParseArguments(userArgs)
+		functions, err = oracall.ParseArguments(userArgs)
 		if grpErr := grp.Err(); grpErr != nil && err == nil {
 			err = grpErr
 		}
@@ -257,7 +257,7 @@ func Main(args []string) int {
 
 	var grp errgroup.Group
 	grp.Go(func() error {
-		if err := structs.SaveFunctions(out, functions,
+		if err := oracall.SaveFunctions(out, functions,
 			*flagPackage, *flagSkipFormat, *flagProto == "",
 		); err != nil {
 			return errors.Wrap(err, "save functions")
@@ -272,7 +272,7 @@ func Main(args []string) int {
 			if err != nil {
 				return errors.Wrap(err, "create proto")
 			}
-			err = structs.SaveProtobuf(fh, functions, *flagPackage)
+			err = oracall.SaveProtobuf(fh, functions, *flagPackage)
 			if closeErr := fh.Close(); closeErr != nil && err == nil {
 				err = closeErr
 			}
@@ -281,7 +281,7 @@ func Main(args []string) int {
 			}
 
 			goOut := "go_out"
-			if structs.Gogo {
+			if oracall.Gogo {
 				goOut = "gofast_out"
 			}
 			cmd := exec.Command(
