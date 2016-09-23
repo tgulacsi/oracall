@@ -67,12 +67,18 @@ FunLoop:
 		if fun.ReturnsCursor() {
 			streamQual = "stream "
 		}
-		name := strings.ToLower(dot2D.Replace(fName))
-		services = append(services, fmt.Sprintf(`rpc %s (%s) returns (%s%s) {}`,
-			name, strings.ToLower(fun.getStructName(false, false)), streamQual, strings.ToLower(fun.getStructName(true, false))))
+		name := CamelCase(dot2D.Replace(fName))
+		services = append(services,
+			fmt.Sprintf(`rpc %s (%s) returns (%s%s) {}`,
+				name,
+				CamelCase(fun.getStructName(false, false)),
+				streamQual,
+				CamelCase(fun.getStructName(true, false)),
+			),
+		)
 	}
 
-	fmt.Fprintf(w, "\nservice %s {\n", pkg)
+	fmt.Fprintf(w, "\nservice %s {\n", CamelCase(pkg))
 	for _, s := range services {
 		fmt.Fprintf(w, "\t%s\n", s)
 	}
@@ -118,7 +124,7 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 	}
 
 	return protoWriteMessageTyp(dst,
-		dot2D.Replace(strings.ToLower(f.name))+"__"+dirname,
+		CamelCase(dot2D.Replace(strings.ToLower(f.name))+"__"+dirname),
 		seen, args...)
 }
 
@@ -172,6 +178,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			fmt.Fprintf(w, "\t%s%s %s = %d%s;\n", rule, typ, aName, i+1, optS)
 			continue
 		}
+		typ = CamelCase(typ)
 		if _, ok := seen[typ]; !ok {
 			//lName := strings.ToLower(arg.Name)
 			subArgs := make([]Argument, 0, 16)
