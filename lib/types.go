@@ -29,12 +29,13 @@ func NewArg(ora string) Arg {
 
 // FromOra retrieves the value of the argument with arg type, from src variable to dst variable.
 func (arg Arg) FromOra(dst, src string) string {
-	switch arg.ora {
-	case "DATE":
-		return fmt.Sprintf("%s = string(%s)", dst, src)
-	default:
-		return fmt.Sprintf("%s = %s", dst, src)
+	if !Gogo {
+		switch arg.ora {
+		case "DATE":
+			return fmt.Sprintf("%s = string(%s)", dst, src)
+		}
 	}
+	return fmt.Sprintf("%s = %s", dst, src)
 }
 
 // ToOra adds the value of the argument with arg type, from src variable to dst variable.

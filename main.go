@@ -61,10 +61,12 @@ func Main(args []string) int {
 	flagPackage := flag.String("package", "main", "package name of the generated functions")
 	flagOut := flag.String("out", "generated_functions.go", "generated functions file name")
 	flagProto := flag.String("proto", "oracall.proto", "protocol buffers file name")
+	flagGenerator := flag.String("protoc-gen", "gofast", "use protoc-gen-<generator>")
 
 	flag.Parse()
 	Log := logger.Log
 	outPath := flag.Arg(0)
+	oracall.Gogo = *flagGenerator != "go"
 
 	var functions []oracall.Function
 	var err error
@@ -280,10 +282,7 @@ func Main(args []string) int {
 				return errors.Wrap(err, "SaveProtobuf")
 			}
 
-			goOut := "go_out"
-			if oracall.Gogo {
-				goOut = "gofast_out"
-			}
+			goOut := *flagGenerator + "_out"
 			cmd := exec.Command(
 				"protoc",
 				os.ExpandEnv("--proto_path=$GOPATH/src:."),
