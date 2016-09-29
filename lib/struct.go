@@ -56,6 +56,15 @@ func (f Function) String() string {
 	return f.Name() + "(" + strings.Join(args, ", ") + ")"
 }
 
+func (f Function) HasCursorOut() bool {
+	for _, arg := range f.Args {
+		if arg.IsOutput() && arg.Type == "REF CURSOR" {
+			return true
+		}
+	}
+	return false
+}
+
 const (
 	DIR_IN  = 1
 	DIR_OUT = 2

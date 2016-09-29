@@ -48,14 +48,25 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	fn := strings.Replace(fun.name, ".", "__", -1)
 	callBuf := buffers.Get()
 	defer buffers.Put(callBuf)
-	fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *%s) (output *%s, err error) {
+	if fun.HasCursorOut() {
+		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(input *%s, stream %s_%sServer) (err error) {
+			output := new(%s)
+		`,
+			CamelCase(fn),
+			CamelCase(fun.getStructName(false, false)),
+			CamelCase(fun.Package), CamelCase(fn),
+			CamelCase(fun.getStructName(true, false)),
+		)
+	} else {
+		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *%s) (output *%s, err error) {
 		output = new(%s)
     `,
-		CamelCase(fn),
-		CamelCase(fun.getStructName(false, false)),
-		CamelCase(fun.getStructName(true, false)),
-		CamelCase(fun.getStructName(true, false)),
-	)
+			CamelCase(fn),
+			CamelCase(fun.getStructName(false, false)),
+			CamelCase(fun.getStructName(true, false)),
+			CamelCase(fun.getStructName(true, false)),
+		)
+	}
 	if haveChecks {
 		callBuf.WriteString(
 			`
@@ -73,12 +84,14 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%s`, params) }"+`
 	ses, err := s.OraSesPool.Get()
 	if err != nil {
-		return nil, errors.Wrap(err, "Get")
+		err = errors.Wrap(err, "Get")
+		return
 	}
 	defer s.OraSesPool.Put(ses)
 	qry := %s
     if _, err = ses.PrepAndExeP(qry, params...); err != nil {
-		return nil, errors.Wrapf(err, "%%s %%#v", qry, params)
+		err = errors.Wrapf(err, "%%s %%#v", qry, params)
+		return
 	}
     `, call[i:j], fun.getPlsqlConstName())
 	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %s`, params) }\n")
@@ -219,7 +232,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
-			decls = append(decls, vn+" "+arg.TypeName+";")
+			decls = append(decls, vn+" "+arg.TypeName+"; --E:"+arg.Name)
 			callArgs[arg.Name] = vn
 			aname := (CamelCase(arg.Name))
 			//aname := capitalize(replHidden(arg.Name))
@@ -254,7 +267,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					0, arg, k)
 			}
 		case FLAVOR_TABLE:
-			if false && arg.Type == "REF CURSOR" {
+			if arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
 					Log("msg", "cannot use IN cursor variables", "arg", arg)
 					os.Exit(1)
@@ -271,11 +284,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					if arg.IsInput() {
 						setvar = " := :" + arg.Name
 					}
-					decls = append(decls, arg.Name+" "+typ+setvar+";")
+					decls = append(decls, arg.Name+" "+typ+setvar+"; --A:"+arg.Name)
 
 					vn = getInnerVarName(fun.Name(), arg.Name)
 					callArgs[arg.Name] = vn
-					decls = append(decls, vn+" "+arg.TypeName+";")
+					decls = append(decls, vn+" "+arg.TypeName+"; --B:"+arg.Name)
 					if arg.IsInput() {
 						pre = append(pre,
 							vn+".DELETE;",
@@ -303,7 +316,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
 					callArgs[arg.Name] = vn
-					decls = append(decls, vn+" "+arg.TypeName+";")
+					decls = append(decls, vn+" "+arg.TypeName+"; --C:"+arg.Name)
 
 					aname := (CamelCase(arg.Name))
 					//aname := capitalize(replHidden(arg.Name))
@@ -330,7 +343,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					// declarations go first
 					for k, v := range arg.TableOf.RecordOf {
 						typ = getTableType(v.AbsType)
-						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+";")
+						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D:"+arg.Name)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
 						if arg.IsInput() {
