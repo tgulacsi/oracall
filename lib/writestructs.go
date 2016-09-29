@@ -96,7 +96,7 @@ FunLoop:
 		for _, dir := range []bool{false, true} {
 			if err := fun.SaveStruct(structW, dir, true); err != nil {
 				if errors.Cause(err) == ErrMissingTableOf {
-					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name())
+					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name(), "error", err)
 					continue FunLoop
 				}
 				return err
