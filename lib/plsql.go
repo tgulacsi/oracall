@@ -480,6 +480,14 @@ func (arg Argument) getConvSimpleTable(
 ) ([]string, []string) {
 	if arg.IsOutput() {
 		got := arg.goType(true)
+		if arg.Type == "REF CURSOR" {
+			convIn = append(convIn, fmt.Sprintf(`output.%s = make([]*%s, 0, %d)
+				%s = new(ora.Rset) // gcst4 %q`,
+				name, CamelCase(got), tableSize,
+				paramName, arg.goType(true)))
+			// FIXME(tgulacsi): convOut with for paramName.(*ora.Rset).Next(), stream.Send
+			return convIn, convOut
+		}
 		if got == "*[]string" {
 			got = "[]string"
 		}
