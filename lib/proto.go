@@ -187,14 +187,15 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 					subArgs = append(subArgs, *arg.TableOf)
 				} else {
 					for _, v := range arg.TableOf.RecordOf {
-						subArgs = append(subArgs, v)
+						subArgs = append(subArgs, v.Argument)
 					}
 				}
 			} else {
 				for _, v := range arg.RecordOf {
-					subArgs = append(subArgs, v)
+					subArgs = append(subArgs, v.Argument)
 				}
 			}
+			Log("subArgs", subArgs)
 			if err := protoWriteMessageTyp(buf, typ, seen, subArgs...); err != nil {
 				Log("msg", "protoWriteMessageTyp", "error", err)
 				return err

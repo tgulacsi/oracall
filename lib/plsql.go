@@ -105,7 +105,7 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	if hasCursorOut {
 		fmt.Fprintf(callBuf, `
 		reseters := make([]func(), 0, len(iterators))
-		iterators2 := make([]func() error, 0, len(iterators))
+		iterators2 := make([]iterator, 0, len(iterators))
 		for len(iterators) > 0 {
 			iterators2 = iterators2[:0]
 			reseters = reseters[:0]
@@ -286,7 +286,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						aname, CamelCase(arg.goType(false)[1:])))
 				}
 			}
-			for k, v := range arg.RecordOf {
+			for _, a := range arg.RecordOf {
+				k, v := a.Name, a.Argument
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				kName := (CamelCase(k))
 				//kName := capitalize(replHidden(k))
@@ -362,21 +363,13 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
                     }`, aname, arg.TableOf.goType(true),
 							aname, CamelCase(arg.TableOf.goType(true)), MaxTableSize))
 					}
-					/* // PLS-00110: a(z) 'P038.DELETE' hozzárendelt változó ilyen környezetben nem használható
-					if arg.IsOutput() {
-						// DELETE out tables
-						for k := range arg.TableOf.RecordOf {
-							post = append(post,
-								":"+getParamName(fun.Name(), vn+"."+k)+".DELETE;")
-						}
-					}
-					*/
 					if !arg.IsInput() {
 						pre = append(pre, vn+".DELETE;")
 					}
 
 					// declarations go first
-					for k, v := range arg.TableOf.RecordOf {
+					for _, a := range arg.TableOf.RecordOf {
+						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
 						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D:"+arg.Name)
 
@@ -390,7 +383,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 					// here comes the loops
 					var idxvar string
-					for k, v := range arg.TableOf.RecordOf {
+					for _, a := range arg.TableOf.RecordOf {
+						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
@@ -437,7 +431,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						post = append(post,
 							"  i1 := "+vn+".NEXT(i1); i2 := i2 + 1;",
 							"END LOOP;")
-						for k := range arg.TableOf.RecordOf {
+						for _, a := range arg.TableOf.RecordOf {
+							k := a.Name
 							tmp = getParamName(fun.Name(), vn+"."+k)
 							post = append(post, ":"+tmp+" := "+tmp+";")
 						}
@@ -581,8 +576,7 @@ func (arg Argument) getConvRefCursor(
 				}
 				break
 			}
-			// FIXME(tgulacsi): generate struct adder from rset.Row ([]interface{})
-			a = append(a, rset.Row)
+			a = append(a, %s)
 		}
 		output.%s = a
 		return err
@@ -593,9 +587,26 @@ func (arg Argument) getConvRefCursor(
 		name,
 		name,
 		tableSize,
+		arg.getFromRset("rset.Row"),
 		name,
 	))
 	return convIn, convOut
+}
+
+func (arg Argument) getFromRset(rsetRow string) string {
+	buf := buffers.Get()
+	defer buffers.Put(buf)
+
+	GoT := CamelCase(arg.goType(true))
+	if GoT[0] == '*' {
+		GoT = "&" + GoT[1:]
+	}
+	fmt.Fprintf(buf, "%s{\n", GoT)
+	for i, a := range arg.TableOf.RecordOf {
+		fmt.Fprintf(buf, "\t%s: %s[%d].(%s),\n", CamelCase(a.Name), rsetRow, i, a.Argument.goType(true))
+	}
+	fmt.Fprintf(buf, "}")
+	return buf.String()
 }
 
 func getOutConvTSwitch(name, pTyp string) string {

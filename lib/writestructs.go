@@ -328,7 +328,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 			checks = append(checks, "if "+name+" != nil {")
 		}
 		for _, sub := range arg.RecordOf {
-			checks = genChecks(checks, sub, name, arg.Flavor == FLAVOR_TABLE) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
+			checks = genChecks(checks, sub.Argument, name, arg.Flavor == FLAVOR_TABLE) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
 		}
 		if parentIsTable || got[0] == '*' {
 			checks = append(checks, "}")
@@ -416,7 +416,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		case "CLOB", "BLOB":
 			return "ora.Lob"
 		default:
-			Log("msg", "unknown simple type", "type", arg.Type, "arg", arg)
+			Log("error", fmt.Sprintf("%+v", errors.New("unknown simple type")), "type", arg.Type, "arg", fmt.Sprintf("%#v", arg))
 			os.Exit(1)
 		}
 	}

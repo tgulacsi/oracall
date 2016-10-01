@@ -86,9 +86,13 @@ type Argument struct {
 	Scale                   uint8
 	Charset                 string
 	Charlength              uint
-	TableOf                 *Argument           // this argument is a table (array) of this type
-	RecordOf                map[string]Argument //this argument is a record (map) of this type
+	TableOf                 *Argument       // this argument is a table (array) of this type
+	RecordOf                []NamedArgument //this argument is a record (map) of this type
 	goTypeName              string
+}
+type NamedArgument struct {
+	Name string
+	Argument
 }
 
 func (a Argument) String() string {
@@ -150,7 +154,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	switch arg.Type {
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
-		arg.RecordOf = make(map[string]Argument, 1)
+		arg.RecordOf = make([]NamedArgument, 1)
 		if arg.TypeName == "" {
 			arg.TypeName = arg.Name
 		}

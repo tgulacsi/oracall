@@ -204,11 +204,11 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 
 func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err error) {
 	var (
-		level    uint8
-		fun      Function
-		args     = make([]Argument, 0, 16)
-		lastArgs = make([]*Argument, 0, 3)
-		row      int
+		prev, level uint8
+		fun         Function
+		args        = make([]Argument, 0, 16)
+		lastArgs    = make([]*Argument, 0, 3)
+		row         int
 	)
 	functions = make([]Function, 0, 8)
 	seen := make(map[string]uint8, 64)
@@ -272,26 +272,14 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 				Log("msg", "lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
 				os.Exit(1)
 			}
+			if prev != level {
+				lastArg.RecordOf = nil
+			}
 			if lastArg.Flavor == FLAVOR_TABLE {
 				lastArg.TableOf = &arg
 			} else {
-				if lastArg.RecordOf == nil {
-					lastArg.RecordOf = make(map[string]Argument, 1)
-				}
-				lastArg.RecordOf[arg.Name] = arg
+				lastArg.RecordOf = append(lastArg.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
 			}
-			/*
-				for i := int(level) - 2; i >= 0; i-- {
-						if lastArgs[i].Flavor == FLAVOR_TABLE {
-							lastArgs[i].TableOf = lastArgs[i+1]
-						} else {
-							if lastArgs[i].RecordOf == nil {
-								lastArgs[i].RecordOf = make(map[string]Argument, 1)
-							}
-							lastArgs[i].RecordOf[lastArgs[i+1].Name] = *lastArgs[i+1]
-						}
-				}
-			*/
 			// copy back to root
 			if len(args) > 0 {
 				args[len(args)-1] = *lastArgs[0]
@@ -300,6 +288,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		if arg.Flavor != FLAVOR_SIMPLE {
 			lastArgs = append(lastArgs[:level], &arg)
 		}
+		prev = level
 	}
 	if fun.name != "" {
 		fun.Args = args
