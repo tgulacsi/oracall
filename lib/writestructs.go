@@ -41,6 +41,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatti
 			"package "+pkg+`
 import (
 	"encoding/xml"
+	"io"
     "log"
     "fmt"
 	"strings"
@@ -57,6 +58,7 @@ import (
 var DebugLevel = uint(0)
 
 // against "unused import" error
+var _ = io.EOF
 var _ ora.Ses
 var _ context.Context
 var _ custom.Date
@@ -79,6 +81,11 @@ type oracallServer struct {
 
 func NewServer(p OraSesPool) *oracallServer {
 	return &oracallServer{OraSesPool: p}
+}
+
+type iterator struct {
+	Reset func()
+	Iterate func() error
 }
 
 `)

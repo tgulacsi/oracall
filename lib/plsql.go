@@ -48,9 +48,11 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	fn := strings.Replace(fun.name, ".", "__", -1)
 	callBuf := buffers.Get()
 	defer buffers.Put(callBuf)
-	if fun.HasCursorOut() {
+	hasCursorOut := fun.HasCursorOut()
+	if hasCursorOut {
 		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(input *%s, stream %s_%sServer) (err error) {
 			output := new(%s)
+			iterators := make([]iterator, 0, 1)
 		`,
 			CamelCase(fn),
 			CamelCase(fun.getStructName(false, false)),
@@ -60,6 +62,8 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	} else {
 		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *%s) (output *%s, err error) {
 		output = new(%s)
+		iterators := make([]iterator, 0, 1) // just temporary
+		_ = iterators
     `,
 			CamelCase(fn),
 			CamelCase(fun.getStructName(false, false)),
@@ -97,6 +101,37 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %s`, params) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
+	}
+	if hasCursorOut {
+		fmt.Fprintf(callBuf, `
+		reseters := make([]func(), 0, len(iterators))
+		iterators2 := make([]func() error, 0, len(iterators))
+		for len(iterators) > 0 {
+			iterators2 = iterators2[:0]
+			reseters = reseters[:0]
+			for _, it := range iterators {
+				if err = it.Iterate(); err != nil {
+					if err != io.EOF {
+						stream.Send(output)
+						return
+					}
+					reseters = append(reseters, it.Reset)
+					err = nil
+					continue
+				}
+				iterators2 = append(iterators2, it)
+			}
+			if len(iterators) != len(iterators2) {
+				iterators = append(iterators[:0], iterators2...)
+			}
+			if err = stream.Send(output); err != nil {
+				return
+			}
+			// reset the all arrays
+			for _, reset := range reseters {
+				reset()
+			}
+		}`)
 	}
 	fmt.Fprintf(callBuf, `
         return
@@ -481,12 +516,7 @@ func (arg Argument) getConvSimpleTable(
 	if arg.IsOutput() {
 		got := arg.goType(true)
 		if arg.Type == "REF CURSOR" {
-			convIn = append(convIn, fmt.Sprintf(`output.%s = make([]*%s, 0, %d)
-				%s = new(ora.Rset) // gcst4 %q`,
-				name, CamelCase(got), tableSize,
-				paramName, arg.goType(true)))
-			// FIXME(tgulacsi): convOut with for paramName.(*ora.Rset).Next(), stream.Send
-			return convIn, convOut
+			return arg.getConvRefCursor(convIn, convOut, name, paramName, tableSize)
 		}
 		if got == "*[]string" {
 			got = "[]string"
@@ -521,6 +551,50 @@ func (arg Argument) getConvSimpleTable(
 	} else {
 		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
 	}
+	return convIn, convOut
+}
+
+func (arg Argument) getConvRefCursor(
+	convIn, convOut []string,
+	name, paramName string,
+	tableSize int,
+) ([]string, []string) {
+	got := arg.goType(true)
+	GoT := CamelCase(got)
+	convIn = append(convIn, fmt.Sprintf(`output.%s = make([]%s, 0, %d)
+				%s = new(ora.Rset) // gcrf1 %q`,
+		name, GoT, tableSize,
+		paramName, got))
+	// FIXME(tgulacsi): convOut with for paramName.(*ora.Rset).Next(), stream.Send
+	convOut = append(convOut, fmt.Sprintf(`
+	{
+		rset := %s.(*ora.Rset)
+		iterators = append(iterators, iterator{
+			Reset: func() { output.%s = nil },
+			Iterate: func() error {
+		a := output.%s[:0]
+		var err error
+		for i := 0; i < %d; i++ {
+			if !rset.Next() {
+				if err = rset.Err; err == io.EOF {
+					err = nil
+				}
+				break
+			}
+			// FIXME(tgulacsi): generate struct adder from rset.Row ([]interface{})
+			a = append(a, rset.Row)
+		}
+		output.%s = a
+		return err
+		},
+		})
+	}`,
+		paramName,
+		name,
+		name,
+		tableSize,
+		name,
+	))
 	return convIn, convOut
 }
 
