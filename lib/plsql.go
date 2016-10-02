@@ -95,7 +95,7 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	qry := %s
 	stmt, err := ses.Prep(qry)
 	if err != nil {
-		err =errors.Wrap(err, qry)
+		err = errors.Wrap(err, qry)
 		return
 	}
 	if _, err = stmt.ExeP(params...); err != nil {
