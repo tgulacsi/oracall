@@ -98,7 +98,7 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 		err =errors.Wrap(err, qry)
 		return
 	}
-	if _, err =stmt.ExeP(params...); err != nil {
+	if _, err = stmt.ExeP(params...); err != nil {
 		err = errors.Wrapf(err, "%%s %%#v", qry, params)
 		return
 	}
@@ -110,16 +110,18 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	}
 	if hasCursorOut {
 		fmt.Fprintf(callBuf, `
+		if len(iterators) == 0 {
+			err = stream.Send(output)
+			return
+		}
 		reseters := make([]func(), 0, len(iterators))
 		iterators2 := make([]iterator, 0, len(iterators))
-		IteratorsLoop:
-		for len(iterators) > 0 {
-			iterators2 = iterators2[:0]
-			reseters = reseters[:0]
+		for {
 			for _, it := range iterators {
 				if err = it.Iterate(); err != nil {
 					if err != io.EOF {
-						break IteratorsLoop
+						_ = stream.Send(output)
+						return
 					}
 					reseters = append(reseters, it.Reset)
 					err = nil
@@ -127,19 +129,22 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 				}
 				iterators2 = append(iterators2, it)
 			}
-			if len(iterators) != len(iterators2) {
-				iterators = append(iterators[:0], iterators2...)
-			}
 			if err = stream.Send(output); err != nil {
 				return
+			}
+			if len(iterators) != len(iterators2) {
+				if len(iterators2) == 0 {
+					err = stream.Send(output)
+					return
+				}
+				iterators = append(iterators[:0], iterators2...)
 			}
 			// reset the all arrays
 			for _, reset := range reseters {
 				reset()
 			}
-		}
-		if sendErr := stream.Send(output); sendErr != nil && err == nil {
-			err = sendErr
+			iterators2 = iterators2[:0]
+			reseters = reseters[:0]
 		}
 		`)
 	}
@@ -588,8 +593,8 @@ func (arg Argument) getConvRefCursor(
 		var err error
 		for i := 0; i < %d; i++ {
 			if !rset.Next() {
-				if err = rset.Err; err == io.EOF {
-					err = nil
+				if err = rset.Err; err == nil {
+					err = io.EOF
 				}
 				break
 			}
