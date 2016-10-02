@@ -16,20 +16,30 @@ limitations under the License.
 
 package oracall
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
-type Arg struct {
+type PlsType struct {
 	ora string
 }
 
 // NewArg returns a new argument to ease arument conversions.
-func NewArg(ora string) Arg {
-	return Arg{ora: ora}
+func NewPlsType(ora string) PlsType {
+	return PlsType{ora: ora}
 }
 
 // FromOra retrieves the value of the argument with arg type, from src variable to dst variable.
-func (arg Arg) FromOra(dst, src string) string {
-	if !Gogo {
+func (arg PlsType) FromOra(dst, src, varName string) string {
+	if Gogo {
+		if varName != "" {
+			switch arg.ora {
+			case "DATE":
+				return fmt.Sprintf("%s.Set(%s)", dst, varName)
+			}
+		}
+	} else {
 		switch arg.ora {
 		case "DATE":
 			return fmt.Sprintf("%s = string(%s)", dst, src)
@@ -39,6 +49,22 @@ func (arg Arg) FromOra(dst, src string) string {
 }
 
 // ToOra adds the value of the argument with arg type, from src variable to dst variable.
-func (arg Arg) ToOra(dst, src string) string {
-	return fmt.Sprintf("%s = %s", dst, src)
+func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
+	if Gogo {
+		switch arg.ora {
+		case "DATE": // custom.Date
+			dstVar := mkVarName(dst)
+			return fmt.Sprintf("%s := %s.Get(); %s = &%s", dstVar, strings.TrimPrefix(src, "&"), dst, dstVar), dstVar
+		}
+	}
+	return fmt.Sprintf("%s = %s", dst, src), ""
+}
+
+func mkVarName(dst string) string {
+	return "var_" + strings.Map(func(r rune) rune {
+		if r == '[' || r == ']' {
+			return '_'
+		}
+		return r
+	}, dst)
 }

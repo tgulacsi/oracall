@@ -85,7 +85,7 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
-	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%s`, params) }"+`
+	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%v`, params) }"+`
 	ses, err := s.OraSesPool.Get()
 	if err != nil {
 		err = errors.Wrap(err, "Get")
@@ -98,7 +98,7 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 		return
 	}
     `, call[i:j], fun.getPlsqlConstName())
-	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %s`, params) }\n")
+	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %v`, params) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -106,14 +106,14 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 		fmt.Fprintf(callBuf, `
 		reseters := make([]func(), 0, len(iterators))
 		iterators2 := make([]iterator, 0, len(iterators))
+		IteratorsLoop:
 		for len(iterators) > 0 {
 			iterators2 = iterators2[:0]
 			reseters = reseters[:0]
 			for _, it := range iterators {
 				if err = it.Iterate(); err != nil {
 					if err != io.EOF {
-						stream.Send(output)
-						return
+						break IteratorsLoop
 					}
 					reseters = append(reseters, it.Reset)
 					err = nil
@@ -131,7 +131,11 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 			for _, reset := range reseters {
 				reset()
 			}
-		}`)
+		}
+		if sendErr := stream.Send(output); sendErr != nil && err == nil {
+			err = sendErr
+		}
+		`)
 	}
 	fmt.Fprintf(callBuf, `
         return
@@ -496,9 +500,15 @@ func (arg Argument) getConvSimple(
 		} else if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
 		}
-		convIn = append(convIn, fmt.Sprintf(`%s = &output.%s // gcs1`, paramName, name))
+		src := "output." + name
+		in, varName := arg.ToOra(paramName, "&"+src)
+		convIn = append(convIn, in)
+		if varName != "" {
+			convOut = append(convOut, arg.FromOra(src, paramName, varName))
+		}
 	} else {
-		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcs2", paramName, name))
+		in, _ := arg.ToOra(paramName, "input."+name)
+		convIn = append(convIn, in)
 	}
 	return convIn, convOut
 }
@@ -560,10 +570,11 @@ func (arg Argument) getConvRefCursor(
 				%s = new(ora.Rset) // gcrf1 %q`,
 		name, GoT, tableSize,
 		paramName, got))
-	// FIXME(tgulacsi): convOut with for paramName.(*ora.Rset).Next(), stream.Send
+
 	convOut = append(convOut, fmt.Sprintf(`
 	{
 		rset := %s.(*ora.Rset)
+		if rset.IsOpen() {
 		iterators = append(iterators, iterator{
 			Reset: func() { output.%s = nil },
 			Iterate: func() error {
@@ -582,6 +593,7 @@ func (arg Argument) getConvRefCursor(
 		return err
 		},
 		})
+		}
 	}`,
 		paramName,
 		name,
@@ -719,9 +731,10 @@ func (arg Argument) getConvTableRec(
 				name[0], name[0], absName,
 				absName,
 				name[0],
-				Arg{ora: arg.PlsType}.FromOra(
+				arg.FromOra(
 					fmt.Sprintf("output.%s[i].%s", name[0], name[1]),
 					"v",
+					"",
 				)))
 	}
 	return convIn, convOut

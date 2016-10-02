@@ -79,16 +79,17 @@ type Argument struct {
 	Flavor uint8
 	//Level                   uint8
 	//Position                uint8
-	Direction               uint8
-	Type, PlsType, TypeName string
-	AbsType                 string
-	Precision               uint8
-	Scale                   uint8
-	Charset                 string
-	Charlength              uint
-	TableOf                 *Argument       // this argument is a table (array) of this type
-	RecordOf                []NamedArgument //this argument is a record (map) of this type
-	goTypeName              string
+	Direction      uint8
+	Type, TypeName string
+	AbsType        string
+	Precision      uint8
+	Scale          uint8
+	Charset        string
+	Charlength     uint
+	TableOf        *Argument       // this argument is a table (array) of this type
+	RecordOf       []NamedArgument //this argument is a record (map) of this type
+	goTypeName     string
+	PlsType
 }
 type NamedArgument struct {
 	Name string
@@ -147,7 +148,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 		dir = DIR_IN
 	}
 
-	arg := Argument{Name: name, Type: dataType, PlsType: plsType,
+	arg := Argument{Name: name, Type: dataType, PlsType: NewPlsType(plsType),
 		TypeName: typeName, Direction: dir,
 		Precision: precision, Scale: scale, Charlength: charlength,
 		Charset: charset}

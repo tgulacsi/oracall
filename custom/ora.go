@@ -26,7 +26,7 @@ func (d *Date) Set(date ora.Date) {
 	*d = Date(date.Get().Format(timeFormat))
 }
 func (d Date) Get() ora.Date {
-	t, err := time.Parse(timeFormat, string(d)) // TODO(tgulacsi): more robust parser
+	t, err := time.Parse(timeFormat[:len(d)], string(d)) // TODO(tgulacsi): more robust parser
 	var od ora.Date
 	if err == nil {
 		od.Set(t)
