@@ -93,10 +93,16 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	}
 	defer s.OraSesPool.Put(ses)
 	qry := %s
-    if _, err = ses.PrepAndExeP(qry, params...); err != nil {
+	stmt, err := ses.Prep(qry)
+	if err != nil {
+		err =errors.Wrap(err, qry)
+		return
+	}
+	if _, err =stmt.ExeP(params...); err != nil {
 		err = errors.Wrapf(err, "%%s %%#v", qry, params)
 		return
 	}
+	defer stmt.Close()
     `, call[i:j], fun.getPlsqlConstName())
 	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %v`, params) }\n")
 	for _, line := range convOut {
