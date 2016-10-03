@@ -433,7 +433,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 	typName = capitalize(typName)
 
 	if arg.Flavor == FLAVOR_TABLE {
-		Log("msg", "TABLE", "arg", arg, "tableOf", arg.TableOf)
+		//Log("msg", "TABLE", "arg", arg, "tableOf", arg.TableOf)
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
 		tn := "[]" + targ.goType(true)
