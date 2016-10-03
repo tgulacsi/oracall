@@ -48,6 +48,19 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	return fmt.Sprintf("%s = %s", dst, src)
 }
 
+func (arg PlsType) GetOra(src, varName string) string {
+	if Gogo {
+		if varName != "" {
+			switch arg.ora {
+			case "DATE":
+				return fmt.Sprintf("NewDate(%s)", varName)
+			}
+		}
+		return fmt.Sprintf("custom.AsDate(%s)", src)
+	}
+	return src
+}
+
 // ToOra adds the value of the argument with arg type, from src variable to dst variable.
 func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 	if Gogo {
@@ -57,7 +70,19 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 			return fmt.Sprintf("%s := %s.Get(); %s = &%s", dstVar, strings.TrimPrefix(src, "&"), dst, dstVar), dstVar
 		}
 	}
-	return fmt.Sprintf("%s = %s", dst, src), ""
+	switch arg.ora {
+	case "PLS_INTEGER":
+		if src[0] != '&' {
+			dstVar := mkVarName(dst)
+			return fmt.Sprintf("%s := ora.Int32{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+		}
+	case "NUMBER":
+		if src[0] != '&' {
+			dstVar := mkVarName(dst)
+			return fmt.Sprintf("%s := ora.Float64{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+		}
+	}
+	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora), ""
 }
 
 func mkVarName(dst string) string {

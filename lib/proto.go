@@ -64,7 +64,7 @@ FunLoop:
 			return err
 		}
 		var streamQual string
-		if fun.ReturnsCursor() {
+		if fun.HasCursorOut() {
 			streamQual = "stream "
 		}
 		name := CamelCase(dot2D.Replace(fName))
@@ -85,15 +85,6 @@ FunLoop:
 	w.Write([]byte("}"))
 
 	return nil
-}
-
-func (f Function) ReturnsCursor() bool {
-	for _, arg := range f.Args {
-		if arg.Direction&DIR_OUT != 0 && arg.Type == "REF CURSOR" {
-			return true
-		}
-	}
-	return false
 }
 
 func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}) error {

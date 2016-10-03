@@ -57,6 +57,10 @@ func (f Function) String() string {
 }
 
 func (f Function) HasCursorOut() bool {
+	if f.Returns != nil &&
+		f.Returns.IsOutput() && f.Returns.Type == "REF CURSOR" {
+		return true
+	}
 	for _, arg := range f.Args {
 		if arg.IsOutput() && arg.Type == "REF CURSOR" {
 			return true

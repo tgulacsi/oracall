@@ -626,7 +626,13 @@ func (arg Argument) getFromRset(rsetRow string) string {
 	}
 	fmt.Fprintf(buf, "%s{\n", GoT)
 	for i, a := range arg.TableOf.RecordOf {
-		fmt.Fprintf(buf, "\t%s: %s[%d].(%s),\n", CamelCase(a.Name), rsetRow, i, a.Argument.goType(true))
+		got := a.Argument.goType(true)
+		if strings.Contains(got, ".") {
+			fmt.Fprintf(buf, "\t%s: %s,\n", CamelCase(a.Name),
+				a.GetOra(fmt.Sprintf("%s[%d]", rsetRow, i), ""))
+		} else {
+			fmt.Fprintf(buf, "\t%s: custom.As%s(%s[%d]),\n", CamelCase(a.Name), CamelCase(got), rsetRow, i)
+		}
 	}
 	fmt.Fprintf(buf, "}")
 	return buf.String()
