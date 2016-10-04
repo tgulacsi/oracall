@@ -282,7 +282,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
-			decls = append(decls, vn+" "+arg.TypeName+"; --E:"+arg.Name)
+			decls = append(decls, vn+" "+arg.TypeName+"; --E="+arg.Name)
 			callArgs[arg.Name] = vn
 			aname := (CamelCase(arg.Name))
 			//aname := capitalize(replHidden(arg.Name))
@@ -302,6 +302,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 			}
 			for _, a := range arg.RecordOf {
+				a := a
 				k, v := a.Name, a.Argument
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				kName := (CamelCase(k))
@@ -335,11 +336,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					if arg.IsInput() {
 						setvar = " := :" + arg.Name
 					}
-					decls = append(decls, arg.Name+" "+typ+setvar+"; --A:"+arg.Name)
+					decls = append(decls, arg.Name+" "+typ+setvar+"; --A="+arg.Name)
 
 					vn = getInnerVarName(fun.Name(), arg.Name)
 					callArgs[arg.Name] = vn
-					decls = append(decls, vn+" "+arg.TypeName+"; --B:"+arg.Name)
+					decls = append(decls, vn+" "+arg.TypeName+"; --B="+arg.Name)
 					if arg.IsInput() {
 						pre = append(pre,
 							vn+".DELETE;",
@@ -367,16 +368,20 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
 					callArgs[arg.Name] = vn
-					decls = append(decls, vn+" "+arg.TypeName+"; --C:"+arg.Name)
+					decls = append(decls, vn+" "+arg.TypeName+"; --C="+arg.Name)
 
 					aname := (CamelCase(arg.Name))
 					//aname := capitalize(replHidden(arg.Name))
 					if arg.IsOutput() {
 						convOut = append(convOut, fmt.Sprintf(`
-                    if output.%s == nil { // %s
-                        output.%s = make([]%s, 0, %d)
-                    }`, aname, arg.TableOf.goType(true),
-							aname, CamelCase(arg.TableOf.goType(true)), MaxTableSize))
+					if m := %d - cap(output.%s); m > 0 { // %s
+						output.%s = append(output.%s[:cap(output.%s)], make([]%s, m)...)
+                    }
+					output.%s = output.%s[:%d]
+					`,
+							MaxTableSize, aname, arg.TableOf.goType(true),
+							aname, aname, aname, CamelCase(arg.TableOf.goType(true)),
+							aname, aname, MaxTableSize))
 					}
 					if !arg.IsInput() {
 						pre = append(pre, vn+".DELETE;")
@@ -384,9 +389,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 					// declarations go first
 					for _, a := range arg.TableOf.RecordOf {
+						a := a
 						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
-						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D:"+arg.Name)
+						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D="+arg.Name)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
 						if arg.IsInput() {
@@ -399,6 +405,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					// here comes the loops
 					var idxvar string
 					for _, a := range arg.TableOf.RecordOf {
+						a := a
 						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
 
@@ -447,6 +454,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							"  i1 := "+vn+".NEXT(i1); i2 := i2 + 1;",
 							"END LOOP;")
 						for _, a := range arg.TableOf.RecordOf {
+							a := a
 							k := a.Name
 							tmp = getParamName(fun.Name(), vn+"."+k)
 							post = append(post, ":"+tmp+" := "+tmp+";")
@@ -463,7 +471,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		}
 	}
 
-	callb := bytes.NewBuffer(nil)
+	callb := buffers.Get()
+	defer buffers.Put(callb)
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
 	}
@@ -626,6 +635,7 @@ func (arg Argument) getFromRset(rsetRow string) string {
 	}
 	fmt.Fprintf(buf, "%s{\n", GoT)
 	for i, a := range arg.TableOf.RecordOf {
+		a := a
 		got := a.Argument.goType(true)
 		if strings.Contains(got, ".") {
 			fmt.Fprintf(buf, "\t%s: %s,\n", CamelCase(a.Name),
@@ -713,23 +723,25 @@ func (arg Argument) getConvTableRec(
 	absName := "x__" + name[0] + "__" + name[1]
 	typ := arg.goType(true)
 	if arg.IsInput() {
+		amp := "&"
 		if !arg.IsOutput() {
 			lengthS = "len(input." + name[0] + ")"
+			amp = ""
 		}
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)
 			for i,v := range input.%s { %s[i] = %s(v.%s); } // gctr1
-			%s = %s`,
+			%s = %s%s`,
 			absName,
 			typ, lengthS, tableSize,
 			name[0], absName, typ, name[1],
-			paramName, absName))
+			paramName, amp, absName))
 	}
 	if arg.IsOutput() {
 		if !arg.IsInput() {
 			convIn = append(convIn,
 				fmt.Sprintf(`%s := make([]%s, %s, %d)
-			%s = %s // gctr2`,
+			%s = &%s // gctr2`,
 					absName, typ, lengthS, tableSize,
 					paramName, absName))
 		}
@@ -739,15 +751,17 @@ func (arg Argument) getConvTableRec(
 		}
 		output.%s = output.%s[:len(%s)]
 		for i, v := range %s {
-			if output.%s[i] != nil {
-				%s
+			if output.%s[i] == nil {
+				output.%s[i] = new(%s)
 			}
+			%s
 		}`,
 				absName, name[0],
 				name[0], name[0], CamelCase(parent.goType(true)),
 				name[0], name[0], absName,
 				absName,
 				name[0],
+				name[0], CamelCase(parent.goType(true)[1:]),
 				arg.FromOra(
 					fmt.Sprintf("output.%s[i].%s", name[0], name[1]),
 					"v",
