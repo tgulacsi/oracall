@@ -50,13 +50,13 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 
 func (arg PlsType) GetOra(src, varName string) string {
 	if Gogo {
-		if varName != "" {
-			switch arg.ora {
-			case "DATE":
-				return fmt.Sprintf("NewDate(%s)", varName)
+		switch arg.ora {
+		case "DATE":
+			if varName != "" {
+				return fmt.Sprintf("custom.NewDate(%s)", varName)
 			}
+			return fmt.Sprintf("custom.AsDate(%s)", src)
 		}
-		return fmt.Sprintf("custom.AsDate(%s)", src)
 	}
 	return src
 }
@@ -67,21 +67,32 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 		switch arg.ora {
 		case "DATE": // custom.Date
 			dstVar := mkVarName(dst)
-			return fmt.Sprintf("%s := %s.Get(); %s = &%s", dstVar, strings.TrimPrefix(src, "&"), dst, dstVar), dstVar
+			var pointer string
+			if src[0] == '&' {
+				pointer = "&"
+			}
+			return fmt.Sprintf(`%s := %s.Get()
+			%s = %s%s`,
+					dstVar, strings.TrimPrefix(src, "&"),
+					dst, pointer, dstVar,
+				),
+				dstVar
 		}
 	}
-	switch arg.ora {
-	case "PLS_INTEGER":
-		if src[0] != '&' {
-			dstVar := mkVarName(dst)
-			return fmt.Sprintf("%s := ora.Int32{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+	/*
+		switch arg.ora {
+		case "PLS_INTEGER":
+			if src[0] != '&' {
+				dstVar := mkVarName(dst)
+				return fmt.Sprintf("%s := ora.Int32{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+			}
+				case "NUMBER":
+					if src[0] != '&' {
+						dstVar := mkVarName(dst)
+						return fmt.Sprintf("%s := ora.Float64{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+					}
 		}
-	case "NUMBER":
-		if src[0] != '&' {
-			dstVar := mkVarName(dst)
-			return fmt.Sprintf("%s := ora.Float64{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
-		}
-	}
+	*/
 	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora), ""
 }
 

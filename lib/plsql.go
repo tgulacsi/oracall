@@ -572,8 +572,12 @@ func (arg Argument) getConvSimpleTable(
 				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
 			}
 		}
+		in, varName := arg.ToOra(strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1), "output."+name)
+		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
 		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
 	} else {
+		in, varName := arg.ToOra(strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1), "output."+name)
+		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
 		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
 	}
 	return convIn, convOut
@@ -722,19 +726,26 @@ func (arg Argument) getConvTableRec(
 	lengthS := "0"
 	absName := "x__" + name[0] + "__" + name[1]
 	typ := arg.goType(true)
+	oraTyp := typ
+	if oraTyp == "custom.Date" {
+		oraTyp = "ora.Date"
+	}
 	if arg.IsInput() {
 		amp := "&"
 		if !arg.IsOutput() {
 			lengthS = "len(input." + name[0] + ")"
 			amp = ""
 		}
+		too, _ := arg.ToOra(absName+"[i]", "v."+name[1])
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)
-			for i,v := range input.%s { %s[i] = %s(v.%s); } // gctr1
+			for i,v := range input.%s {
+				%s
+			} // gctr1
 			%s = %s%s`,
 			absName,
-			typ, lengthS, tableSize,
-			name[0], absName, typ, name[1],
+			oraTyp, lengthS, tableSize,
+			name[0], too,
 			paramName, amp, absName))
 	}
 	if arg.IsOutput() {
@@ -742,7 +753,7 @@ func (arg Argument) getConvTableRec(
 			convIn = append(convIn,
 				fmt.Sprintf(`%s := make([]%s, %s, %d)
 			%s = &%s // gctr2`,
-					absName, typ, lengthS, tableSize,
+					absName, oraTyp, lengthS, tableSize,
 					paramName, absName))
 		}
 		convOut = append(convOut,
@@ -765,7 +776,7 @@ func (arg Argument) getConvTableRec(
 				arg.FromOra(
 					fmt.Sprintf("output.%s[i].%s", name[0], name[1]),
 					"v",
-					"",
+					"v",
 				)))
 	}
 	return convIn, convOut
