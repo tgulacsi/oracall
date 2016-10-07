@@ -269,21 +269,25 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	callArgs := make(map[string]string, 16)
 
 	getTableType := func(absType string) string {
-		typ, ok := tableTypes[absType]
-		if !ok {
-			typ = strings.Map(func(c rune) rune {
-				switch c {
-				case '(', ',':
-					return '_'
-				case ' ', ')':
-					return -1
-				default:
-					return c
-				}
-			}, absType) + "_tab_typ"
-			decls = append(decls, "TYPE "+typ+" IS TABLE OF "+absType+" INDEX BY BINARY_INTEGER;")
-			tableTypes[absType] = typ
+		if strings.HasPrefix(absType, "CHAR") {
+			absType = "VARCHAR2" + absType[4:]
 		}
+		typ, ok := tableTypes[absType]
+		if ok {
+			return typ
+		}
+		typ = strings.Map(func(c rune) rune {
+			switch c {
+			case '(', ',':
+				return '_'
+			case ' ', ')':
+				return -1
+			default:
+				return c
+			}
+		}, absType) + "_tab_typ"
+		decls = append(decls, "TYPE "+typ+" IS TABLE OF "+absType+" INDEX BY BINARY_INTEGER;")
+		tableTypes[absType] = typ
 		return typ
 	}
 	//fStructIn, fStructOut := fun.getStructName(false), fun.getStructName(true)

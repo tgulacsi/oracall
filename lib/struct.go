@@ -137,12 +137,6 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	if typeName != "" && typeName[len(typeName)-1] == '@' {
 		typeName = typeName[:len(typeName)-1]
 	}
-	if typeName == "CHAR" {
-		typeName = "VARCHAR2"
-	}
-	if plsType == "CHAR" {
-		plsType = "VARCHAR2"
-	}
 
 	if dirName != "" {
 		switch dirName {
