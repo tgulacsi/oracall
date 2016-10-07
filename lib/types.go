@@ -17,6 +17,7 @@ limitations under the License.
 package oracall
 
 import (
+	"encoding/hex"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -76,7 +77,6 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 			if src[0] == '&' {
 				pointer = "&"
 			}
-			Log("dstVar", dstVar)
 			return fmt.Sprintf(`%s := %s.Get() // toOra D
 			%s = %s%s`,
 					dstVar, strings.TrimPrefix(src, "&"),
@@ -101,5 +101,8 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 func mkVarName(dst string) string {
 	h := fnv.New64()
 	io.WriteString(h, dst)
-	return fmt.Sprintf("var_%d", h.Sum64())
+	var raw [8]byte
+	var enc [8 * 2]byte
+	hex.Encode(enc[:], h.Sum(raw[:0]))
+	return fmt.Sprintf("var_%s", enc[:])
 }
