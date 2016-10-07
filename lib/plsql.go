@@ -727,8 +727,13 @@ func (arg Argument) getConvTableRec(
 	absName := "x__" + name[0] + "__" + name[1]
 	typ := arg.goType(true)
 	oraTyp := typ
-	if oraTyp == "custom.Date" {
+	switch oraTyp {
+	case "custom.Date":
 		oraTyp = "ora.Date"
+	case "float64":
+		oraTyp = "ora.Float64"
+	case "int32":
+		oraTyp = "ora.Int32"
 	}
 	if arg.IsInput() {
 		amp := "&"
@@ -765,7 +770,7 @@ func (arg Argument) getConvTableRec(
 			if output.%s[i] == nil {
 				output.%s[i] = new(%s)
 			}
-			%s
+			%s // gctr3
 		}`,
 				absName, name[0],
 				name[0], name[0], CamelCase(parent.goType(true)),

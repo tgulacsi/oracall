@@ -39,13 +39,16 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 				return fmt.Sprintf("%s.Set(%s)", dst, varName)
 			}
 		}
-	} else {
-		switch arg.ora {
-		case "DATE":
-			return fmt.Sprintf("%s = string(%s)", dst, src)
-		}
 	}
-	return fmt.Sprintf("%s = %s", dst, src)
+	switch arg.ora {
+	case "DATE":
+		return fmt.Sprintf("%s = string(%s)", dst, src)
+	case "PLS_INTEGER":
+		return fmt.Sprintf("%s = %s.Value", dst, src)
+	case "NUMBER":
+		return fmt.Sprintf("%s = %s.Value", dst, src)
+	}
+	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora)
 }
 
 func (arg PlsType) GetOra(src, varName string) string {
@@ -79,20 +82,18 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 				dstVar
 		}
 	}
-	/*
-		switch arg.ora {
-		case "PLS_INTEGER":
-			if src[0] != '&' {
-				dstVar := mkVarName(dst)
-				return fmt.Sprintf("%s := ora.Int32{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
-			}
-				case "NUMBER":
-					if src[0] != '&' {
-						dstVar := mkVarName(dst)
-						return fmt.Sprintf("%s := ora.Float64{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
-					}
+	switch arg.ora {
+	case "PLS_INTEGER":
+		if src[0] != '&' {
+			dstVar := mkVarName(dst)
+			return fmt.Sprintf("%s := ora.Int32{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}
-	*/
+	case "NUMBER":
+		if src[0] != '&' {
+			dstVar := mkVarName(dst)
+			return fmt.Sprintf("%s := ora.Float64{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+		}
+	}
 	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora), ""
 }
 
