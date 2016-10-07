@@ -322,6 +322,18 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 		case FLAVOR_RECORD:
 			vn = getInnerVarName(fun.Name(), arg.Name)
+			if arg.TypeName == "" {
+				arg.TypeName = mkRecTypName(arg.Name)
+				decls = append(decls, "TYPE "+arg.TypeName+" IS RECORD (")
+				for i, sub := range arg.RecordOf {
+					var comma string
+					if i != 0 {
+						comma = ","
+					}
+					decls = append(decls, "  "+comma+sub.Name+" "+sub.AbsType)
+				}
+				decls = append(decls, ");")
+			}
 			decls = append(decls, vn+" "+arg.TypeName+"; --E="+arg.Name)
 			callArgs[arg.Name] = vn
 			aname := (CamelCase(arg.Name))

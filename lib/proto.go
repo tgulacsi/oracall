@@ -160,6 +160,9 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		if strings.HasPrefix(got, "*") {
 			got = got[1:]
 		}
+		if got == "" {
+			got = mkRecTypName(arg.Name)
+		}
 		typ, pOpts := protoType(got)
 		var optS string
 		if s := pOpts.String(); s != "" {
@@ -287,3 +290,4 @@ func CopyStruct(dest interface{}, src interface{}) error {
 	}
 	return nil
 }
+func mkRecTypName(name string) string { return strings.ToLower(name) + "_rek_typ" }

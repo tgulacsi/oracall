@@ -28,6 +28,8 @@ type PlsType struct {
 	ora string
 }
 
+func (arg PlsType) String() string { return arg.ora }
+
 // NewArg returns a new argument to ease arument conversions.
 func NewPlsType(ora string) PlsType {
 	return PlsType{ora: ora}

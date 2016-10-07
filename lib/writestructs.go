@@ -209,6 +209,9 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 		//aName = capitalize(goName(arg.Name))
 		aName = capitalize(replHidden(arg.Name))
 		got = arg.goType(arg.Flavor == FLAVOR_TABLE)
+		if got == "" || got == "*" {
+			got = got + mkRecTypName(arg.Name)
+		}
 		lName := strings.ToLower(arg.Name)
 		io.WriteString(w, "\t"+aName+" "+got+
 			"\t`json:\""+lName+"\""+
@@ -234,7 +237,7 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 
 	var b []byte
 	if b, err = format.Source(buf.Bytes()); err != nil {
-		return fmt.Errorf("error saving struct %q: %s\n%s", structName, err, buf.String())
+		return errors.Wrapf(err, "save struct %q (%s)", structName, buf.String())
 	}
 	dst.Write(b)
 
@@ -248,7 +251,7 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 			return err
 		}
 		if b, err = format.Source(buf.Bytes()); err != nil {
-			return fmt.Errorf("error writing check of %s: %s\n%s", structName, err, buf.String())
+			return errors.Wrapf(err, "write check of %s (%s)", structName, buf.String())
 		}
 		if _, err = dst.Write(b); err != nil {
 			return err
@@ -451,7 +454,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 	}
 
 	// FLAVOR_RECORD
-	if arg.TypeName == "" {
+	if false && arg.TypeName == "" {
 		Log("msg", "arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
