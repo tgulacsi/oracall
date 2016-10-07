@@ -30,6 +30,7 @@ import (
 
 // MaxTableSize is the maximum size of the array arguments
 const MaxTableSize = 1000
+const batchSize = 128
 
 //
 // OracleArgument
@@ -100,8 +101,13 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 		return
 	}
 	if _, err = stmt.ExeP(params...); err != nil {
-		err = errors.Wrapf(err, "%%s %%#v", qry, params)
-		return
+		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
+			// "existing state of packages has been discarded"
+			_, err= stmt.ExeP(params...)
+		}
+		if err = errors.Wrapf(err, "%%s %%#v", qry, params); err != nil {
+			return
+		}
 	}
 	defer stmt.Close()
     `, call[i:j], fun.getPlsqlConstName())
@@ -675,7 +681,7 @@ func (arg Argument) getConvRefCursor(
 		paramName,
 		name,
 		name,
-		tableSize,
+		batchSize,
 		arg.getFromRset("rset.Row"),
 		name,
 	))
