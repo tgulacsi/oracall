@@ -18,6 +18,8 @@ package oracall
 
 import (
 	"fmt"
+	"hash/fnv"
+	"io"
 	"strings"
 )
 
@@ -66,15 +68,16 @@ func (arg PlsType) GetOra(src, varName string) string {
 
 // ToOra adds the value of the argument with arg type, from src variable to dst variable.
 func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
+	dstVar := mkVarName(dst)
 	if Gogo {
 		switch arg.ora {
 		case "DATE": // custom.Date
-			dstVar := mkVarName(dst)
 			var pointer string
 			if src[0] == '&' {
 				pointer = "&"
 			}
-			return fmt.Sprintf(`%s := %s.Get()
+			Log("dstVar", dstVar)
+			return fmt.Sprintf(`%s := %s.Get() // toOra D
 			%s = %s%s`,
 					dstVar, strings.TrimPrefix(src, "&"),
 					dst, pointer, dstVar,
@@ -85,12 +88,10 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 	switch arg.ora {
 	case "PLS_INTEGER":
 		if src[0] != '&' {
-			dstVar := mkVarName(dst)
 			return fmt.Sprintf("%s := ora.Int32{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}
 	case "NUMBER":
 		if src[0] != '&' {
-			dstVar := mkVarName(dst)
 			return fmt.Sprintf("%s := ora.Float64{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}
 	}
@@ -98,10 +99,7 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 }
 
 func mkVarName(dst string) string {
-	return "var_" + strings.Map(func(r rune) rune {
-		if r == '[' || r == ']' {
-			return '_'
-		}
-		return r
-	}, dst)
+	h := fnv.New64()
+	io.WriteString(h, dst)
+	return fmt.Sprintf("var_%d", h.Sum64())
 }

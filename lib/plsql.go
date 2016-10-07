@@ -334,7 +334,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					`, aname, CamelCase(arg.goType(false)[1:]),
 						aname, aname, aname))
 				} else {
-					convOut = append(convOut, fmt.Sprintf(`
+					// yes, convIn - getConvRec uses this!
+					convIn = append(convIn, fmt.Sprintf(`
                     if output.%s == nil {
                         output.%s = new(%s)
                     }`, aname,
@@ -743,14 +744,17 @@ func (arg Argument) getConvRec(
 	key string,
 ) ([]string, []string) {
 
-	if arg.IsInput() {
+	if arg.IsOutput() {
+		too, varName := arg.ToOra(paramName, "&output."+name)
+		convIn = append(convIn, too+" // gcr2 var="+varName)
+		if varName != "" {
+			convOut = append(convOut, arg.FromOra("output."+name, varName, varName))
+		}
+	} else if arg.IsInput() {
 		parts := strings.Split(name, ".")
 		convIn = append(convIn,
-			fmt.Sprintf("if input.%s != nil { %s = input.%s } // gcr1", parts[0], paramName, name))
-	}
-	if arg.IsOutput() {
-		convIn = append(convIn,
-			fmt.Sprintf("%s = output.%s // gcr2", paramName, name))
+			fmt.Sprintf(`if input.%s != nil { %s = input.%s; } // gcr1`,
+				parts[0], paramName, name))
 	}
 	return convIn, convOut
 }
