@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -184,21 +185,28 @@ func demap(plsql, callFun string) (string, string) {
 	paramsMap := make(map[string][]int, 16)
 
 	var i int
-	//old := plsql
+	first := make(map[string]int, len(paramsMap))
 	plsql, paramsArr := orahlp.MapToSlice(
 		plsql,
 		func(key string) interface{} {
 			paramsMap[key] = append(paramsMap[key], i)
+			if _, ok := first[key]; !ok {
+				first[key] = i
+			}
 			i++
 			return key
 		})
-	//Log("msg","MapToSlice", "old", old, "new", plsql, "params", paramsMap, "arr", paramsArr)
+	if strings.Contains(plsql, "DB_web_otthon.otthon_dij") {
+		fmt.Fprintln(os.Stderr, callFun)
+		Log("msg", "MapToSlice", "params", paramsMap, "arr", paramsArr)
+	}
 
 	opts := repl{
 		ParamsArrLen: len(paramsArr),
 	}
-	var callBuf bytes.Buffer
-	//fmt.Fprintln(os.Stderr, callFun)
+	callBuf := buffers.Get()
+	defer buffers.Put(callBuf)
+	var lastIdx int
 	tpl, err := template.New("callFun").
 		Funcs(
 			map[string]interface{}{
@@ -214,6 +222,7 @@ func demap(plsql, callFun string) (string, string) {
 					if len(arr) > 1 {
 						paramsMap[key] = arr[1:]
 					}
+					lastIdx = i
 					return i
 				},
 			}).
@@ -222,9 +231,36 @@ func demap(plsql, callFun string) (string, string) {
 		fmt.Fprintf(os.Stderr, callFun)
 		panic(err)
 	}
-	if err := tpl.Execute(&callBuf, opts); err != nil {
+	if err := tpl.Execute(callBuf, opts); err != nil {
 		panic(err)
 	}
+	plusIdxs := make([]idxRemap, 0, len(paramsMap))
+	for k, vv := range paramsMap {
+		for _, v := range vv {
+			if i := first[k]; i != v {
+				plusIdxs = append(plusIdxs, idxRemap{Name: k, New: v, Old: i})
+			}
+		}
+	}
+	if len(plusIdxs) == 0 {
+		return plsql, callBuf.String()
+	}
+
+	sort.Sort(byNewRemap(plusIdxs))
+	plus := buffers.Get()
+	defer buffers.Put(plus)
+
+	b := callBuf.Bytes()
+	i = bytes.LastIndex(b, []byte(fmt.Sprintf("params[%d] =", lastIdx)))
+	j := bytes.IndexByte(b[i:], '\n')
+	j += i + 1
+	rest := string(b[j:])
+	callBuf.Truncate(j)
+
+	for _, v := range plusIdxs {
+		fmt.Fprintf(callBuf, "params[%d] = params[%d] // %s\n", v.New, v.Old, v.Name)
+	}
+	callBuf.WriteString(rest)
 	return plsql, callBuf.String()
 }
 
@@ -816,3 +852,16 @@ func getInnerVarName(funName, varName string) string {
 func getParamName(funName, paramName string) string {
 	return getVarName(funName, paramName, "p")
 }
+
+type idxRemap struct {
+	Name     string
+	New, Old int
+}
+
+var _ = sort.Interface(byNewRemap(nil))
+
+type byNewRemap []idxRemap
+
+func (s byNewRemap) Len() int           { return len(s) }
+func (s byNewRemap) Less(i, j int) bool { return s[i].Old < s[j].Old }
+func (s byNewRemap) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
