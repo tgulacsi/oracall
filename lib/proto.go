@@ -147,9 +147,6 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		aName := arg.Name
 		got := arg.goType(false)
-		if arg.Type == "REF CURSOR" {
-			Log("msg", "CUR", "got", got, "rule", rule, "arg", arg)
-		}
 		if strings.HasPrefix(got, "*") {
 			got = got[1:]
 		}
@@ -189,7 +186,6 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 					subArgs = append(subArgs, v.Argument)
 				}
 			}
-			Log("subArgs", subArgs)
 			if err := protoWriteMessageTyp(buf, typ, seen, subArgs...); err != nil {
 				Log("msg", "protoWriteMessageTyp", "error", err)
 				return err
