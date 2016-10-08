@@ -29,7 +29,7 @@ import (
 )
 
 // MaxTableSize is the maximum size of the array arguments
-const MaxTableSize = 1000
+const MaxTableSize = 512
 const batchSize = 128
 
 //
