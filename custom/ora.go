@@ -26,7 +26,11 @@ type Date string
 const timeFormat = "2006-01-02 15:04:05 -0700"
 
 func NewDate(date ora.Date) Date {
-	return Date(date.Get().Format(timeFormat))
+	t := date.Get()
+	if t.IsZero() {
+		return Date("")
+	}
+	return Date(t.Format(timeFormat))
 }
 func (d *Date) Set(date ora.Date) {
 	if date.IsNull() {
@@ -34,14 +38,16 @@ func (d *Date) Set(date ora.Date) {
 	}
 	*d = NewDate(date)
 }
-func (d Date) Get() ora.Date {
+func (d Date) Get() (od ora.Date) {
+	if d == "" {
+		return
+	}
 	t, err := time.Parse(timeFormat[:len(d)], string(d)) // TODO(tgulacsi): more robust parser
-	var od ora.Date
 	if err != nil || t.IsZero() {
-		return od
+		return
 	}
 	od.Set(t)
-	return od
+	return
 }
 
 type Lob struct {
