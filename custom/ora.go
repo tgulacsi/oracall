@@ -29,14 +29,18 @@ func NewDate(date ora.Date) Date {
 	return Date(date.Get().Format(timeFormat))
 }
 func (d *Date) Set(date ora.Date) {
+	if date.IsNull() {
+		*d = Date("")
+	}
 	*d = NewDate(date)
 }
 func (d Date) Get() ora.Date {
 	t, err := time.Parse(timeFormat[:len(d)], string(d)) // TODO(tgulacsi): more robust parser
 	var od ora.Date
-	if err == nil {
-		od.Set(t)
+	if err != nil || t.IsZero() {
+		return od
 	}
+	od.Set(t)
 	return od
 }
 

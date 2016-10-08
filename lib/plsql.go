@@ -202,10 +202,6 @@ func demap(plsql, callFun string) (string, string) {
 			i++
 			return key
 		})
-	if strings.Contains(plsql, "DB_web_otthon.otthon_dij") {
-		fmt.Fprintln(os.Stderr, callFun)
-		Log("msg", "MapToSlice", "params", paramsMap, "arr", paramsArr)
-	}
 
 	opts := repl{
 		ParamsArrLen: len(paramsArr),
