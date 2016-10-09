@@ -796,9 +796,9 @@ func (arg Argument) getConvTableRec(
 	if arg.IsInput() {
 		amp := "&"
 		if !arg.IsOutput() {
-			lengthS = "len(input." + name[0] + ")"
 			amp = ""
 		}
+		lengthS = "len(input." + name[0] + ")"
 		too, _ := arg.ToOra(absName+"[i]", "v."+name[1])
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)
