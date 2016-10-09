@@ -766,9 +766,12 @@ func (arg Argument) getConvRec(
 		}
 	} else if arg.IsInput() {
 		parts := strings.Split(name, ".")
+		too, _ := arg.ToOra(paramName, "input."+name)
 		convIn = append(convIn,
-			fmt.Sprintf(`if input.%s != nil { %s = input.%s; } // gcr1`,
-				parts[0], paramName, name))
+			fmt.Sprintf(`if input.%s != nil {
+				%s
+			} // gcr1`,
+				parts[0], too))
 	}
 	return convIn, convOut
 }
