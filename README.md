@@ -1,6 +1,37 @@
 # OraCall
-OraCall is a package for calling Oracle stored procedures through OCI.
+OraCall is a package for calling Oracle stored procedures with [gRPC](grpc.io).
 As OCI does not allow using PL/SQL record types, this causes some difficulty.
+
+# Getting Started
+## Prerequisities
+Of course you'll need a working Oracle environment. For instructions, see
+[ora](https://github.com/rana/ora/blob/master/README.md).
+
+As OraCall uses [gRPC](grpc.io) for the interface, you'll need `protoc`, the
+[Protocol Buffers](https://developers.google.com/protocol-buffers/)
+[code generator](https://github.com/google/protobuf/releases) and a Go code generator,
+such as [protoc-gen-gofast](https://github.com/gogo/protobuf/tree/master/protoc-gen-gofast).
+But these two is downloaded by `go generate`.
+
+## Installing
+
+	go get github.com/tgulacsi/oracall
+	go generate github.com/tgulacsi/oracall  # this will download protoc and protoc-gen-gofast
+
+Then you can use it:
+
+	oracall -pattern 'MY_PKG.%' -package main -out my_pkg_functions.go -proto my_pkg.proto 'user/passw@sid'
+
+This will generate
+  * `my_pkg_functions.go` with the calling machinery,
+  * `my_pkg.proto` with the Protocol Buffers messages and RPC service definitions,
+  * and call `protoco-gen-gofast` with `my_pkg.proto`, which will generate
+    `my_pkg.pb.go` with the Protocol Buffers (un)marshal code.
+
+# How does it work?
+## 1. read stored procedures' definitions from the database
+First, it reads the functions, procedures' names and their arguments' types from
+the given database with the following query:
 
     SELECT object_id, subprogram_id, package_name, object_name,
            data_level, position, argument_name, in_out,
@@ -9,13 +40,53 @@ As OCI does not allow using PL/SQL record types, this causes some difficulty.
       FROM user_arguments
       ORDER BY object_id, subprogram_id, SEQUENCE;
 
-## Restrictions
+So the argument's type must be readable in `user_arguments`!
+For a `SYS_REFCURSOR` (returning a cursor, a query's result set in Oracle parlance),
+you have to specialize the type for the returned columns -- see below.
+
+## 2. generate calling machinery
+
+## 3. generate .proto file
+
+## 4. call protoc-gen-gofast
+
+## 5. profit!
+
+# Restrictions
 Supported types:
   * PL/SQL simple types
   * PL/SQL record types (defined at stored package level)
   * PL/SQL associative arrays, but just "INDEX BY BINARY_INTEGER" and this arrays
   must be one of the previously supported types (but not arrays!)
   'Cause of OCI restrictions, these arrays must be indexed from 1.
+  * cursors.
+
+
+## REF_CURSOR
+For example for
+
+    FUNCTION ret_cur(p_id IN INTEGER) RETURN SYS_REFCURSOR IS
+	  v_cur SYS_REFCURSOR;
+	BEGIN
+	  OPEN v_cur FOR
+	    SELECT state, amount FROM table;
+	  RETURN v_cur;
+	END;
+
+You'll have to define the type in the package HEAD:
+
+    TYPE state_amount_rec_typ IS RECORD (state table.state%TYPE, amount table.amount%TYPE);
+	TYPE state_amount_cur_typ IS REF CURSOR RETURN state_amount_rec_typ;
+
+Then only change the type in the BODY:
+
+    FUNCTION ret_cur(p_id IN INTEGER) RETURN state_amount_cur_typ IS
+	  v_cur state_amount_cur_typ;
+	BEGIN
+	  OPEN v_cur FOR
+	    SELECT state, amount FROM table;
+	  RETURN v_cur;
+	END;
 
 ## Examples
 ### Minimal

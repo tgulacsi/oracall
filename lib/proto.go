@@ -29,8 +29,7 @@ import (
 var Gogo bool
 
 //go:generate sh ./download-protoc.sh
-//go:generate go get -u github.com/golang/protobuf/protoc-gen-go
-//	go:generate go get -u github.com/gogo/protobuf/protoc-gen-gofast
+//go:generate go get -u github.com/gogo/protobuf/protoc-gen-gofast
 
 // build: protoc --gofast_out=plugins=grpc:. my.proto
 // build: protoc --go_out=plugins=grpc:. my.proto
