@@ -32,12 +32,15 @@ import (
 
 var ErrMissingTableOf = errors.New("missing TableOf info")
 
-func SaveFunctions(dst io.Writer, functions []Function, pkg string, skipFormatting, saveStructs bool) error {
+func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool) error {
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
 	if pkg != "" {
-		fmt.Fprintf(w,
+		if pbImport != "" {
+			pbImport = `pb "` + pbImport + `"`
+		}
+		io.WriteString(w,
 			"package "+pkg+`
 import (
 	"encoding/xml"
@@ -53,6 +56,7 @@ import (
 	"github.com/pkg/errors"
     "gopkg.in/rana/ora.v3"    // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.Date
+	`+pbImport+`
 )
 
 var DebugLevel = uint(0)
@@ -118,10 +122,7 @@ FunLoop:
 			os.Stderr.WriteString("\n\n---------------------8<--------------------\n")
 			os.Stderr.WriteString(callFun)
 			os.Stderr.WriteString("\n--------------------->8--------------------\n\n")
-			if !skipFormatting {
-				return fmt.Errorf("error saving function %s: %s", fun.Name(), err)
-			}
-			b = []byte(callFun)
+			return fmt.Errorf("error saving function %s: %s", fun.Name(), err)
 		}
 		w.Write(b)
 	}

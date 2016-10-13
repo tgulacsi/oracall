@@ -52,8 +52,8 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	defer buffers.Put(callBuf)
 	hasCursorOut := fun.HasCursorOut()
 	if hasCursorOut {
-		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(input *%s, stream %s_%sServer) (err error) {
-			output := new(%s)
+		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(input *pb.%s, stream pb.%s_%sServer) (err error) {
+			output := new(pb.%s)
 			iterators := make([]iterator, 0, 1)
 		`,
 			CamelCase(fn),
@@ -62,8 +62,8 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 			CamelCase(fun.getStructName(true, false)),
 		)
 	} else {
-		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *%s) (output *%s, err error) {
-		output = new(%s)
+		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *pb.%s) (output *pb.%s, err error) {
+		output = new(pb.%s)
 		iterators := make([]iterator, 0, 1) // just temporary
 		_ = iterators
     `,
@@ -428,14 +428,15 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					aname := (CamelCase(arg.Name))
 					//aname := capitalize(replHidden(arg.Name))
 					if arg.IsOutput() {
+						st := withPb(CamelCase(arg.TableOf.goType(true)))
 						convOut = append(convOut, fmt.Sprintf(`
 					if m := %d - cap(output.%s); m > 0 { // %s
-						output.%s = append(output.%s[:cap(output.%s)], make([]%s, m)...)
+						output.%s = append(output.%s[:cap(output.%s)], make([]%s, m)...) // fr1
                     }
 					output.%s = output.%s[:%d]
 					`,
 							MaxTableSize, aname, arg.TableOf.goType(true),
-							aname, aname, aname, CamelCase(arg.TableOf.goType(true)),
+							aname, aname, aname, st,
 							aname, aname, MaxTableSize))
 					}
 					if !arg.IsInput() {
@@ -644,8 +645,8 @@ func (arg Argument) getConvRefCursor(
 	tableSize int,
 ) ([]string, []string) {
 	got := arg.goType(true)
-	GoT := CamelCase(got)
-	convIn = append(convIn, fmt.Sprintf(`output.%s = make([]%s, 0, %d)
+	GoT := withPb(CamelCase(got))
+	convIn = append(convIn, fmt.Sprintf(`output.%s = make([]%s, 0, %d)  // gcrf1
 				%s = new(ora.Rset) // gcrf1 %q`,
 		name, GoT, tableSize,
 		paramName, got))
@@ -804,7 +805,7 @@ func (arg Argument) getConvTableRec(
 		lengthS = "len(input." + name[0] + ")"
 		too, _ := arg.ToOra(absName+"[i]", "v."+name[1])
 		convIn = append(convIn, fmt.Sprintf(`
-			%s := make([]%s, %s, %d)
+			%s := make([]%s, %s, %d)  // gctr1
 			for i,v := range input.%s {
 				%s
 			} // gctr1
@@ -817,13 +818,14 @@ func (arg Argument) getConvTableRec(
 	if arg.IsOutput() {
 		if !arg.IsInput() {
 			convIn = append(convIn,
-				fmt.Sprintf(`%s := make([]%s, %s, %d)
+				fmt.Sprintf(`%s := make([]%s, %s, %d)  // gctr2
 			%s = &%s // gctr2`,
 					absName, oraTyp, lengthS, tableSize,
 					paramName, absName))
 		}
+		got := parent.goType(true)
 		convOut = append(convOut,
-			fmt.Sprintf(`if m := len(%s)-cap(output.%s); m > 0{
+			fmt.Sprintf(`if m := len(%s)-cap(output.%s); m > 0 { // gctr3
 			output.%s = append(output.%s, make([]%s, m)...)
 		}
 		output.%s = output.%s[:len(%s)]
@@ -834,11 +836,11 @@ func (arg Argument) getConvTableRec(
 			%s // gctr3
 		}`,
 				absName, name[0],
-				name[0], name[0], CamelCase(parent.goType(true)),
+				name[0], name[0], withPb(CamelCase(got)),
 				name[0], name[0], absName,
 				absName,
 				name[0],
-				name[0], CamelCase(parent.goType(true)[1:]),
+				name[0], withPb(CamelCase(got[1:])),
 				arg.FromOra(
 					fmt.Sprintf("output.%s[i].%s", name[0], name[1]),
 					"v",
@@ -876,6 +878,16 @@ func getInnerVarName(funName, varName string) string {
 
 func getParamName(funName, paramName string) string {
 	return getVarName(funName, paramName, "p")
+}
+
+func withPb(s string) string {
+	if s == "" {
+		return s
+	}
+	if s[0] == '*' {
+		return "*pb." + s[1:]
+	}
+	return "pb." + s
 }
 
 type idxRemap struct {

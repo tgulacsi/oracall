@@ -20,8 +20,10 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"flag"
+	"log"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -53,19 +55,31 @@ func main() {
 
 func Main(args []string) int {
 	os.Args = args
+	GopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
 
-	flagSkipFormat := flag.Bool("F", false, "skip formatting")
-	//flagVerbose := flag.Bool("v", false, "verbose logging")
 	flagDump := flag.String("dump", "", "dump to this csv")
-	flagPattern := flag.String("pattern", "%", "input filter pattern")
-	flagPackage := flag.String("package", "main", "package name of the generated functions")
-	flagOut := flag.String("out", "generated_functions.go", "generated functions file name")
-	flagProto := flag.String("proto", "oracall.proto", "protocol buffers file name")
+	flagBaseDir := flag.String("base-dir", GopSrc, "base dir for the -pb-out, -db-out flags")
+	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
+	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
 	flagGenerator := flag.String("protoc-gen", "gofast", "use protoc-gen-<generator>")
 
 	flag.Parse()
+	if *flagPbOut == "" {
+		if *flagDbOut == "" {
+			log.Fatal("-pb-out or -db-out is required!")
+		}
+		*flagPbOut = *flagDbOut
+	} else if *flagDbOut == "" {
+		*flagDbOut = *flagPbOut
+	}
+	pbPath, pbPkg := parsePkgFlag(*flagPbOut)
+	dbPath, dbPkg := parsePkgFlag(*flagDbOut)
+
 	Log := logger.Log
-	outPath := flag.Arg(0)
+	pattern := flag.Arg(0)
+	if pattern == "" {
+		pattern = "%"
+	}
 	oracall.Gogo = *flagGenerator != "go"
 
 	var functions []oracall.Function
@@ -73,8 +87,8 @@ func Main(args []string) int {
 
 	if *flagConnect == "" {
 		var filter func(string) bool
-		if *flagPattern != "" && *flagPattern != "%" {
-			rPattern := regexp.MustCompile("(?i)" + strings.Replace(strings.Replace(*flagPattern, ".", "[.]", -1), "%", ".*", -1))
+		if pattern != "%" {
+			rPattern := regexp.MustCompile("(?i)" + strings.Replace(strings.Replace(pattern, ".", "[.]", -1), "%", ".*", -1))
 			filter = func(s string) bool {
 				return rPattern.MatchString(s)
 			}
@@ -100,7 +114,7 @@ func Main(args []string) int {
       FROM user_arguments
 	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
       ORDER BY object_id, subprogram_id, SEQUENCE`
-		rows, err := cx.Query(qry, *flagPattern)
+		rows, err := cx.Query(qry, pattern)
 		if err != nil {
 			Log("qry", qry, "error", err)
 			return 2
@@ -244,10 +258,16 @@ func Main(args []string) int {
 
 	defer os.Stdout.Sync()
 	out := os.Stdout
-	if *flagOut != "" && *flagOut != "-" {
-		*flagOut = maybeJoinPath(outPath, *flagOut)
-		if out, err = os.Create(*flagOut); err != nil {
-			Log("msg", "create", "file", *flagOut, "error", err)
+	if dbPath != "" && dbPath != "-" {
+		fn := "oracall.go"
+		if dbPkg != "main" {
+			fn = dbPkg + ".go"
+		}
+		fn = filepath.Join(*flagBaseDir, dbPath, fn)
+		Log("msg", "Writing generated functions", "file", fn)
+		os.MkdirAll(filepath.Dir(fn), 0775)
+		if out, err = os.Create(fn); err != nil {
+			Log("msg", "create", "file", fn, "error", err)
 			return 1
 		}
 		defer func() {
@@ -259,44 +279,53 @@ func Main(args []string) int {
 
 	var grp errgroup.Group
 	grp.Go(func() error {
-		if err := oracall.SaveFunctions(out, functions,
-			*flagPackage, *flagSkipFormat, *flagProto == "",
+		pbPath := pbPath
+		if pbPath == dbPath {
+			pbPath = ""
+		}
+		if err := oracall.SaveFunctions(
+			out, functions,
+			dbPkg, pbPath, false,
 		); err != nil {
 			return errors.Wrap(err, "save functions")
 		}
 		return nil
 	})
 
-	if *flagProto != "" {
-		grp.Go(func() error {
-			*flagProto = maybeJoinPath(outPath, *flagProto)
-			fh, err := os.Create(*flagProto)
-			if err != nil {
-				return errors.Wrap(err, "create proto")
-			}
-			err = oracall.SaveProtobuf(fh, functions, *flagPackage)
-			if closeErr := fh.Close(); closeErr != nil && err == nil {
-				err = closeErr
-			}
-			if err != nil {
-				return errors.Wrap(err, "SaveProtobuf")
-			}
+	grp.Go(func() error {
+		fn := "oracall.proto"
+		if pbPkg != "main" {
+			fn = pbPkg + ".proto"
+		}
+		fn = filepath.Join(*flagBaseDir, pbPath, fn)
+		os.MkdirAll(filepath.Dir(fn), 0775)
+		Log("msg", "Writing Protocol Buffers", "file", fn)
+		fh, err := os.Create(fn)
+		if err != nil {
+			return errors.Wrap(err, "create proto")
+		}
+		err = oracall.SaveProtobuf(fh, functions, pbPkg)
+		if closeErr := fh.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			return errors.Wrap(err, "SaveProtobuf")
+		}
 
-			goOut := *flagGenerator + "_out"
-			cmd := exec.Command(
-				"protoc",
-				os.ExpandEnv("--proto_path=$GOPATH/src:."),
-				"--"+goOut+"=plugins=grpc:.",
-				*flagProto,
-			)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				return errors.Wrapf(err, "%q", cmd.Args)
-			}
-			return nil
-		})
-	}
+		goOut := *flagGenerator + "_out"
+		cmd := exec.Command(
+			"protoc",
+			"--proto_path="+GopSrc+":.",
+			"--"+goOut+"=plugins=grpc:"+*flagBaseDir,
+			fn,
+		)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return errors.Wrapf(err, "%q", cmd.Args)
+		}
+		return nil
+	})
 
 	if err := grp.Wait(); err != nil {
 		Log("error", err)
@@ -305,19 +334,20 @@ func Main(args []string) int {
 	return 0
 }
 
-func maybeJoinPath(path, file string) string {
-	if path == "" {
-		return file
-	}
-	if strings.Contains(file, string([]rune{os.PathSeparator})) {
-		return file
-	}
-	return filepath.Join(path, file)
-}
-
 func i64ToString(n sql.NullInt64) string {
 	if n.Valid {
 		return strconv.FormatInt(n.Int64, 10)
 	}
 	return ""
+}
+
+func parsePkgFlag(s string) (string, string) {
+	if i := strings.LastIndexByte(s, ':'); i >= 0 {
+		return s[:i], s[i+1:]
+	}
+	pkg := path.Base(s)
+	if pkg == "" {
+		pkg = "main"
+	}
+	return s, pkg
 }
