@@ -41,7 +41,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		if varName != "" {
 			switch arg.ora {
 			case "DATE":
-				return fmt.Sprintf("%s.Set(%s)", dst, varName)
+				return fmt.Sprintf("%s = string(custom.NewDate(%s))", dst, varName)
 			}
 		}
 	}
@@ -61,9 +61,9 @@ func (arg PlsType) GetOra(src, varName string) string {
 		switch arg.ora {
 		case "DATE":
 			if varName != "" {
-				return fmt.Sprintf("custom.NewDate(%s)", varName)
+				return fmt.Sprintf("string(custom.NewDate(%s))", varName)
 			}
-			return fmt.Sprintf("custom.AsDate(%s)", src)
+			return fmt.Sprintf("string(custom.AsDate(%s))", src)
 		}
 	}
 	return src
@@ -79,7 +79,7 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 			if src[0] == '&' {
 				pointer = "&"
 			}
-			return fmt.Sprintf(`%s := %s.Get() // toOra D
+			return fmt.Sprintf(`%s := custom.Date(%s).Get() // toOra D
 			%s = %s%s`,
 					dstVar, strings.TrimPrefix(src, "&"),
 					dst, pointer, dstVar,
