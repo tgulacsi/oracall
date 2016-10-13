@@ -215,29 +215,11 @@ func protoType(got string) (string, protoOptions) {
 		return "double", nil
 
 	case "ora.date", "custom.date":
-		if !Gogo {
-			return "string", nil
-		}
-		return "string", protoOptions(map[string]interface{}{
-			"gogoproto.nullable":   false,
-			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Date",
-		})
+		return "string", nil
 	case "n", "ora.n":
-		if !Gogo {
-			return "string", nil
-		}
-		return "string", protoOptions(map[string]interface{}{
-			"gogoproto.nullable":   false,
-			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Number",
-		})
+		return "string", nil
 	case "ora.lob":
-		if !Gogo {
-			return "bytes", nil
-		}
-		return "bytes", protoOptions(map[string]interface{}{
-			"gogoproto.nullable":   false,
-			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.Lob",
-		})
+		return "bytes", nil
 	default:
 		return trimmed, nil
 	}
