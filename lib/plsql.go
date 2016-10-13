@@ -343,17 +343,17 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			if arg.IsOutput() {
 				if arg.IsInput() {
 					convIn = append(convIn, fmt.Sprintf(`
-					output.%s = new(%s)
+					output.%s = new(%s)  // sr1
 					if input.%s != nil { *output.%s = *input.%s }
-					`, aname, CamelCase(arg.goType(false)[1:]),
+					`, aname, withPb(CamelCase(arg.goType(false)[1:])),
 						aname, aname, aname))
 				} else {
 					// yes, convIn - getConvRec uses this!
 					convIn = append(convIn, fmt.Sprintf(`
                     if output.%s == nil {
-                        output.%s = new(%s)
+                        output.%s = new(%s)  // sr2
                     }`, aname,
-						aname, CamelCase(arg.goType(false)[1:])))
+						aname, withPb(CamelCase(arg.goType(false)[1:]))))
 				}
 			}
 			for _, a := range arg.RecordOf {
@@ -569,22 +569,22 @@ func (arg Argument) getConvSimple(
 	if arg.IsOutput() {
 		got := arg.goType(false)
 		if got[0] == '*' {
-			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s) // %s", name, got[1:], got))
+			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s) // %s  // gcs1", name, got[1:], got))
 			if arg.IsInput() {
-				convIn = append(convIn, fmt.Sprintf(`if input.%s != nil { *output.%s = *input.%s }`, name, name, name))
+				convIn = append(convIn, fmt.Sprintf(`if input.%s != nil { *output.%s = *input.%s }  // gcs2`, name, name, name))
 			}
 		} else if arg.IsInput() {
-			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s`, name, name))
+			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s  // gcs3`, name, name))
 		}
 		src := "output." + name
 		in, varName := arg.ToOra(paramName, "&"+src)
-		convIn = append(convIn, in)
+		convIn = append(convIn, in+"  // gcs3")
 		if varName != "" {
 			convOut = append(convOut, arg.FromOra(src, paramName, varName))
 		}
 	} else {
 		in, _ := arg.ToOra(paramName, "input."+name)
-		convIn = append(convIn, in)
+		convIn = append(convIn, in+"  // gcs4")
 	}
 	return convIn, convOut
 }
@@ -693,7 +693,7 @@ func (arg Argument) getFromRset(rsetRow string) string {
 	if GoT[0] == '*' {
 		GoT = "&" + GoT[1:]
 	}
-	fmt.Fprintf(buf, "%s{\n", GoT)
+	fmt.Fprintf(buf, "%s{\n", withPb(GoT))
 	for i, a := range arg.TableOf.RecordOf {
 		a := a
 		got := a.Argument.goType(true)
@@ -884,8 +884,8 @@ func withPb(s string) string {
 	if s == "" {
 		return s
 	}
-	if s[0] == '*' {
-		return "*pb." + s[1:]
+	if s[0] == '*' || s[0] == '&' {
+		return s[:1] + "pb." + s[1:]
 	}
 	return "pb." + s
 }

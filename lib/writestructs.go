@@ -374,6 +374,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 			typName = typName[1:]
 		}
 	}()
+	// cached?
 	if arg.goTypeName != "" {
 		if strings.Index(arg.goTypeName, "__") > 0 {
 			return "*" + arg.goTypeName
@@ -381,6 +382,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		return arg.goTypeName
 	}
 	defer func() {
+		// cache it
 		arg.goTypeName = typName
 	}()
 	if arg.Flavor == FLAVOR_SIMPLE {
