@@ -141,7 +141,7 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 			}
 			if len(iterators) != len(iterators2) {
 				if len(iterators2) == 0 {
-					err = stream.Send(output)
+					//err = stream.Send(output)
 					return
 				}
 				iterators = append(iterators[:0], iterators2...)
