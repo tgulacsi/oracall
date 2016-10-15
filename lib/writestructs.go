@@ -104,8 +104,9 @@ FunLoop:
 		if !saveStructs {
 			structW = ioutil.Discard
 		}
+		var checkName string
 		for _, dir := range []bool{false, true} {
-			if err := fun.SaveStruct(structW, dir, true); err != nil {
+			if err := fun.SaveStruct(structW, dir); err != nil {
 				if errors.Cause(err) == ErrMissingTableOf {
 					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name(), "error", err)
 					continue FunLoop
@@ -113,7 +114,10 @@ FunLoop:
 				return err
 			}
 		}
-		plsBlock, callFun := fun.PlsqlBlock(saveStructs)
+		if checkName, err = fun.GenChecks(w); err != nil {
+			return err
+		}
+		plsBlock, callFun := fun.PlsqlBlock(checkName)
 		fmt.Fprintf(w, "\nconst %s = `", fun.getPlsqlConstName())
 		io.WriteString(w, plsBlock)
 		io.WriteString(w, "`\n\n")
@@ -165,7 +169,7 @@ func (f Function) getStructName(out, withPackage bool) string {
 
 var buffers = newBufPool(1 << 16)
 
-func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
+func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	dirmap, dirname := uint8(DIR_IN), "input"
 	if out {
 		dirmap, dirname = DIR_OUT, "output"
@@ -173,7 +177,6 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 	var (
 		err                    error
 		aName, structName, got string
-		checks                 []string
 	)
 	args := make([]Argument, 0, len(f.Args))
 	for _, arg := range f.Args {
@@ -186,9 +189,6 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 		args = append(args, *f.Returns)
 	}
 
-	if dirmap == uint8(DIR_IN) {
-		checks = make([]string, 0, len(args)+1)
-	}
 	structName = CamelCase(f.getStructName(out, true))
 	//structName = f.getStructName(out)
 	buf := buffers.Get()
@@ -217,9 +217,6 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 		io.WriteString(w, "\t"+aName+" "+got+
 			"\t`json:\""+lName+"\""+
 			" xml:\""+lName+"\"`\n")
-		if generateChecks && checks != nil {
-			checks = genChecks(checks, arg, "s", false)
-		}
 	}
 	io.WriteString(w, "}\n")
 
@@ -240,25 +237,48 @@ func (f Function) SaveStruct(dst io.Writer, out, generateChecks bool) error {
 	if b, err = format.Source(buf.Bytes()); err != nil {
 		return errors.Wrapf(err, "save struct %q (%s)", structName, buf.String())
 	}
-	dst.Write(b)
+	_, err = dst.Write(b)
 
-	if checks != nil {
-		buf.Reset()
-		fmt.Fprintf(w, "\n// Check checks input bounds for %s\nfunc (s %s) Check() error {\n", structName, structName)
-		for _, line := range checks {
-			fmt.Fprintf(w, line+"\n")
-		}
-		if _, err = io.WriteString(buf, "\n\treturn nil\n}\n"); err != nil {
-			return err
-		}
-		if b, err = format.Source(buf.Bytes()); err != nil {
-			return errors.Wrapf(err, "write check of %s (%s)", structName, buf.String())
-		}
-		if _, err = dst.Write(b); err != nil {
-			return err
+	return err
+}
+
+func (f Function) GenChecks(w io.Writer) (string, error) {
+	args := make([]Argument, 0, len(f.Args))
+	for _, arg := range f.Args {
+		if arg.IsInput() {
+			args = append(args, arg)
 		}
 	}
-	return nil
+	checks := make([]string, 0, len(args)+1)
+	for _, arg := range args {
+		checks = genChecks(checks, arg, "s", false)
+	}
+	if len(checks) == 0 {
+		return "", nil
+	}
+	structName := CamelCase(strings.SplitN(f.getStructName(false, true), "__", 2)[1])
+	buf := buffers.Get()
+	defer buffers.Put(buf)
+	nm := "Check" + structName
+	fmt.Fprintf(buf, `
+// %s checks input bounds for pb.%s
+func %s(s *pb.%s) error {
+	`,
+		nm, structName,
+		nm, structName,
+	)
+	for _, line := range checks {
+		fmt.Fprintf(buf, line+"\n")
+	}
+	if _, err := io.WriteString(buf, "\n\treturn nil\n}\n"); err != nil {
+		return "", err
+	}
+	b, err := format.Source(buf.Bytes())
+	if err != nil {
+		return nm, errors.Wrapf(err, "write check of %s (%s)", structName, buf.String())
+	}
+	_, err = w.Write(b)
+	return nm, err
 }
 
 func genChecks(checks []string, arg Argument, base string, parentIsTable bool) []string {

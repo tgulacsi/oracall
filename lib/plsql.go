@@ -41,7 +41,7 @@ var (
 )
 
 // SavePlsqlBlock saves the plsql block definition into writer
-func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
+func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
 		Log("msg", "error preparing", "function", fun, "error", err)
@@ -50,36 +50,38 @@ func (fun Function) PlsqlBlock(haveChecks bool) (plsql, callFun string) {
 	fn := strings.Replace(fun.name, ".", "__", -1)
 	callBuf := buffers.Get()
 	defer buffers.Put(callBuf)
+
+	var check string
+	if checkName != "" {
+		check = fmt.Sprintf(`
+	if err = %s(input); err != nil {
+        return
+    }
+	`, checkName)
+	}
+
 	hasCursorOut := fun.HasCursorOut()
 	if hasCursorOut {
 		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(input *pb.%s, stream pb.%s_%sServer) (err error) {
+			%s
 			output := new(pb.%s)
 			iterators := make([]iterator, 0, 1)
 		`,
-			CamelCase(fn),
-			CamelCase(fun.getStructName(false, false)),
-			CamelCase(fun.Package), CamelCase(fn),
+			CamelCase(fn), CamelCase(fun.getStructName(false, false)), CamelCase(fun.Package), CamelCase(fn),
+			check,
 			CamelCase(fun.getStructName(true, false)),
 		)
 	} else {
 		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *pb.%s) (output *pb.%s, err error) {
+		%s
 		output = new(pb.%s)
 		iterators := make([]iterator, 0, 1) // just temporary
 		_ = iterators
     `,
-			CamelCase(fn),
-			CamelCase(fun.getStructName(false, false)),
-			CamelCase(fun.getStructName(true, false)),
+			CamelCase(fn), CamelCase(fun.getStructName(false, false)), CamelCase(fun.getStructName(true, false)),
+			check,
 			CamelCase(fun.getStructName(true, false)),
 		)
-	}
-	if haveChecks {
-		callBuf.WriteString(
-			`
-	if err = input.Check(); err != nil {
-        return
-    }
-	`)
 	}
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
