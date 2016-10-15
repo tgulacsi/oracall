@@ -27,6 +27,7 @@ import (
 )
 
 var Gogo bool
+var NumberAsString bool
 
 //go:generate sh ./download-protoc.sh
 //go:generate go get -u github.com/gogo/protobuf/protoc-gen-gofast
@@ -205,19 +206,20 @@ func protoType(got, aName string) (string, protoOptions) {
 		return "string", nil
 	case "ora.string":
 		return "string", nil
-	case "int32":
+
+	case "int32", "ora.int32":
+		if NumberAsString {
+			return "sint32", protoOptions{
+				"gogoproto.jsontag": aName + ",string,omitempty",
+			}
+		}
 		return "sint32", nil
-		//return "sint32", protoOptions{
-		//"gogoproto.jsontag": aName + ",string,omitempty",
-		//}
-	case "ora.int32":
-		return "sint32", nil
-	case "float64":
-		return "double", nil
-		//return "double", protoOptions{
-		//"gogoproto.jsontag": aName + ",string,omitempty",
-		//}
-	case "ora.float64":
+	case "float64", "ora.float64":
+		if NumberAsString {
+			return "double", protoOptions{
+				"gogoproto.jsontag": aName + ",string,omitempty",
+			}
+		}
 		return "double", nil
 
 	case "ora.date", "custom.date":
