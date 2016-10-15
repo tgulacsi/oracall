@@ -27,6 +27,7 @@ import (
 )
 
 var Gogo bool
+var NumberAsString bool
 
 //go:generate sh ./download-protoc.sh
 //go:generate go get -u github.com/gogo/protobuf/protoc-gen-gofast
@@ -159,7 +160,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		if got == "" {
 			got = mkRecTypName(arg.Name)
 		}
-		typ, pOpts := protoType(got)
+		typ, pOpts := protoType(got, arg.Name)
 		var optS string
 		if s := pOpts.String(); s != "" {
 			optS = " " + s
@@ -199,19 +200,26 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 	return err
 }
 
-func protoType(got string) (string, protoOptions) {
+func protoType(got, aName string) (string, protoOptions) {
 	switch trimmed := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")); trimmed {
 	case "ora.time", "time.time":
 		return "string", nil
 	case "ora.string":
 		return "string", nil
-	case "int32":
+
+	case "int32", "ora.int32":
+		if NumberAsString {
+			return "sint32", protoOptions{
+				"gogoproto.jsontag": aName + ",string,omitempty",
+			}
+		}
 		return "sint32", nil
-	case "ora.int32":
-		return "sint32", nil
-	case "float64":
-		return "double", nil
-	case "ora.float64":
+	case "float64", "ora.float64":
+		if NumberAsString {
+			return "double", protoOptions{
+				"gogoproto.jsontag": aName + ",string,omitempty",
+			}
+		}
 		return "double", nil
 
 	case "ora.date", "custom.date":

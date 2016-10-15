@@ -62,6 +62,7 @@ func Main(args []string) int {
 	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
 	flagGenerator := flag.String("protoc-gen", "gofast", "use protoc-gen-<generator>")
+	flagNumberAsString := flag.Bool("number-as-string", false, "add ,string to json tags")
 
 	flag.Parse()
 	if *flagPbOut == "" {
@@ -81,6 +82,7 @@ func Main(args []string) int {
 		pattern = "%"
 	}
 	oracall.Gogo = *flagGenerator != "go"
+	oracall.NumberAsString = *flagNumberAsString
 
 	var functions []oracall.Function
 	var err error
