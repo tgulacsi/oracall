@@ -119,8 +119,41 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	}
 	if hasCursorOut {
 		fmt.Fprintf(callBuf, `
-		if err = sendIterators(stream, iterators); err != nil {
+		if len(iterators) == 0 {
+			err = stream.Send(output)
 			return
+		}
+		reseters := make([]func(), 0, len(iterators))
+		iterators2 := make([]iterator, 0, len(iterators))
+		for {
+			for _, it := range iterators {
+				if err = it.Iterate(); err != nil {
+					if err != io.EOF {
+						_ = stream.Send(output)
+						return
+					}
+					reseters = append(reseters, it.Reset)
+					err = nil
+					continue
+				}
+				iterators2 = append(iterators2, it)
+			}
+			if err = stream.Send(output); err != nil {
+				return
+			}
+			if len(iterators) != len(iterators2) {
+				if len(iterators2) == 0 {
+					//err = stream.Send(output)
+					return
+				}
+				iterators = append(iterators[:0], iterators2...)
+			}
+			// reset the all arrays
+			for _, reset := range reseters {
+				reset()
+			}
+			iterators2 = iterators2[:0]
+			reseters = reseters[:0]
 		}
 		`)
 	}
@@ -871,3 +904,5 @@ type byNewRemap []idxRemap
 func (s byNewRemap) Len() int           { return len(s) }
 func (s byNewRemap) Less(i, j int) bool { return s[i].Old < s[j].Old }
 func (s byNewRemap) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+// vim: se noet fileencoding=utf-8:

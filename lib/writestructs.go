@@ -92,44 +92,6 @@ type iterator struct {
 	Iterate func() error
 }
 
-func sendIterators(stream interface { Send(interface{}) error }, iterators []iterator) error {
-	if len(iterators) == 0 {
-		return stream.Send(output)
-	}
-	reseters := make([]func(), 0, len(iterators))
-	iterators2 := make([]iterator, 0, len(iterators))
-	for {
-		for _, it := range iterators {
-			if err = it.Iterate(); err != nil {
-				if err != io.EOF {
-					_ = stream.Send(output)
-					return err
-				}
-				reseters = append(reseters, it.Reset)
-				err = nil
-				continue
-			}
-			iterators2 = append(iterators2, it)
-		}
-		if err = stream.Send(output); err != nil {
-			return err
-		}
-		if len(iterators) != len(iterators2) {
-			if len(iterators2) == 0 {
-				return nil
-			}
-			iterators = append(iterators[:0], iterators2...)
-		}
-		// reset the arrays
-		for _, reset := range reseters {
-			reset()
-		}
-		iterators2 = iterators2[:0]
-		reseters = reseters[:0]
-	}
-	return nil
-}
-
 `)
 	}
 	types := make(map[string]string, 16)
@@ -607,3 +569,5 @@ func (bp bufPool) Put(b *bytes.Buffer) {
 	b.Reset()
 	bp.Pool.Put(b)
 }
+
+// vim: se noet fileencoding=utf-8:
