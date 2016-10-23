@@ -26,7 +26,7 @@ import (
 	"os"
 	"strings"
 
-	_ "gopkg.in/goracle.v1"
+	_ "gopkg.in/rana/ora.v3"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")
@@ -36,7 +36,7 @@ func main() {
 	if *flagConnect == "" {
 		log.Fatalf("connect string is needed")
 	}
-	conn, err := sql.Open("goracle", *flagConnect)
+	conn, err := sql.Open("ora", *flagConnect)
 	if err != nil {
 		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
 	}
