@@ -92,6 +92,43 @@ type iterator struct {
 	Iterate func() error
 }
 
+func sendIterators(send func() error, iterators []iterator) error {
+	if len(iterators) == 0 {
+		return send()
+	}
+	reseters := make([]func(), 0, len(iterators))
+	iterators2 := make([]iterator, 0, len(iterators))
+	for {
+		for _, it := range iterators {
+			if err := it.Iterate(); err != nil {
+				if err != io.EOF {
+					_ = send()
+					return err
+				}
+				reseters = append(reseters, it.Reset)
+				continue
+			}
+			iterators2 = append(iterators2, it)
+		}
+		if err := send(); err != nil {
+			return err
+		}
+		if len(iterators) != len(iterators2) {
+			if len(iterators2) == 0 {
+				return nil
+			}
+			iterators = append(iterators[:0], iterators2...)
+		}
+		// reset the all arrays
+		for _, reset := range reseters {
+			reset()
+		}
+		iterators2 = iterators2[:0]
+		reseters = reseters[:0]
+	}
+	return nil
+}
+
 `)
 	}
 	types := make(map[string]string, 16)
