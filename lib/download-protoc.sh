@@ -20,12 +20,11 @@ if ! protoc --version 2>/dev/null | fgrep 'libprotoc 3'; then
 fi
 
 if [ ! -e $GOPATH/src/google/api/annotations.proto ]; then
-	dst="$tmpdir/common-protos.zip"
-	curl -L -sS https://github.com/googleapis/googleapis/archive/common-protos-1_3_1.zip -o "$dst"
-	cd $GOPATH/src && unzip -o "$dst"
-	rsync -a googleapis-common-protos-1_3_1/google/ $GOPATH/src/google/
-	rm -rf googleapis-common-protos-1_3_1
+	rm -rf $GOPATH/src/google/api
+	go get github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
+	ln -s ../github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis/google/api $GOPATH/src/google/api
 fi
+
 rm -rf "$tmpdir"
 
 if which protoc-gen-gofast 2>/dev/null && which protoc-gen-go 2>/dev/null; then
