@@ -166,7 +166,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			optS = " " + s
 		}
 		if arg.Flavor == FLAVOR_SIMPLE || arg.Flavor == FLAVOR_TABLE && arg.TableOf.Flavor == FLAVOR_SIMPLE {
-			fmt.Fprintf(w, "\t%s%s %s = %d%s;\n", rule, typ, aName, i+1, optS)
+			fmt.Fprintf(w, "\t%s%s %s = %d%s;\t// %s\n", rule, typ, aName, i+1, optS, arg.AbsType)
 			continue
 		}
 		typ = CamelCase(typ)
