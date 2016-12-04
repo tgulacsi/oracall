@@ -33,8 +33,8 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/tgulacsi/go/orahlp"
-	"gopkg.in/rana/ora.v3"
-	"gopkg.in/rana/ora.v3/lg"
+	"gopkg.in/rana/ora.v4"
+	"gopkg.in/rana/ora.v4/lg"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")

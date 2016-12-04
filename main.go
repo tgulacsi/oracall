@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/csv"
 	"flag"
@@ -28,6 +29,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"golang.org/x/sync/errgroup"
@@ -37,7 +39,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tgulacsi/go/loghlp/kitloghlp"
 	oracall "github.com/tgulacsi/oracall/lib"
-	"gopkg.in/rana/ora.v3" // for Oracle-specific drivers
+
+	// for Oracle-specific drivers
+	ora "gopkg.in/rana/ora.v4"
+	"gopkg.in/rana/ora.v4/lg"
 )
 
 //go:generate go generate ./lib
@@ -63,6 +68,7 @@ func Main(args []string) int {
 	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
 	flagGenerator := flag.String("protoc-gen", "gofast", "use protoc-gen-<generator>")
 	flagNumberAsString := flag.Bool("number-as-string", false, "add ,string to json tags")
+	flagVerbose := flag.Bool("v", false, "verbose logging")
 
 	flag.Parse()
 	if *flagPbOut == "" {
@@ -97,13 +103,15 @@ func Main(args []string) int {
 		}
 		functions, err = oracall.ParseCsvFile("", filter)
 	} else {
-		ora.Register(nil)
 		cx, err := sql.Open("ora", *flagConnect)
 		if err != nil {
 			Log("msg", "connecting to", "dsn", *flagConnect, "error", err)
 			return 1
 		}
 		defer cx.Close()
+		if *flagVerbose {
+			ora.SetCfg(ora.Cfg().SetLogger(lg.Log))
+		}
 		if err = cx.Ping(); err != nil {
 			Log("msg", "pinging", "dsn", *flagConnect, "error", err)
 			return 1
@@ -116,7 +124,9 @@ func Main(args []string) int {
       FROM user_arguments
 	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
       ORDER BY object_id, subprogram_id, SEQUENCE`
-		rows, err := cx.Query(qry, pattern)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		rows, err := cx.QueryContext(ctx, qry, pattern)
 		if err != nil {
 			Log("qry", qry, "error", err)
 			return 2

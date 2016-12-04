@@ -54,7 +54,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/pkg/errors"
-    "gopkg.in/rana/ora.v3"    // Oracle
+    "gopkg.in/rana/ora.v4"    // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.Date
 	`+pbImport+`
 )

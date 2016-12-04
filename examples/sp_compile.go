@@ -26,7 +26,7 @@ import (
 	"os"
 	"strings"
 
-	_ "gopkg.in/rana/ora.v3"
+	_ "gopkg.in/rana/ora.v4"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")

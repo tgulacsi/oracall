@@ -36,8 +36,8 @@ import (
 	"reflect"
 	"strings"
 
-	"gopkg.in/rana/ora.v3"
-	"gopkg.in/rana/ora.v3/lg"
+	"gopkg.in/rana/ora.v4"
+	"gopkg.in/rana/ora.v4/lg"
 )
 
 var (

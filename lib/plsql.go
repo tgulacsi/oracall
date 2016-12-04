@@ -664,7 +664,7 @@ func (arg Argument) getConvRefCursor(
 		var err error
 		for i := 0; i < %d; i++ {
 			if !rset.Next() {
-				if err = rset.Err; err == nil {
+				if err = rset.Err(); err == nil {
 					err = io.EOF
 				}
 				break

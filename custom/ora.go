@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/rana/ora.v3"
+	"gopkg.in/rana/ora.v4"
 )
 
 type Number string
