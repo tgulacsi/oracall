@@ -107,6 +107,11 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 			// "existing state of packages has been discarded"
 			_, err= stmt.ExeP(params...)
 		}
+		if err != nil && strings.Contains(err.Error(), "state of") {
+			log.Println("!!! discard session !!!")
+			ses.Close()
+			ses = nil
+		}
 		if err = errors.Wrapf(err, "%%s %%#v", qry, params); err != nil {
 			return
 		}
