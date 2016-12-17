@@ -124,9 +124,16 @@ func Main(args []string) int {
       FROM user_arguments
 	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
       ORDER BY object_id, subprogram_id, SEQUENCE`
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		rows, err := cx.QueryContext(ctx, qry, pattern)
+		var rows *sql.Rows
+		if qc, ok := (interface{}(cx)).(interface {
+			QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
+		}); ok {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			rows, err = qc.QueryContext(ctx, qry, pattern)
+		} else {
+			rows, err = cx.Query(qry, pattern)
+		}
 		if err != nil {
 			Log("qry", qry, "error", err)
 			return 2
@@ -363,3 +370,5 @@ func parsePkgFlag(s string) (string, string) {
 	}
 	return s, pkg
 }
+
+// vim: set fileencoding=utf-8 noet:
