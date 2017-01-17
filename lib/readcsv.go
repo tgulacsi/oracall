@@ -222,7 +222,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		funName = nameFun.Name()
 		if seen[funName] > 1 {
 			Log("msg", "function "+funName+" already seen! skipping...")
-			continue
+			//continue
 		}
 		if fun.Name() == "" || funName != fun.Name() { //new (differs from prev record
 			seen[funName]++

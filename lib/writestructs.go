@@ -413,6 +413,8 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 				return "string"
 			}
 			return "string" // NULL is the same as the empty string for Oracle
+		case "RAW":
+			return "string"
 		case "NUMBER":
 			return "float64"
 			if !isTable && arg.IsOutput() {
@@ -441,6 +443,8 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 			return "*ora.Rset"
 		case "CLOB", "BLOB":
 			return "ora.Lob"
+		case "BFILE":
+			return "ora.Bfile"
 		default:
 			Log("error", fmt.Sprintf("%+v", errors.New("unknown simple type")), "type", arg.Type, "arg", fmt.Sprintf("%#v", arg))
 			os.Exit(1)

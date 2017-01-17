@@ -226,7 +226,7 @@ func protoType(got, aName string) (string, protoOptions) {
 		return "string", nil
 	case "n", "ora.n":
 		return "string", nil
-	case "ora.lob":
+	case "raw", "ora.lob", "ora.bfile":
 		return "bytes", nil
 	default:
 		return trimmed, nil

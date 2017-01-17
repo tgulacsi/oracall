@@ -116,14 +116,22 @@ func Main(args []string) int {
 			Log("msg", "pinging", "dsn", *flagConnect, "error", err)
 			return 1
 		}
+		tbl := "user_arguments"
+		if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
+			tbl = "all_arguments"
+		}
 		qry := `
-    SELECT object_id, subprogram_id, package_name, object_name,
+    SELECT A.*
+	  FROM
+	(SELECT DISTINCT object_id, subprogram_id, sequence,
+	       package_name, object_name,
            data_level, position, argument_name, in_out,
            data_type, data_precision, data_scale, character_set_name,
            pls_type, char_length, type_owner, type_name, type_subname, type_link
-      FROM user_arguments
+      FROM ` + tbl + `
 	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
-      ORDER BY object_id, subprogram_id, SEQUENCE`
+     ) A
+      ORDER BY 1, 2, 3`
 		var rows *sql.Rows
 		if qc, ok := (interface{}(cx)).(interface {
 			QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
@@ -183,10 +191,10 @@ func Main(args []string) int {
 		grp.Go(func() error {
 			defer close(userArgs)
 			var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString
-			var oid, subid, level, pos, prec, scale, length sql.NullInt64
+			var oid, seq, subid, level, pos, prec, scale, length sql.NullInt64
 			ua := oracall.UserArgument{}
 			for rows.Next() {
-				err = rows.Scan(&oid, &subid, &pn, &on,
+				err = rows.Scan(&oid, &subid, &seq, &pn, &on,
 					&level, &pos, &an, &ua.InOut,
 					&ua.DataType, &prec, &scale, &cs,
 					&plsT, &length, &tOwner, &tName, &tSub, &tLink)
