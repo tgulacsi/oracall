@@ -186,7 +186,6 @@ func Main(args []string) int {
 		}
 
 		userArgs := make(chan oracall.UserArgument, 16)
-		var readErr error
 		var grp syncutil.Group
 		grp.Go(func() error {
 			defer close(userArgs)
@@ -199,7 +198,6 @@ func Main(args []string) int {
 					&ua.DataType, &prec, &scale, &cs,
 					&plsT, &length, &tOwner, &tName, &tSub, &tLink)
 				if err != nil {
-					readErr = err
 					return errors.Wrapf(err, "reading row=%v", rows)
 				}
 				if cw != nil {
@@ -268,7 +266,6 @@ func Main(args []string) int {
 				userArgs <- ua
 			}
 			if err = rows.Err(); err != nil {
-				readErr = err
 				return errors.Wrapf(err, "walking rows")
 			}
 			return nil
