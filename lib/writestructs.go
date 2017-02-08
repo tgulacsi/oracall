@@ -107,7 +107,7 @@ FunLoop:
 		var checkName string
 		for _, dir := range []bool{false, true} {
 			if err := fun.SaveStruct(structW, dir); err != nil {
-				if errors.Cause(err) == ErrMissingTableOf {
+				if SkipMissingTableOf && errors.Cause(err) == ErrMissingTableOf {
 					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name(), "error", err)
 					continue FunLoop
 				}

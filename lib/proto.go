@@ -26,6 +26,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var SkipMissingTableOf = true
+
 var Gogo bool
 var NumberAsString bool
 
@@ -57,7 +59,7 @@ FunLoop:
 	for _, fun := range functions {
 		fName := strings.ToLower(fun.name)
 		if err := fun.SaveProtobuf(w, seen); err != nil {
-			if errors.Cause(err) == ErrMissingTableOf {
+			if SkipMissingTableOf && errors.Cause(err) == ErrMissingTableOf {
 				Log("msg", "SKIP function, missing TableOf info", "function", fName)
 				continue FunLoop
 			}

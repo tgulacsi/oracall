@@ -62,6 +62,7 @@ func Main(args []string) int {
 	os.Args = args
 	GopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
 
+	flagSkipMissingTableOf := flag.Bool("skip-missing-table-of", true, "skip functions with missing TableOf info")
 	flagDump := flag.String("dump", "", "dump to this csv")
 	flagBaseDir := flag.String("base-dir", GopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
@@ -89,6 +90,7 @@ func Main(args []string) int {
 	}
 	oracall.Gogo = *flagGenerator != "go"
 	oracall.NumberAsString = *flagNumberAsString
+	oracall.SkipMissingTableOf = *flagSkipMissingTableOf
 
 	var functions []oracall.Function
 	var err error
