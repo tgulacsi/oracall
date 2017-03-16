@@ -51,7 +51,7 @@ func (d Date) Get() (od ora.Date) {
 }
 
 type Lob struct {
-	ora.Lob
+	*ora.Lob
 	data []byte
 	err  error
 }
