@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"strconv"
 	"time"
 
@@ -102,19 +103,20 @@ func AsFloat64(v interface{}) float64 {
 	if v == nil {
 		return 0
 	}
+	var result float64
 	switch x := v.(type) {
 	case float64:
-		return x
+		result = x
 	case float32:
-		return float64(x)
+		result = float64(x)
 	case int64:
-		return float64(x)
+		result = float64(x)
 	case int32:
-		return float64(x)
+		result = float64(x)
 	case ora.Float64:
-		return x.Value
+		result = x.Value
 	case ora.Float32:
-		return float64(x.Value)
+		result = float64(x.Value)
 	case string:
 		if x == "" {
 			return 0
@@ -123,11 +125,15 @@ func AsFloat64(v interface{}) float64 {
 		if err != nil {
 			log.Printf("ERROR parsing %q as Float64", x)
 		}
-		return f
+		result = f
 	default:
 		log.Printf("WARN: unknown Int64 type %T", v)
+		return 0
 	}
-	return 0
+	if result == 0 {
+		return math.SmallestNonzeroFloat64
+	}
+	return result
 }
 func AsInt32(v interface{}) int32 {
 	if v == nil {
