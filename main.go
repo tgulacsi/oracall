@@ -38,6 +38,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/tgulacsi/go/loghlp/kitloghlp"
+	"github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
 	// for Oracle-specific drivers
@@ -62,13 +63,14 @@ func Main(args []string) int {
 	os.Args = args
 	GopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
 
-	flagSkipMissingTableOf := flag.Bool("skip-missing-table-of", true, "skip functions with missing TableOf info")
+	flag.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", true, "skip functions with missing TableOf info")
 	flagDump := flag.String("dump", "", "dump to this csv")
 	flagBaseDir := flag.String("base-dir", GopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
 	flagGenerator := flag.String("protoc-gen", "gofast", "use protoc-gen-<generator>")
-	flagNumberAsString := flag.Bool("number-as-string", false, "add ,string to json tags")
+	flag.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
+	flag.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
 
 	flag.Parse()
@@ -89,8 +91,6 @@ func Main(args []string) int {
 		pattern = "%"
 	}
 	oracall.Gogo = *flagGenerator != "go"
-	oracall.NumberAsString = *flagNumberAsString
-	oracall.SkipMissingTableOf = *flagSkipMissingTableOf
 
 	var functions []oracall.Function
 	var err error

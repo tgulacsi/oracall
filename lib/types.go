@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Tam·s Gul·csi
+Copyright 2016 Tam√°s Gul√°csi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -108,3 +108,5 @@ func mkVarName(dst string) string {
 	hex.Encode(enc[:], h.Sum(raw[:0]))
 	return fmt.Sprintf("var_%s", enc[:])
 }
+
+// vim: set fileencoding=utf-8 noet:
