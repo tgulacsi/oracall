@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Tam√°s Gul√°csi
+Copyright 2016 Tam·s Gul·csi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	case "PLS_INTEGER":
 		return fmt.Sprintf("%s = %s.Value", dst, src)
 	case "NUMBER":
-		return fmt.Sprintf("%s = %s.Value", dst, src)
+		return fmt.Sprintf("%s = custom.AsFloat64(%s.Value)", dst, src)
 	}
 	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora)
 }

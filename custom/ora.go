@@ -11,6 +11,8 @@ import (
 	"gopkg.in/rana/ora.v4"
 )
 
+var ZeroIsAlmostZero bool
+
 type Number string
 
 func (n *Number) Set(num ora.OCINum) {
@@ -130,7 +132,7 @@ func AsFloat64(v interface{}) float64 {
 		log.Printf("WARN: unknown Int64 type %T", v)
 		return 0
 	}
-	if result == 0 {
+	if ZeroIsAlmostZero && result == 0 {
 		return math.SmallestNonzeroFloat64
 	}
 	return result
