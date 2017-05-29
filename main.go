@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/csv"
@@ -122,6 +123,28 @@ func Main(args []string) int {
 		if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
 			tbl = "all_arguments"
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		var grp syncutil.Group
+		grp.Go(func() error {
+			qry := "SELECT text FROM user_source WHERE name = :1 AND type = :2 ORDER BY lineno"
+			rows, err := cx.QueryContext(ctx, qry)
+			if err != nil {
+				return errors.Wrap(err, qry)
+			}
+			defer rows.Close()
+			var buf bytes.Buffer
+			for rows.Next() {
+				var line sql.NullString
+				if err := rows.Scan(&line); err != nil {
+					return errors.Wrap(err, qry)
+				}
+				buf.WriteString(line.String)
+			}
+			return errors.Wrap(rows.Err(), qry)
+		})
+
 		qry := `
     SELECT A.*
 	  FROM
@@ -138,8 +161,6 @@ func Main(args []string) int {
 		if qc, ok := (interface{}(cx)).(interface {
 			QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
 		}); ok {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
 			rows, err = qc.QueryContext(ctx, qry, pattern)
 		} else {
 			rows, err = cx.Query(qry, pattern)
@@ -188,7 +209,6 @@ func Main(args []string) int {
 		}
 
 		userArgs := make(chan oracall.UserArgument, 16)
-		var grp syncutil.Group
 		grp.Go(func() error {
 			defer close(userArgs)
 			var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString

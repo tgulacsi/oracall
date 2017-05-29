@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2013 TamĂĄs GulĂĄcsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,10 +25,10 @@ import (
 var Log = func(...interface{}) error { return nil }
 
 const (
-	MarkNull = "␀" // 0x2400 = nul
-	//MarkValid  = "滿" // 0x6eff = fill; full, satisfied
+	MarkNull = "â" // 0x2400 = nul
+	//MarkValid  = "ćťż" // 0x6eff = fill; full, satisfied
 	MarkValid = "Valid" // 0x6eff = fill; full, satisfied
-	//MarkHidden = "匿"     // 0x533f = hide
+	//MarkHidden = "ĺż"     // 0x533f = hide
 	MarkHidden = "_hidden"
 
 	DefaultMaxVARCHARLength = 32767
@@ -39,6 +39,7 @@ type Function struct {
 	Package, name string
 	Returns       *Argument
 	Args          []Argument
+	Documentation string
 }
 
 func (f Function) Name() string {
