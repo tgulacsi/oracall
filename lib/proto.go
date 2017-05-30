@@ -72,7 +72,7 @@ FunLoop:
 		name := CamelCase(dot2D.Replace(fName))
 		var comment string
 		if fun.Documentation != "" {
-			comment = "/*\n" + fun.Documentation + "\n*/\n"
+			comment = "/// " + strings.Replace(fun.Documentation , "\n", "\n/// ", -1)+ "\n"
 		}
 		services = append(services,
 			fmt.Sprintf(`%srpc %s (%s) returns (%s%s) {}`,

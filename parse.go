@@ -31,6 +31,9 @@ func parseDocs(ctx context.Context, text string) (map[string]string, error) {
 	l := lex("docs", text)
 	var buf bytes.Buffer
 	for {
+	if err := ctx.Err(); err != nil {
+		return m,err
+	}
 		item := l.nextItem()
 		switch item.typ {
 		case itemError:
@@ -77,33 +80,34 @@ const (
 )
 
 func lexText(l *lexer) stateFn {
-	for {
-		if l.pos == len(l.input) {
-			l.emit(itemEOF)
-			return nil
-		}
-
-		// skip --...\n
-		lcPos := strings.Index(l.input[l.pos:], lcBegin)
-		bcPos := strings.Index(l.input[l.pos:], bcBegin)
-		if lcPos >= 0 || bcPos >= 0 {
-			pos, next := lcPos, lexLineComment
-			if bcPos != -1 && pos > bcPos {
-				pos, next = bcPos, lexBlockComment
-			}
-			l.pos += pos
-			l.emit(itemText)
-			l.start += 2
-			return next
-		}
-		l.pos = len(l.input)
-		l.emit(itemText)
+	if l.pos == len(l.input) {
+		l.emit(itemEOF)
 		return nil
 	}
+
+	// skip --...\n
+	lcPos := strings.Index(l.input[l.pos:], lcBegin)
+	bcPos := strings.Index(l.input[l.pos:], bcBegin)
+	if lcPos >= 0 || bcPos >= 0 {
+		pos, next := lcPos, lexLineComment
+		if bcPos != -1 && pos > bcPos {
+			pos, next = bcPos, lexBlockComment
+		}
+		l.pos += pos
+		l.emit(itemText)
+		l.start += 2
+		return next
+	}
+	l.pos = len(l.input)
+	l.emit(itemText)
 	return nil
 }
 
 func lexLineComment(l *lexer) stateFn {
+	if l.pos < 0 || len(l.input) <= l.pos {
+		l.emit(itemEOF)
+		return nil
+	}
 	end := strings.Index(l.input[l.pos:], lcEnd)
 	if end < 0 {
 		l.emit(itemError)
@@ -116,6 +120,10 @@ func lexLineComment(l *lexer) stateFn {
 	return lexText
 }
 func lexBlockComment(l *lexer) stateFn {
+	if l.pos < 0 || len(l.input) <= l.pos {
+		l.emit(itemEOF)
+		return nil
+	}
 	end := strings.Index(l.input[l.pos:], bcEnd)
 	if end < 0 {
 		l.emit(itemError)
@@ -168,7 +176,12 @@ func (l *lexer) run() {
 
 // emit passes an item back to the client.
 func (l *lexer) emit(t itemType) {
-	l.items <- item{t, l.input[l.start:l.pos]}
+	if l.start > l.pos {
+		//panic(fmt.Sprintf("start=%d > %d=pos", l.start, l.pos))
+		l.items <- item{typ: t}
+	} else {
+		l.items <- item{typ: t, val: l.input[l.start:l.pos]}
+	}
 	l.start = l.pos
 }
 

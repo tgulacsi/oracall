@@ -29,6 +29,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -229,7 +230,10 @@ func Main(args []string) int {
 							if err := getSource(ctx, buf, cx, ua.PackageName); err != nil {
 								return errors.WithMessage(err, ua.PackageName)
 							}
+							ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 							funDocs, err := parseDocs(ctx, buf.String())
+							cancel()
+							Log("msg", "parseDocs", "package", ua.PackageName, "docs", len(funDocs), "error", err)
 							docsMu.Lock()
 							pn := oracall.UnoCap(ua.PackageName) + "."
 							for nm, doc := range funDocs {
@@ -293,13 +297,30 @@ func Main(args []string) int {
 			return nil
 		})
 		functions, err = oracall.ParseArguments(userArgs)
-		if grpErr := grp.Err(); grpErr != nil && err == nil {
-			err = grpErr
-		}
-		for _, f := range functions {
-			if f.Documentation == "" {
-				f.Documentation = docs[f.Name()]
+		if grpErr := grp.Err(); grpErr != nil {
+			if err == nil {
+				err = grpErr
 			}
+			Log("msg", "ParseArguments", "error", grpErr)
+		}
+		docNames := make([]string, 0, len(docs))
+		for k := range docs {
+			docNames = append(docNames, k)
+		}
+		sort.Strings(docNames)
+		var any bool
+		for i, f := range functions {
+			if f.Documentation == "" {
+				if f.Documentation = docs[f.Name()]; f.Documentation == "" {
+					Log("msg", "No documentation", "function", f.Name())
+					any = true
+				} else {
+					functions[i] = f
+				}
+			}
+		}
+		if any {
+			Log("has", docNames)
 		}
 	}
 	if err != nil {
@@ -388,8 +409,8 @@ func Main(args []string) int {
 var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 1024)) }}
 
 func getSource(ctx context.Context, w io.Writer, cx *sql.DB, packageName string) error {
-	qry := "SELECT text FROM user_source WHERE name = :1 AND type = 'PACKAGE' ORDER BY lineno"
-	rows, err := cx.QueryContext(ctx, qry)
+	qry := "SELECT text FROM user_source WHERE name = UPPER(:1) AND type = 'PACKAGE' ORDER BY line"
+	rows, err := cx.QueryContext(ctx, qry, packageName)
 	if err != nil {
 		return errors.Wrap(err, qry)
 	}

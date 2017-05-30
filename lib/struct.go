@@ -54,7 +54,11 @@ func (f Function) String() string {
 	for i := range args {
 		args[i] = f.Args[i].String()
 	}
-	return f.Name() + "(" + strings.Join(args, ", ") + ")"
+	s := f.Name() + "(" + strings.Join(args, ", ") + ")"
+	if f.Documentation == "" {
+		return s
+	}
+	return s + "\n" + f.Documentation
 }
 
 func (f Function) HasCursorOut() bool {
