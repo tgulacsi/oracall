@@ -33,7 +33,7 @@ import (
 
 	"github.com/antzucaro/matchr"
 	"github.com/kylelemons/godebug/pretty"
-	"gopkg.in/rana/ora.v4"
+	_ "gopkg.in/rana/ora.v4"
 )
 
 var (
@@ -582,7 +582,6 @@ var buildOnce sync.Once
 
 func init() {
 	flag.Parse()
-	ora.Register(nil)
 }
 
 var db *sql.DB

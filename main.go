@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2017 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -229,7 +229,7 @@ func Main(args []string) int {
 							if err := getSource(ctx, buf, cx, ua.PackageName); err != nil {
 								return errors.WithMessage(err, ua.PackageName)
 							}
-							funDocs, err := parseDocs(ctx, buf.Bytes())
+							funDocs, err := parseDocs(ctx, buf.String())
 							docsMu.Lock()
 							pn := oracall.UnoCap(ua.PackageName) + "."
 							for nm, doc := range funDocs {
@@ -404,10 +404,6 @@ func getSource(ctx context.Context, w io.Writer, cx *sql.DB, packageName string)
 		}
 	}
 	return errors.Wrap(rows.Err(), qry)
-}
-
-func parseDocs(ctx context.Context, source []byte) (map[string]string, error) {
-	return nil, nil
 }
 
 func i64ToString(n sql.NullInt64) string {
