@@ -70,8 +70,13 @@ FunLoop:
 			streamQual = "stream "
 		}
 		name := CamelCase(dot2D.Replace(fName))
+		var comment string
+		if fun.Documentation != "" {
+			comment = "/*\n" + fun.Documentation + "\n*/\n"
+		}
 		services = append(services,
-			fmt.Sprintf(`rpc %s (%s) returns (%s%s) {}`,
+			fmt.Sprintf(`%srpc %s (%s) returns (%s%s) {}`,
+				comment,
 				name,
 				CamelCase(fun.getStructName(false, false)),
 				streamQual,
