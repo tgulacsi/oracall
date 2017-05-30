@@ -230,7 +230,7 @@ func Main(args []string) int {
 							if err := getSource(ctx, buf, cx, ua.PackageName); err != nil {
 								return errors.WithMessage(err, ua.PackageName)
 							}
-							ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+							ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 							funDocs, err := parseDocs(ctx, buf.String())
 							cancel()
 							Log("msg", "parseDocs", "package", ua.PackageName, "docs", len(funDocs), "error", err)
@@ -240,6 +240,9 @@ func Main(args []string) int {
 								docs[pn+strings.ToLower(nm)] = doc
 							}
 							docsMu.Unlock()
+							if err == context.DeadlineExceeded {
+								err = nil
+							}
 							return err
 						})
 					}
