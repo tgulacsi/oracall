@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -30,6 +31,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -127,23 +129,6 @@ func Main(args []string) int {
 		defer cancel()
 
 		var grp syncutil.Group
-		grp.Go(func() error {
-			qry := "SELECT text FROM user_source WHERE name = :1 AND type = :2 ORDER BY lineno"
-			rows, err := cx.QueryContext(ctx, qry)
-			if err != nil {
-				return errors.Wrap(err, qry)
-			}
-			defer rows.Close()
-			var buf bytes.Buffer
-			for rows.Next() {
-				var line sql.NullString
-				if err := rows.Scan(&line); err != nil {
-					return errors.Wrap(err, qry)
-				}
-				buf.WriteString(line.String)
-			}
-			return errors.Wrap(rows.Err(), qry)
-		})
 
 		qry := `
     SELECT A.*
@@ -157,14 +142,7 @@ func Main(args []string) int {
 	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
      ) A
       ORDER BY 1, 2, 3`
-		var rows *sql.Rows
-		if qc, ok := (interface{}(cx)).(interface {
-			QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
-		}); ok {
-			rows, err = qc.QueryContext(ctx, qry, pattern)
-		} else {
-			rows, err = cx.Query(qry, pattern)
-		}
+		rows, err := cx.QueryContext(ctx, qry, pattern)
 		if err != nil {
 			Log("qry", qry, "error", err)
 			return 2
@@ -208,6 +186,9 @@ func Main(args []string) int {
 			}
 		}
 
+		var prevPackage string
+		var docsMu sync.Mutex
+		docs := make(map[string]string)
 		userArgs := make(chan oracall.UserArgument, 16)
 		grp.Go(func() error {
 			defer close(userArgs)
@@ -239,6 +220,25 @@ func Main(args []string) int {
 				ua.Position, ua.DataPrecision, ua.DataScale, ua.CharLength = 0, 0, 0, 0
 				if pn.Valid {
 					ua.PackageName = pn.String
+					if ua.PackageName != prevPackage {
+						prevPackage = ua.PackageName
+						grp.Go(func() error {
+							buf := bufPool.Get().(*bytes.Buffer)
+							defer bufPool.Put(buf)
+							buf.Reset()
+							if err := getSource(ctx, buf, cx, ua.PackageName); err != nil {
+								return errors.WithMessage(err, ua.PackageName)
+							}
+							funDocs, err := parseDocs(ctx, buf.Bytes())
+							docsMu.Lock()
+							pn := oracall.UnoCap(ua.PackageName) + "."
+							for nm, doc := range funDocs {
+								docs[pn+strings.ToLower(nm)] = doc
+							}
+							docsMu.Unlock()
+							return err
+						})
+					}
 				}
 				if on.Valid {
 					ua.ObjectName = on.String
@@ -296,9 +296,14 @@ func Main(args []string) int {
 		if grpErr := grp.Err(); grpErr != nil && err == nil {
 			err = grpErr
 		}
+		for _, f := range functions {
+			if f.Documentation == "" {
+				f.Documentation = docs[f.Name()]
+			}
+		}
 	}
 	if err != nil {
-		Log("msg", "reade", "file", flag.Arg(0), "error", err)
+		Log("msg", "read", "file", flag.Arg(0), "error", err)
 		return 3
 	}
 
@@ -378,6 +383,31 @@ func Main(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 1024)) }}
+
+func getSource(ctx context.Context, w io.Writer, cx *sql.DB, packageName string) error {
+	qry := "SELECT text FROM user_source WHERE name = :1 AND type = 'PACKAGE' ORDER BY lineno"
+	rows, err := cx.QueryContext(ctx, qry)
+	if err != nil {
+		return errors.Wrap(err, qry)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var line sql.NullString
+		if err := rows.Scan(&line); err != nil {
+			return errors.Wrap(err, qry)
+		}
+		if _, err := io.WriteString(w, line.String); err != nil {
+			return err
+		}
+	}
+	return errors.Wrap(rows.Err(), qry)
+}
+
+func parseDocs(ctx context.Context, source []byte) (map[string]string, error) {
+	return nil, nil
 }
 
 func i64ToString(n sql.NullInt64) string {

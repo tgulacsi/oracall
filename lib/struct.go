@@ -46,7 +46,7 @@ func (f Function) Name() string {
 	if f.Package == "" {
 		return strings.ToLower(f.name)
 	}
-	return unocap(f.Package) + "." + strings.ToLower(f.name)
+	return UnoCap(f.Package) + "." + strings.ToLower(f.name)
 }
 
 func (f Function) String() string {
@@ -191,7 +191,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	return arg
 }
 
-func unocap(text string) string {
+func UnoCap(text string) string {
 	i := strings.Index(text, "_")
 	if i == 0 {
 		return capitalize(text)
