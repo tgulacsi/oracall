@@ -23,7 +23,6 @@ import (
 	"encoding/csv"
 	"flag"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -41,6 +40,7 @@ import (
 	"go4.org/syncutil"
 
 	"github.com/pkg/errors"
+	"github.com/go-kit/kit/log"
 	"github.com/tgulacsi/go/loghlp/kitloghlp"
 	"github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
@@ -80,7 +80,8 @@ func Main(args []string) int {
 	flag.Parse()
 	if *flagPbOut == "" {
 		if *flagDbOut == "" {
-			log.Fatal("-pb-out or -db-out is required!")
+			logger.Log("-pb-out or -db-out is required!")
+			os.Exit(1)
 		}
 		*flagPbOut = *flagDbOut
 	} else if *flagDbOut == "" {
@@ -227,13 +228,16 @@ func Main(args []string) int {
 							buf := bufPool.Get().(*bytes.Buffer)
 							defer bufPool.Put(buf)
 							buf.Reset()
+
+							Log := log.With(logger, "package", ua.PackageName).Log
 							if err := getSource(ctx, buf, cx, ua.PackageName); err != nil {
+								Log("msg", "getSource", "error", err)
 								return errors.WithMessage(err, ua.PackageName)
 							}
 							ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 							funDocs, err := parseDocs(ctx, buf.String())
 							cancel()
-							Log("msg", "parseDocs", "package", ua.PackageName, "docs", len(funDocs), "error", err)
+							Log("msg", "parseDocs", "docs", len(funDocs), "error", err)
 							docsMu.Lock()
 							pn := oracall.UnoCap(ua.PackageName) + "."
 							for nm, doc := range funDocs {

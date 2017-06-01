@@ -31,10 +31,11 @@ func parseDocs(ctx context.Context, text string) (map[string]string, error) {
 	l := lex("docs", text)
 	var buf bytes.Buffer
 	for {
-	if err := ctx.Err(); err != nil {
-		return m,err
-	}
+		if err := ctx.Err(); err != nil {
+			return m, err
+		}
 		item := l.nextItem()
+		//logger.Log("item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
 		switch item.typ {
 		case itemError:
 			return m, errors.New(item.val)
@@ -90,15 +91,17 @@ func lexText(l *lexer) stateFn {
 	bcPos := strings.Index(l.input[l.pos:], bcBegin)
 	if lcPos >= 0 || bcPos >= 0 {
 		pos, next := lcPos, lexLineComment
-		if bcPos != -1 && pos > bcPos {
+		if bcPos != -1 && (pos == -1 || pos > bcPos) {
 			pos, next = bcPos, lexBlockComment
 		}
 		l.pos += pos
+		//logger.Log("msg", "lexText", "lcPos",lcPos, "bcPos",bcPos,"pos",pos,"l.pos",l.pos, "l.start",l.start)
 		l.emit(itemText)
 		l.start += 2
 		return next
 	}
 	l.pos = len(l.input)
+	//logger.Log("msg", "lexText", "start", l.start, "pos", l.pos)
 	l.emit(itemText)
 	return nil
 }
@@ -148,8 +151,11 @@ func (i item) String() string {
 	case itemError:
 		return i.val
 	}
-	if len(i.val) > 10 {
-		return fmt.Sprintf("%.10q...", i.val)
+	if len(i.val) > 20 {
+		if len(i.val) > 40 {
+			return fmt.Sprintf("%.20q...%.20q", i.val, i.val[len(i.val)-20:])
+		}
+		return fmt.Sprintf("%.20q...", i.val)
 	}
 	return fmt.Sprintf("%q", i.val)
 }
@@ -171,31 +177,32 @@ func (l *lexer) run() {
 	for state := lexText; state != nil; {
 		state = state(l)
 	}
-	close(l.items) // No more tokens will be delivered.
 }
 
 // emit passes an item back to the client.
 func (l *lexer) emit(t itemType) {
-	if l.start > l.pos {
-		//panic(fmt.Sprintf("start=%d > %d=pos", l.start, l.pos))
-		l.items <- item{typ: t}
-	} else {
-		l.items <- item{typ: t, val: l.input[l.start:l.pos]}
-	}
+	//logger.Log("EMIT", item{typ: t, val: l.input[l.start:l.pos]})
+	l.items <- item{typ: t, val: l.input[l.start:l.pos]}
 	l.start = l.pos
+	if l.start == len(l.input) {
+		l.items <- item{typ: itemEOF}
+		close(l.items) // No more tokens will be delivered.
+	}
 }
 
 // nextItem returns the next item from the input.
 func (l *lexer) nextItem() item {
-	for l.state != nil {
+	for {
 		select {
 		case item := <-l.items:
 			return item
 		default:
+			if l.state == nil {
+				return item{typ: itemEOF}
+			}
 			l.state = l.state(l)
 		}
 	}
-	return item{typ: itemEOF}
 }
 
 // lex creates a new scanner for the input string.
