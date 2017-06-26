@@ -59,7 +59,7 @@ var logger = kitloghlp.New(os.Stderr)
 var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
 
 func main() {
-	oracall.Log = logger.With("lib", "oracall").Log
+	oracall.Log = log.With(logger, "lib", "oracall").Log
 	os.Exit(Main(os.Args))
 }
 
