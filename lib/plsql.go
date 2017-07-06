@@ -48,8 +48,26 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		os.Exit(1)
 	}
 	fn := strings.Replace(fun.name, ".", "__", -1)
-	callBuf := buffers.Get()
-	defer buffers.Put(callBuf)
+
+	plsBuf := buffers.Get()
+	defer buffers.Put(plsBuf)
+	plsBuf.Reset()
+	if len(decls) > 0 {
+		io.WriteString(plsBuf, "DECLARE\n")
+		for _, line := range decls {
+			fmt.Fprintf(plsBuf, "  %s\n", line)
+		}
+		plsBuf.Write([]byte{'\n'})
+	}
+	io.WriteString(plsBuf, "BEGIN\n")
+	for _, line := range pre {
+		fmt.Fprintf(plsBuf, "  %s\n", line)
+	}
+	fmt.Fprintf(plsBuf, "\n  %s;\n\n", call)
+	for _, line := range post {
+		fmt.Fprintf(plsBuf, "  %s\n", line)
+	}
+	io.WriteString(plsBuf, "\nEND;\n")
 
 	var check string
 	if checkName != "" {
@@ -59,6 +77,10 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
     }
 	`, checkName)
 	}
+
+	callBuf := buffers.Get()
+	defer buffers.Put(callBuf)
+	callBuf.Reset()
 
 	hasCursorOut := fun.HasCursorOut()
 	if hasCursorOut {
@@ -86,10 +108,28 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
+
+	var pls string
+	{
+	var i int
+	paramsMap := make(map[string][]int, 16)
+	first := make(map[string]int, len(paramsMap))
+	pls, _ = orahlp.MapToSlice(
+		plsBuf.String(),
+		func(key string) interface{} {
+			paramsMap[key] = append(paramsMap[key], i)
+			if _, ok := first[key]; !ok {
+				first[key] = i
+			}
+			i++
+			return key
+		})
+	}
+
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
-	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Printf(`calling %s\n\twith %%v`, params) }"+`
+	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Println(`calling %s as`); log.Printf(`%s`, params...) }"+`
 	ses, err := s.OraSesPool.Get()
 	if err != nil {
 		err = errors.Wrap(err, "Get")
@@ -117,7 +157,8 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		}
 	}
 	defer stmt.Close()
-    `, call[i:j], fun.getPlsqlConstName())
+    `,
+		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"), fun.getPlsqlConstName())
 	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %v`, params) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
@@ -166,25 +207,6 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
         return
     }`)
 	callFun = callBuf.String()
-
-	plsBuf := callBuf
-	plsBuf.Reset()
-	if len(decls) > 0 {
-		io.WriteString(plsBuf, "DECLARE\n")
-		for _, line := range decls {
-			fmt.Fprintf(plsBuf, "  %s\n", line)
-		}
-		plsBuf.Write([]byte{'\n'})
-	}
-	io.WriteString(plsBuf, "BEGIN\n")
-	for _, line := range pre {
-		fmt.Fprintf(plsBuf, "  %s\n", line)
-	}
-	fmt.Fprintf(plsBuf, "\n  %s;\n\n", call)
-	for _, line := range post {
-		fmt.Fprintf(plsBuf, "  %s\n", line)
-	}
-	io.WriteString(plsBuf, "\nEND;\n")
 	plsql = plsBuf.String()
 
 	plsql, callFun = demap(plsql, callFun)
@@ -192,12 +214,8 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 }
 
 func demap(plsql, callFun string) (string, string) {
-	type repl struct {
-		ParamsArrLen int
-	}
-	paramsMap := make(map[string][]int, 16)
-
 	var i int
+	paramsMap := make(map[string][]int, 16)
 	first := make(map[string]int, len(paramsMap))
 	plsql, paramsArr := orahlp.MapToSlice(
 		plsql,
@@ -210,6 +228,9 @@ func demap(plsql, callFun string) (string, string) {
 			return key
 		})
 
+	type repl struct {
+		ParamsArrLen int
+	}
 	opts := repl{
 		ParamsArrLen: len(paramsArr),
 	}

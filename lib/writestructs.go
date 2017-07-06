@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"unicode"
@@ -572,6 +573,30 @@ func (bp bufPool) Put(b *bytes.Buffer) {
 	}
 	b.Reset()
 	bp.Pool.Put(b)
+}
+
+var rIdentifier = regexp.MustCompile(`:([0-9a-zA-Z][a-zA-Z0-9_]*)`)
+
+func ReplOraPh(s string, params []interface{}) string {
+	var i int
+	return rIdentifier.ReplaceAllStringFunc(
+		s,
+		func(_ string) string {
+			i++
+			return fmt.Sprintf("%v", params[i-1])
+		},
+	)
+}
+
+func replOraPhMeta(text, sliceName string) string {
+	var i int
+	return rIdentifier.ReplaceAllStringFunc(
+		text,
+		func(_ string) string {
+			i++
+			return fmt.Sprintf("`"+`+fmt.Sprintf("%%v", %s[%d])+`+"`", sliceName, i-1)
+		},
+	)
 }
 
 // vim: se noet fileencoding=utf-8:
