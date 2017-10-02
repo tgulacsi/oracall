@@ -11,7 +11,7 @@ func TestOne(t *testing.T) {
 	Log = kitloghlp.NewTestLogger(t).Log
 	for i, tc := range testCases {
 		functions := tc.ParseCsv(t, i)
-		got, _ := functions[0].PlsqlBlock(true)
+		got, _ := functions[0].PlsqlBlock("")
 		d := diff.Diff(tc.PlSql, got)
 		if d != "" {
 			//FIXME(tgulacsi): this should be an error!
