@@ -39,15 +39,14 @@ import (
 
 	"go4.org/syncutil"
 
-	"github.com/pkg/errors"
 	"github.com/go-kit/kit/log"
+	"github.com/pkg/errors"
 	"github.com/tgulacsi/go/loghlp/kitloghlp"
 	"github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
 	// for Oracle-specific drivers
-	ora "gopkg.in/rana/ora.v4"
-	"gopkg.in/rana/ora.v4/lg"
+	goracle "gopkg.in/goracle.v2"
 )
 
 //go:generate go generate ./lib
@@ -117,7 +116,7 @@ func Main(args []string) int {
 		}
 		defer cx.Close()
 		if *flagVerbose {
-			ora.SetCfg(ora.Cfg().SetLogger(lg.Log))
+			goracle.Log = log.With(logger, "lib", "goracle").Log
 		}
 		if err = cx.Ping(); err != nil {
 			Log("msg", "pinging", "dsn", *flagConnect, "error", err)

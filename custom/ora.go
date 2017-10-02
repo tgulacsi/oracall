@@ -1,6 +1,7 @@
 package custom
 
 import (
+	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -8,40 +9,37 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/rana/ora.v4"
+	"gopkg.in/goracle.v2"
 )
 
 var ZeroIsAlmostZero bool
 
-type Number string
+type Number goracle.Number
 
-func (n *Number) Set(num ora.OCINum) {
-	*n = Number(num.String())
+func (n *Number) Set(num goracle.Number) {
+	*n = Number(num)
 }
-func (n Number) Get() ora.OCINum {
-	var num ora.OCINum
-	num.SetString(string(n))
-	return num
+func (n Number) Get() goracle.Number {
+	return goracle.Number(n)
 }
 
 type Date string
 
 const timeFormat = "2006-01-02 15:04:05 -0700"
 
-func NewDate(date ora.Date) Date {
-	t := date.Get()
+func NewDate(t time.Time) Date {
 	if t.IsZero() {
 		return Date("")
 	}
 	return Date(t.Format(timeFormat))
 }
-func (d *Date) Set(date ora.Date) {
-	if date.IsNull() {
+func (d *Date) Set(t time.Time) {
+	if t.IsZero() {
 		*d = Date("")
 	}
-	*d = NewDate(date)
+	*d = NewDate(t)
 }
-func (d Date) Get() (od ora.Date) {
+func (d Date) Get() (od time.Time) {
 	if d == "" {
 		return
 	}
@@ -49,12 +47,11 @@ func (d Date) Get() (od ora.Date) {
 	if err != nil || t.IsZero() {
 		return
 	}
-	od.Set(t)
-	return
+	return t
 }
 
 type Lob struct {
-	*ora.Lob
+	*goracle.Lob
 	data []byte
 	err  error
 }
@@ -95,8 +92,10 @@ func AsString(v interface{}) string {
 	switch x := v.(type) {
 	case string:
 		return x
-	case ora.String:
-		return x.Value
+	case sql.NullString:
+		return x.String
+	case fmt.Stringer:
+		return x.String()
 	}
 	return fmt.Sprintf("%v", v)
 }
@@ -115,10 +114,8 @@ func AsFloat64(v interface{}) float64 {
 		result = float64(x)
 	case int32:
 		result = float64(x)
-	case ora.Float64:
-		result = x.Value
-	case ora.Float32:
-		result = float64(x.Value)
+	case sql.NullFloat64:
+		result = x.Float64
 	case string:
 		if x == "" {
 			return 0
@@ -150,10 +147,8 @@ func AsInt32(v interface{}) int32 {
 		return int32(x)
 	case float32:
 		return int32(x)
-	case ora.Int32:
-		return x.Value
-	case ora.Int64:
-		return int32(x.Value)
+	case sql.NullInt64:
+		return int32(x.Int64)
 	case string:
 		if x == "" {
 			return 0
@@ -178,10 +173,8 @@ func AsInt64(v interface{}) int64 {
 		return int64(x)
 	case float32:
 		return int64(x)
-	case ora.Int64:
-		return x.Value
-	case ora.Int32:
-		return int64(x.Value)
+	case sql.NullInt64:
+		return x.Int64
 	case string:
 		if x == "" {
 			return 0
@@ -207,10 +200,6 @@ func AsDate(v interface{}) Date {
 		return Date(x.Format(timeFormat))
 	case string:
 		return Date(x)
-	case ora.Date:
-		var d Date
-		d.Set(x)
-		return d
 	default:
 		log.Printf("WARN: unknown Date type %T", v)
 	}
