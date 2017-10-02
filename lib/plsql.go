@@ -111,52 +111,41 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 
 	var pls string
 	{
-	var i int
-	paramsMap := make(map[string][]int, 16)
-	first := make(map[string]int, len(paramsMap))
-	pls, _ = orahlp.MapToSlice(
-		plsBuf.String(),
-		func(key string) interface{} {
-			paramsMap[key] = append(paramsMap[key], i)
-			if _, ok := first[key]; !ok {
-				first[key] = i
-			}
-			i++
-			return key
-		})
+		var i int
+		paramsMap := make(map[string][]int, 16)
+		first := make(map[string]int, len(paramsMap))
+		pls, _ = orahlp.MapToSlice(
+			plsBuf.String(),
+			func(key string) interface{} {
+				paramsMap[key] = append(paramsMap[key], i)
+				if _, ok := first[key]; !ok {
+					first[key] = i
+				}
+				i++
+				return key
+			})
 	}
 
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Println(`calling %s as`); log.Printf(`%s`, params...) }"+`
-	ses, err := s.OraSesPool.Get()
-	if err != nil {
-		err = errors.Wrap(err, "Get")
-		return
-	}
-	defer s.OraSesPool.Put(ses)
 	qry := %s
-	stmt, err := ses.Prep(qry)
-	if err != nil {
-		err = errors.Wrap(err, qry)
+	stmt, stmtErr := s.PrepareContext(ctx, qry)
+	if stmtErr != nil {
+		err = errors.Wrap(stmtErr, qry)
 		return
 	}
-	if _, err = stmt.ExeP(params...); err != nil {
+	defer stmt.Close()
+	if _, err = stmt.ExecContext(ctx, params...); err != nil {
 		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
 			// "existing state of packages has been discarded"
-			_, err= stmt.ExeP(params...)
+			_, err = stmt.ExecContext(ctx, params...)
 		}
-		if err != nil && strings.Contains(err.Error(), "state of") {
-			log.Println("!!! discard session !!!")
-			ses.Close()
-			ses = nil
-		}
-		if err = errors.Wrapf(err, "%%s %%#v", qry, params); err != nil {
+		if err != nil {
 			return
 		}
 	}
-	defer stmt.Close()
     `,
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"), fun.getPlsqlConstName())
 	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %v`, params) }\n")

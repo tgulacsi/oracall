@@ -44,18 +44,20 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 		io.WriteString(w,
 			"package "+pkg+`
 import (
+	"encoding/json"
 	"encoding/xml"
 	"io"
     "log"
     "fmt"
 	"strings"
+	"database/sql"
 	"strconv"
     "time"    // for datetimes
 
 	"golang.org/x/net/context"
 
 	"github.com/pkg/errors"
-    "gopkg.in/rana/ora.v4"    // Oracle
+    _ "gopkg.in/goracle.v2"    // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.Date
 	`+pbImport+`
 )
@@ -64,7 +66,6 @@ var DebugLevel = uint(0)
 
 // against "unused import" error
 var _ = io.EOF
-var _ ora.Ses
 var _ context.Context
 var _ custom.Date
 var _ strconv.NumError
@@ -75,17 +76,12 @@ var _ log.Logger
 var _ = errors.Wrap
 var _ = fmt.Printf
 
-type OraSesPool interface {
-	Get() (*ora.Ses, error)
-	Put(*ora.Ses)
-}
-
 type oracallServer struct {
-	OraSesPool
+	*sql.DB
 }
 
-func NewServer(p OraSesPool) *oracallServer {
-	return &oracallServer{OraSesPool: p}
+func NewServer(db *sql.DB) *oracallServer {
+	return &oracallServer{DB: db}
 }
 
 type iterator struct {
