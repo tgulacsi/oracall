@@ -67,7 +67,7 @@ func TestWriteStruct(t *testing.T) {
 			t.Skipf("cannot create temp file in %q: %v", dn, err)
 			return
 		}
-		err = SaveFunctions(fh, functions, "main", false, true)
+		err = SaveFunctions(fh, functions, "main", "unosoft.hu/ws/bruno/pb", true)
 		if err != nil {
 			_ = fh.Close()
 			t.Errorf("%d. Saving functions: %v", i, err)
