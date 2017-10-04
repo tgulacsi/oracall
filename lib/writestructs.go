@@ -33,6 +33,8 @@ import (
 
 var ErrMissingTableOf = errors.New("missing TableOf info")
 
+var Goracle bool
+
 func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool) error {
 	var err error
 	w := errWriter{Writer: dst, err: &err}
@@ -40,6 +42,10 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 	if pkg != "" {
 		if pbImport != "" {
 			pbImport = `pb "` + pbImport + `"`
+		}
+		oraImport := "gopkg.in/rana/ora.v4"
+		if Goracle {
+			oraImport = "gopkg.in/goracle.v2"
 		}
 		io.WriteString(w,
 			"package "+pkg+`
@@ -57,7 +63,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/pkg/errors"
-    _ "gopkg.in/goracle.v2"    // Oracle
+    _ "`+oraImport+`" // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.Date
 	`+pbImport+`
 )
@@ -76,6 +82,14 @@ var _ log.Logger
 var _ = errors.Wrap
 var _ = fmt.Printf
 
+type iterator struct {
+	Reset func()
+	Iterate func() error
+}
+
+`)
+		if Goracle {
+			io.WriteString(w, `
 type oracallServer struct {
 	*sql.DB
 }
@@ -84,12 +98,25 @@ func NewServer(db *sql.DB) *oracallServer {
 	return &oracallServer{DB: db}
 }
 
-type iterator struct {
-	Reset func()
-	Iterate func() error
+`)
+		} else {
+			io.WriteString(w, `
+
+type OraSesPool interface {
+	Get() (*ora.Ses, error)
+	Put(*ora.Ses)
+}
+
+type oracallServer struct {
+	OraSesPool
+}
+
+func NewServer(p OraSesPool) *oracallServer {
+	return &oracallServer{OraSesPool: p}
 }
 
 `)
+		}
 	}
 	types := make(map[string]string, 16)
 	inits := make([]string, 0, len(functions))
