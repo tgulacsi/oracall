@@ -42,7 +42,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
 	"github.com/tgulacsi/go/loghlp/kitloghlp"
-	"github.com/tgulacsi/oracall/custom"
+	custom "github.com/tgulacsi/oracall/custom"
+	custom_ora "github.com/tgulacsi/oracall/custom_ora"
 	oracall "github.com/tgulacsi/oracall/lib"
 
 	// for Oracle-specific drivers
@@ -78,6 +79,7 @@ func Main(args []string) int {
 	flagVerbose := flag.Bool("v", false, "verbose logging")
 
 	flag.Parse()
+	custom_ora.ZeroIsAlmostZero = custom.ZeroIsAlmostZero
 	if *flagPbOut == "" {
 		if *flagDbOut == "" {
 			logger.Log("-pb-out or -db-out is required!")

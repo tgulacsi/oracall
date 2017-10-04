@@ -1,5 +1,3 @@
-// +build goracle
-
 package custom
 
 import (

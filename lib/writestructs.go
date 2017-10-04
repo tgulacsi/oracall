@@ -44,8 +44,10 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 			pbImport = `pb "` + pbImport + `"`
 		}
 		oraImport := "gopkg.in/rana/ora.v4"
+		customImport := "github.com/tgulacsi/oracall/custom_ora"
 		if Goracle {
 			oraImport = "gopkg.in/goracle.v2"
+			customImport = "github.com/tgulacsi/oracall/custom"
 		}
 		io.WriteString(w,
 			"package "+pkg+`
@@ -64,7 +66,7 @@ import (
 
 	"github.com/pkg/errors"
     _ "`+oraImport+`" // Oracle
-	"github.com/tgulacsi/oracall/custom"	// custom.Date
+	"`+customImport+`"	// custom.Date
 	`+pbImport+`
 )
 
