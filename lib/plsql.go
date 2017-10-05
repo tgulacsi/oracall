@@ -84,7 +84,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 
 	hasCursorOut := fun.HasCursorOut()
 	if hasCursorOut {
-		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(input *pb.%s, stream pb.%s_%sServer) (err error) {
+		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *pb.%s, stream pb.%s_%sServer) (err error) {
 			%s
 			output := new(pb.%s)
 			iterators := make([]iterator, 0, 1)
@@ -605,7 +605,7 @@ func (arg Argument) getIsValidCheck(name string) string {
 	if got[0] == '*' {
 		return name + " != nil"
 	}
-	if strings.HasPrefix(got, "ora.") {
+	if strings.HasPrefix(got, "goracle.") {
 		return "!" + name + ".IsNull"
 	}
 	if strings.HasPrefix(got, "sql.Null") {
@@ -699,13 +699,13 @@ func (arg Argument) getConvRefCursor(
 	got := arg.goType(true)
 	GoT := withPb(CamelCase(got))
 	convIn = append(convIn, fmt.Sprintf(`output.%s = make([]%s, 0, %d)  // gcrf1
-				%s = new(ora.Rset) // gcrf1 %q`,
+				%s = new(sql.Rows) // gcrf1 %q`,
 		name, GoT, tableSize,
 		paramName, got))
 
 	convOut = append(convOut, fmt.Sprintf(`
 	{
-		rset := %s.(*ora.Rset)
+		rset := %s.(*sql.Rows)
 		if rset.IsOpen() {
 		iterators = append(iterators, iterator{
 			Reset: func() { output.%s = nil },
@@ -843,11 +843,11 @@ func (arg Argument) getConvTableRec(
 	oraTyp := typ
 	switch oraTyp {
 	case "custom.Date":
-		oraTyp = "ora.Date"
+		oraTyp = "time.Time"
 	case "float64":
-		oraTyp = "ora.Float64"
+		oraTyp = "float64"
 	case "int32":
-		oraTyp = "ora.Int32"
+		oraTyp = "int32"
 	}
 	if arg.IsInput() {
 		amp := "&"

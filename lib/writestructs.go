@@ -65,7 +65,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/pkg/errors"
-    _ "`+oraImport+`" // Oracle
+    goracle "`+oraImport+`" // Oracle
 	"`+customImport+`"	// custom.Date
 	`+pbImport+`
 )
@@ -73,6 +73,7 @@ import (
 var DebugLevel = uint(0)
 
 // against "unused import" error
+var _ json.Marshaler
 var _ = io.EOF
 var _ context.Context
 var _ custom.Date
@@ -83,6 +84,7 @@ var _ xml.Name
 var _ log.Logger
 var _ = errors.Wrap
 var _ = fmt.Printf
+var _ goracle.Lob
 
 type iterator struct {
 	Reset func()
@@ -327,14 +329,14 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
-		case "ora.String":
+		case "sql.NullString":
 			checks = append(checks,
-				fmt.Sprintf(`if !%s.IsNull && len(%s.Value) > %d {
+				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
         return errors.New("%s is longer than accepted (%d)")
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
-		case "NullString", "sql.NullString":
+		case "NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
         return errors.New("%s is longer than accepted (%d)")
@@ -349,16 +351,6 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
         return errors.New("%s is out of bounds (-%s..%s)")
     }`,
 						name, cons, name, cons,
-						name, cons, cons))
-			}
-		case "ora.Int32", "ora.Int64", "ora.Float32", "ora.Float64":
-			if arg.Precision > 0 {
-				cons := strings.Repeat("9", int(arg.Precision))
-				checks = append(checks,
-					fmt.Sprintf(`if !%s.IsNull && (%s.Value <= -%s || %s.Value > %s) {
-        return errors.New("%s is out of bounds (-%s..%s)")
-    }`,
-						name, name, cons, name, cons,
 						name, cons, cons))
 			}
 		case "NullInt64", "NullFloat64", "sql.NullInt64", "sql.NullFloat64":
