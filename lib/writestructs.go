@@ -458,7 +458,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
 			return "custom.Date"
 		case "REF CURSOR":
-			return "*ora.Rset"
+			return "*sql.Rows"
 		case "CLOB", "BLOB":
 			return "ora.Lob"
 		case "BFILE":

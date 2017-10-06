@@ -84,7 +84,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 
 	hasCursorOut := fun.HasCursorOut()
 	if hasCursorOut {
-		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(ctx context.Context, input *pb.%s, stream pb.%s_%sServer) (err error) {
+		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(input *pb.%s, stream pb.%s_%sServer) (err error) {
 			%s
 			output := new(pb.%s)
 			iterators := make([]iterator, 0, 1)
@@ -135,6 +135,8 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"), fun.getPlsqlConstName())
 	if Goracle {
 		callBuf.WriteString(`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	stmt, stmtErr := s.PrepareContext(ctx, qry)
 	if stmtErr != nil {
 		err = errors.Wrap(stmtErr, qry)
@@ -706,11 +708,11 @@ func (arg Argument) getConvRefCursor(
 	convOut = append(convOut, fmt.Sprintf(`
 	{
 		rset := %s.(*sql.Rows)
-		if rset.IsOpen() {
 		iterators = append(iterators, iterator{
 			Reset: func() { output.%s = nil },
 			Iterate: func() error {
 		a := output.%s[:0]
+		I := make([]interface{}, %d)
 		var err error
 		for i := 0; i < %d; i++ {
 			if !rset.Next() {
@@ -719,19 +721,22 @@ func (arg Argument) getConvRefCursor(
 				}
 				break
 			}
+			if err = rset.Scan(I...); err != nil {
+				break
+			}
 			a = append(a, %s)
 		}
 		output.%s = a
 		return err
 		},
 		})
-		}
 	}`,
 		paramName,
 		name,
 		name,
+		len(arg.TableOf.RecordOf),
 		batchSize,
-		arg.getFromRset("rset.Row"),
+		arg.getFromRset("I"),
 		name,
 	))
 	return convIn, convOut
