@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2017 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -528,8 +528,8 @@ func build(t *testing.T) {
 
 func generateAndBuild(t *testing.T, prefix string) (outFn string) {
 	runCommand(t, "sh", "-c",
-		"oracall -F -connect='"+*flagConnect+
-			"' TST_ORACALL."+strings.ToUpper(prefix)+"%"+
+		"oracall -connect='"+*flagConnect+"' -pb-out=github.com/tgulacsi/oracall/testdata/integration_test/pb:pb"+
+			" TST_ORACALL."+strings.ToUpper(prefix)+"%"+
 			" >./testdata/integration_test/generated_functions.go")
 
 	if outFh, err := ioutil.TempFile("", "oracall-integration_test"); err != nil {

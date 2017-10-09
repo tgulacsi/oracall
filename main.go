@@ -75,7 +75,6 @@ func Main(args []string) int {
 	flagGenerator := flag.String("protoc-gen", "gofast", "use protoc-gen-<generator>")
 	flag.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
 	flag.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
-	flag.BoolVar(&oracall.Goracle, "goracle", false, "use gopkg.in/goracle.v2 instead of gopkg.in/rana/ora.v4")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
 
 	flag.Parse()

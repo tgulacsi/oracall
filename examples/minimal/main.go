@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2017 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,14 +25,15 @@ Package main for minimal is a minimal example for oracall usage
 package main
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"encoding/xml"
 	"flag"
 	"io/ioutil"
 	"log"
 	"os"
-
-	"gopkg.in/rana/ora.v4"
+	"time"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")
@@ -79,16 +80,22 @@ func main() {
 	log.Printf("calling %s(%#v)", funName, inp)
 
 	// get cursor
-	env, srv, ses, err := ora.NewEnvSrvSes(*flagConnect, nil)
+	db, err := sql.Open("ora", *flagConnect)
 	if err != nil {
 		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
 	}
-	defer env.Close()
-	defer srv.Close()
-	defer ses.Close()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer tx.Rollback()
 
 	// call the function
-	out, err := fun(ses, inp)
+	out, err := fun(tx, inp)
 	if err != nil {
 		log.Fatalf("error calling %s(%s): %s", funName, inp, err)
 	}

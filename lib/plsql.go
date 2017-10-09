@@ -132,9 +132,9 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Println(`calling %s as`); log.Printf(`%s`, params...) }"+`
 	qry := %s
 `,
-		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"), fun.getPlsqlConstName())
-	if Goracle {
-		callBuf.WriteString(`
+		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"),
+		fun.getPlsqlConstName())
+	callBuf.WriteString(`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	stmt, stmtErr := s.PrepareContext(ctx, qry)
@@ -153,37 +153,6 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		}
 	}
     `)
-	} else {
-		callBuf.WriteString(`
-	ses, err := s.OraSesPool.Get()
-	if err != nil {
-			err = errors.Wrap(err, "Get")
-			return
-	}
-	defer s.OraSesPool.Put(ses)
-	qry := %s
-	stmt, err := ses.Prep(qry)
-	if err != nil {
-			err = errors.Wrap(err, qry)
-			return
-	}
-	if _, err = stmt.ExeP(params...); err != nil {
-			if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
-					// "existing state of packages has been discarded"
-					_, err= stmt.ExeP(params...)
-			}
-			if err != nil && strings.Contains(err.Error(), "state of") {
-					log.Println("!!! discard session !!!")
-					ses.Close()
-					ses = nil
-			}
-			if err = errors.Wrapf(err, "%%s %%#v", qry, params); err != nil {
-					return
-			}
-	}
-	defer stmt.Close()
-    `)
-	}
 
 	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %v`, params) }\n")
 	for _, line := range convOut {
