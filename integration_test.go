@@ -33,6 +33,7 @@ import (
 
 	"github.com/antzucaro/matchr"
 	"github.com/kylelemons/godebug/pretty"
+	oracall "github.com/tgulacsi/oracall/lib"
 	_ "gopkg.in/rana/ora.v4"
 )
 
@@ -97,7 +98,7 @@ func TestGenSimple(t *testing.T) {
 			t.Logf("SKIP " + todo[0])
 			continue
 		}
-		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
+		got := runTest(t, outFn, "-connect="+*flagConnect, oracall.CamelCase(todo[0]), todo[1])
 		withTime := false
 		todo[2] = strings.TrimSpace(todo[2])
 		if strings.Index(todo[2], "{{NOW}}") >= 0 {

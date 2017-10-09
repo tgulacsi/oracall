@@ -84,11 +84,11 @@ type iterator struct {
 }
 
 type oracallServer struct {
-	*sql.DB
+	db *sql.DB
 }
 
 func NewServer(db *sql.DB) *oracallServer {
-	return &oracallServer{DB: db}
+	return &oracallServer{db: db}
 }
 
 `)

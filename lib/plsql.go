@@ -25,7 +25,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/tgulacsi/go/orahlp"
+	"gopkg.in/goracle.v2"
 )
 
 // MaxTableSize is the maximum size of the array arguments
@@ -114,7 +114,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		var i int
 		paramsMap := make(map[string][]int, 16)
 		first := make(map[string]int, len(paramsMap))
-		pls, _ = orahlp.MapToSlice(
+		pls, _ = goracle.MapToSlice(
 			plsBuf.String(),
 			func(key string) interface{} {
 				paramsMap[key] = append(paramsMap[key], i)
@@ -137,7 +137,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	callBuf.WriteString(`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stmt, stmtErr := s.PrepareContext(ctx, qry)
+	stmt, stmtErr := s.db.PrepareContext(ctx, qry)
 	if stmtErr != nil {
 		err = errors.Wrap(stmtErr, qry)
 		return
@@ -212,7 +212,7 @@ func demap(plsql, callFun string) (string, string) {
 	var i int
 	paramsMap := make(map[string][]int, 16)
 	first := make(map[string]int, len(paramsMap))
-	plsql, paramsArr := orahlp.MapToSlice(
+	plsql, paramsArr := goracle.MapToSlice(
 		plsql,
 		func(key string) interface{} {
 			paramsMap[key] = append(paramsMap[key], i)
@@ -622,8 +622,13 @@ func (arg Argument) getConvSimpleTable(
 		if arg.Type == "REF CURSOR" {
 			return arg.getConvRefCursor(convIn, convOut, name, paramName, tableSize)
 		}
-		if got == "*[]string" {
-			got = "[]string"
+		if strings.HasPrefix(got, "*[]") { // FIXME(tgulacsi): just a hack, ProtoBuf never generates a pointer to a slice
+			got = got[1:]
+		}
+		if false {
+			if got == "*[]string" {
+				got = "[]string"
+			}
 		}
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf(`
