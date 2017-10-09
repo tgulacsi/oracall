@@ -33,6 +33,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"time"
 )
 
@@ -47,44 +48,19 @@ func main() {
 	if *flagConnect == "" {
 		log.Fatalf("connect string is needed")
 	}
-	funName := flag.Arg(0)
-	fun, ok := Functions[funName]
-	if !ok {
-		log.Fatalf("cannot find function named %q", funName)
-	}
-	log.Printf("fun to be called is %v", fun)
-
-	// parse stdin as json into the proper input struct
-	var (
-		input []byte
-		err   error
-	)
-	if flag.NArg() < 2 {
-		if input, err = ioutil.ReadAll(os.Stdin); err != nil {
-			log.Fatalf("error reading from stdin: %s", err)
-		}
-	} else {
-		input = []byte(flag.Arg(1))
-	}
-	inp := InputFactories[funName]()
-	if err = inp.FromJSON(input); err != nil {
-		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
-	}
-	b, err := xml.Marshal(inp)
-	if err != nil {
-		log.Fatalf("error marshaling %v to xml: %s", inp, err)
-	}
-	log.Printf("input marshaled to xml: %s", b)
-
-	DebugLevel = 1
-	log.Printf("calling %s(%#v)", funName, inp)
-
-	// get cursor
 	db, err := sql.Open("ora", *flagConnect)
 	if err != nil {
 		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
 	}
 	defer db.Close()
+
+	srv := NewServer(db)
+	funName := flag.Arg(0)
+	rf := reflect.ValueOf(srv).MethodByName(funName)
+	if !rf.IsValid() {
+		log.Fatalf("cannot find function named %q", funName)
+	}
+	log.Printf("fun to be called is %q", funName)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -94,13 +70,45 @@ func main() {
 	}
 	defer tx.Rollback()
 
-	// call the function
-	out, err := fun(tx, inp)
+	// parse stdin as json into the proper input struct
+	var input []byte
+	if flag.NArg() < 2 {
+		if input, err = ioutil.ReadAll(os.Stdin); err != nil {
+			log.Fatalf("error reading from stdin: %s", err)
+		}
+	} else {
+		input = []byte(flag.Arg(1))
+	}
+
+	rft := rf.Type()
+	args := make([]reflect.Value, 0, rft.NumIn())
+	if rft.In(0).Name() == "Context" {
+		args = append(args, reflect.ValueOf(ctx))
+	}
+	args = append(args, reflect.ValueOf(tx))
+	rinp := reflect.Zero(rft.In(len(args)).Elem())
+	inp := rinp.Interface()
+	args = append(args, rinp)
+
+	if err = json.Unmarshal(input, inp); err != nil {
+		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
+	}
+	b, err := xml.Marshal(inp)
 	if err != nil {
+		log.Fatalf("error marshaling %v to xml: %s", inp, err)
+	}
+	log.Printf("input marshaled to xml: %s", b)
+
+	log.Printf("calling %s(%#v)", funName, inp)
+
+	// call the function
+	outs := rf.Call(args)
+	if err := outs[1].Interface(); err != nil {
 		log.Fatalf("error calling %s(%s): %s", funName, inp, err)
 	}
 
 	// present the output as json
+	out := outs[0].Interface()
 	if b, err = json.Marshal(out); err != nil {
 		log.Fatalf("error marshaling output: %s", err)
 	}

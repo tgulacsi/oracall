@@ -102,15 +102,19 @@ func main() {
 
 	// call the function
 	outs := rf.Call(args)
-	if err := outs[1].Interface(); err != nil {
+	log.Printf("outs: %+v", outs)
+	err, _ = outs[1].Interface().(error)
+	if err != nil {
 		log.Fatalf("error calling %s(%#v): %v", funName, inp, err)
 	}
 
-	out := outs[1].Interface()
+	out := outs[0].Interface()
+	log.Printf("outs: (%T,%T) (%+v, %+v)", out, err, out, err)
 	// present the output as json
-	if err = json.NewEncoder(os.Stdout).Encode(out); err != nil {
+	err = json.NewEncoder(os.Stdout).Encode(out)
+	os.Stdout.Close()
+	if err != nil {
 		log.Fatalf("error marshaling output: %s\n%+v\n%s", err, out,
 			spew.Sdump(out))
 	}
-	os.Stdout.Close()
 }
