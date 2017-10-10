@@ -53,6 +53,7 @@ import (
 	"database/sql"
 	"strconv"
     "time"    // for datetimes
+	"unsafe"
 
 	"golang.org/x/net/context"
 
@@ -77,6 +78,7 @@ var _ log.Logger
 var _ = errors.Wrap
 var _ = fmt.Printf
 var _ goracle.Lob
+var _ unsafe.Pointer
 
 type iterator struct {
 	Reset func()

@@ -163,10 +163,10 @@ func TestGenRec(t *testing.T) {
 
 func createStoredProc(t *testing.T) {
 	compile(t, `CREATE OR REPLACE PACKAGE TST_oracall AS
-TYPE num_tab_typ IS TABLE OF NUMBER INDEX BY BINARY_INTEGER;
+TYPE num_tab_typ IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
 
 TYPE mix_rec_typ IS RECORD (num NUMBER, dt DATE, text VARCHAR2(1000));
-TYPE mix_tab_typ IS TABLE OF mix_rec_typ INDEX BY BINARY_INTEGER;
+TYPE mix_tab_typ IS TABLE OF mix_rec_typ INDEX BY PLS_INTEGER;
 
   TYPE kotveny_rec_typ IS RECORD (
     dijkod VARCHAR2(2),

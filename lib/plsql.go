@@ -677,12 +677,14 @@ func (arg Argument) getConvSimpleTable(
 			if arg.IsInput() {
 				convIn = append(convIn, fmt.Sprintf("output.%s = input.%s", name, name))
 			} else {
-				if got == "[]goracle.Number" { //FIXME[tgulacsi]: just a hack
-					got = "[]string"
+				got = CamelCase(got)
+				if got == "[]goracle.Number" {
+					convIn = append(convIn,
+						fmt.Sprintf("output.%s = make([]string, 0, %d) // gcst3", name, tableSize))
 				} else {
-					got = CamelCase(got)
+					convIn = append(convIn,
+						fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
 				}
-				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
 			}
 		}
 		in, varName := arg.ToOra(
@@ -690,14 +692,29 @@ func (arg Argument) getConvSimpleTable(
 			"output."+name,
 			true)
 		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
-		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
+		if got == "[]goracle.Number" { // don't copy, hack
+			convIn = append(convIn,
+				fmt.Sprintf(`if len(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
+				fmt.Sprintf(`%s = (*(*[1<<27]goracle.Number)(unsafe.Pointer(&output.%s[:1][0])))[:len(output.%s):len(output.%s)] // gcst1`, paramName, name, name, name))
+		} else {
+			convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
+		}
 	} else {
 		in, varName := arg.ToOra(
 			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
 			"output."+name,
 			false)
 		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
-		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
+		if arg.goType(true) == "[]goracle.Number" {
+			convIn = append(convIn,
+				fmt.Sprintf(`if len(input.%s) == 0 { %s = []goracle.Number{} } else {
+			%s = (*(*[1<<27]goracle.Number)(unsafe.Pointer(&input.%s[0])))[:len(input.%s):len(input.%s)] // gcst2
+		}`,
+					name, paramName,
+					paramName, name, name, name))
+		} else {
+			convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
+		}
 	}
 	return convIn, convOut
 }
