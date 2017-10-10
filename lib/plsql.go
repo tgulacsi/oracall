@@ -42,7 +42,7 @@ var (
 
 // SavePlsqlBlock saves the plsql block definition into writer
 func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
-	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
+	decls, pre, call, post, convIn, convOut, paramsIdxOff, err := fun.prepareCall()
 	if err != nil {
 		Log("msg", "error preparing", "function", fun, "error", err)
 		os.Exit(1)
@@ -105,6 +105,9 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 			CamelCase(fun.getStructName(true, false)),
 		)
 	}
+	if paramsIdxOff != 0 {
+		convIn = append(convIn, "params[0] = goracle.PlSQLArrays")
+	}
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -129,10 +132,10 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
-	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Println(`calling %s as`); log.Printf(`%s`, params...) }"+`
+	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Println(`calling %s as`); log.Printf(`%s`, params[%d:]...) }"+`
 	qry := %s
 `,
-		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"),
+		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"), paramsIdxOff,
 		fun.getPlsqlConstName())
 	callBuf.WriteString(`
 	ctx, cancel := context.WithCancel(context.Background())
@@ -204,11 +207,11 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	callFun = callBuf.String()
 	plsql = plsBuf.String()
 
-	plsql, callFun = demap(plsql, callFun)
+	plsql, callFun = demap(plsql, callFun, paramsIdxOff)
 	return
 }
 
-func demap(plsql, callFun string) (string, string) {
+func demap(plsql, callFun string, paramsIdxOff int) (string, string) {
 	var i int
 	paramsMap := make(map[string][]int, 16)
 	first := make(map[string]int, len(paramsMap))
@@ -248,7 +251,7 @@ func demap(plsql, callFun string) (string, string) {
 						paramsMap[key] = arr[1:]
 					}
 					lastIdx = i
-					return i
+					return i + paramsIdxOff
 				},
 			}).
 		Parse(callFun)
@@ -289,7 +292,7 @@ func demap(plsql, callFun string) (string, string) {
 	return plsql, callBuf.String()
 }
 
-func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
+func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, paramsIdxOff int, err error) {
 	tableTypes := make(map[string]string, 4)
 	callArgs := make(map[string]string, 16)
 
@@ -316,13 +319,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		return typ
 	}
 	//fStructIn, fStructOut := fun.getStructName(false), fun.getStructName(true)
-	var (
-		vn, tmp, typ string
-		ok           bool
-	)
-	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
-	convIn = append(convIn, "params := make([]interface{}, {{.ParamsArrLen}})", "var x, v interface{}\n _,_ = x,v")
-
 	args := make([]Argument, 0, len(fun.Args)+1)
 	for _, arg := range fun.Args {
 		arg.Name = replHidden(arg.Name)
@@ -331,11 +327,27 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	if fun.Returns != nil {
 		args = append(args, *fun.Returns)
 	}
+	for _, arg := range args {
+		if arg.Flavor == FLAVOR_TABLE {
+			paramsIdxOff = 1
+			break
+		}
+	}
+
+	var (
+		vn, tmp, typ string
+		ok           bool
+	)
+	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
+	convIn = append(convIn,
+		fmt.Sprintf("params := make([]interface{}, {{.ParamsArrLen}}+%d)", paramsIdxOff),
+		"var x, v interface{}\n _,_ = x,v")
+
 	addParam := func(paramName string) string {
 		if paramName == "" {
 			panic("empty param name")
 		}
-		return `params[{{paramsIdx "` + paramName + `"}}]`
+		return fmt.Sprintf(`params[{{paramsIdx %q}}]`, paramName)
 	}
 	for _, arg := range args {
 		switch arg.Flavor {
