@@ -405,11 +405,11 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		case "RAW":
 			return "string"
 		case "NUMBER":
-			return "float64"
+			return "goracle.Number"
 			if !isTable && arg.IsOutput() {
-				return "*float64"
+				return "*goracle.Number"
 			}
-			return "float64"
+			return "goracle.Number"
 		case "INTEGER":
 			if !isTable && arg.IsOutput() {
 				return "*int64"
@@ -520,7 +520,7 @@ func CamelCase(text string) string {
 			}
 			return '_'
 		}
-		if last == 0 || last == '_' || '0' <= last && last <= '9' {
+		if last == 0 || last == '_' || last == '.' || '0' <= last && last <= '9' {
 			return unicode.ToUpper(r)
 		}
 		return unicode.ToLower(r)

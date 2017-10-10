@@ -51,7 +51,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	case "PLS_INTEGER":
 		return fmt.Sprintf("%s = %s.Int64", dst, src)
 	case "NUMBER":
-		return fmt.Sprintf("%s = custom.AsFloat64(%s.Float64)", dst, src)
+		return fmt.Sprintf("%s = custom.AsFloat64(%s)", dst, src)
 	}
 	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora)
 }
@@ -102,7 +102,7 @@ func (arg PlsType) ToOra(dst, src string, isOutput bool) (expr string, variable 
 		}
 	case "NUMBER":
 		if src[0] != '&' {
-			return fmt.Sprintf("var %s sql.NullFloat64; if %s != 0 { %s.Float64, %s.Valid = %s, true }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+			return fmt.Sprintf("%s := goracle.Number(%s); %s = %s", dstVar, src, dst, dstVar), dstVar
 		}
 	}
 	if isOutput {

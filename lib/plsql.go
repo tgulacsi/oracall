@@ -139,7 +139,7 @@ if true || DebugLevel > 0 {
 }
 	qry := %s
 `,
-		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"), paramsIdxOff,
+		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"), paramsIdxOff,
 		fun.getPlsqlConstName())
 	if paramsIdxOff != 0 {
 		fmt.Fprintf(callBuf, `
@@ -677,7 +677,11 @@ func (arg Argument) getConvSimpleTable(
 			if arg.IsInput() {
 				convIn = append(convIn, fmt.Sprintf("output.%s = input.%s", name, name))
 			} else {
-				got = CamelCase(got)
+				if got == "[]goracle.Number" { //FIXME[tgulacsi]: just a hack
+					got = "[]string"
+				} else {
+					got = CamelCase(got)
+				}
 				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
 			}
 		}

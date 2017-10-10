@@ -229,6 +229,11 @@ func protoType(got, aName string) (string, protoOptions) {
 		}
 		return "double", nil
 
+	case "goracle.number":
+		return "string", protoOptions{
+			"gogoproto.jsontag": aName + ",omitempty",
+		}
+
 	case "custom.date":
 		return "string", nil
 	case "n":

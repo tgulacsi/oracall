@@ -47,6 +47,8 @@ var (
 func init() {
 	flag.Parse()
 
+	os.Setenv("NLS_LANG", "american_america.AL32UTF8")
+
 	now := time.Now()
 	f := "2006-01-02T15:04:05"
 	m, err := time.ParseInLocation(f, now.UTC().Format(f), time.Local)
@@ -80,19 +82,19 @@ func TestGenSimple(t *testing.T) {
 		{"simple_char_in", `{"txt": "abraka dabra"}`, `{}`},
 		{"simple_char_out", `{}`, `{"ret":"A"}`},
 		{"simple_char_inout", `{"txt": "abraka dabra"}`, `{"txt":"ABRAKA DABRA#"}`},
-		{"simple_num_in", `{"num": 33}`, `{}`},
-		{"simple_num_out", `{}`, `{"ret":0.6666666666666665}`},
+		{"simple_num_in", `{"num": "33"}`, `{}`},
+		{"simple_num_out", `{}`, `{"ret":".6666666666666666666666666666666666666667"}`},
 		{"simple_date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
 		{"simple_date_out", `{}`, `{"ret":"{{TODAY}}"}`}, // 5.
 		{"simple_char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
 
 		{"simple_all_inout",
-			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
-			`{"txt2":"abraka#","int2":-2,"num2":0.4333333333333333,"dt2":"` +
+			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": "0.1", "num3": "0.3", "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
+			`{"txt2":"abraka#","int2":-2,"num2":".4333333333333333333333333333333333333333","dt2":"` +
 				strings.Replace(now.Truncate(24*time.Hour).AddDate(0, 1, 0).Format(time.RFC3339), "T02:", "T00:", 1) +
-				`","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00` + TOff + `"}`},
-		{"simple_nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
-		{"simple_sum_nums", `{"nums":[1.1,2,3.3]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
+				`","txt3":"A#","int3":-1,"num3":"1.3","dt3":"2014-02-03T00:00:00` + TOff + `"}`},
+		{"simple_nums_count", `{"nums":["1","2","3","4.4"]}`, `{"ret":4}`},
+		{"simple_sum_nums", `{"nums":["1.1","2","3.3"]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
 	} {
 		if *flagOnly != "" && todo[0] != *flagOnly {
 			t.Logf("SKIP " + todo[0])
