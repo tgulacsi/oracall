@@ -70,7 +70,7 @@ func (arg PlsType) GetOra(src, varName string) string {
 }
 
 // ToOra adds the value of the argument with arg type, from src variable to dst variable.
-func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
+func (arg PlsType) ToOra(dst, src string, isOutput bool) (expr string, variable string) {
 	dstVar := mkVarName(dst)
 	if Gogo {
 		switch arg.ora {
@@ -78,6 +78,14 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 			var pointer string
 			if src[0] == '&' {
 				pointer = "&"
+			}
+			if isOutput {
+				return fmt.Sprintf(`%s := custom.Date(%s).Get() // toOra D
+			%s = sql.Out{Dest:%s%s, In:true}`,
+						dstVar, strings.TrimPrefix(src, "&"),
+						dst, pointer, dstVar,
+					),
+					dstVar
 			}
 			return fmt.Sprintf(`%s := custom.Date(%s).Get() // toOra D
 			%s = %s%s`,
@@ -96,6 +104,9 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 		if src[0] != '&' {
 			return fmt.Sprintf("var %s sql.NullFloat64; if %s != 0 { %s.Float64, %s.Valid = %s, true }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}
+	}
+	if isOutput {
+		return fmt.Sprintf("%s = sql.Out{Dest:%s,In:true} // %s", dst, src, arg.ora), ""
 	}
 	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora), ""
 }

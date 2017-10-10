@@ -600,13 +600,15 @@ func (arg Argument) getConvSimple(
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s  // gcs3`, name, name))
 		}
 		src := "output." + name
-		in, varName := arg.ToOra(paramName, "&"+src)
-		convIn = append(convIn, in+"  // gcs3")
+		in, varName := arg.ToOra(paramName, "&"+src, true)
+		convIn = append(convIn, in)
+		//fmt.Sprintf("%s = sql.Out{Dest:%s,In:%t}  // gcs3", paramName, "&"+src, arg.IsInput()))
 		if varName != "" {
-			convOut = append(convOut, arg.FromOra(src, paramName, varName))
+			convOut = append(convOut,
+				fmt.Sprintf("%s  // gcs4", arg.FromOra(src, paramName, varName)))
 		}
 	} else {
-		in, _ := arg.ToOra(paramName, "input."+name)
+		in, _ := arg.ToOra(paramName, "input."+name, false)
 		convIn = append(convIn, in+"  // gcs4")
 	}
 	return convIn, convOut
@@ -656,11 +658,17 @@ func (arg Argument) getConvSimpleTable(
 				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
 			}
 		}
-		in, varName := arg.ToOra(strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1), "output."+name)
+		in, varName := arg.ToOra(
+			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
+			"output."+name,
+			true)
 		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
 		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
 	} else {
-		in, varName := arg.ToOra(strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1), "output."+name)
+		in, varName := arg.ToOra(
+			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
+			"output."+name,
+			false)
 		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
 		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
 	}
@@ -675,13 +683,13 @@ func (arg Argument) getConvRefCursor(
 	got := arg.goType(true)
 	GoT := withPb(CamelCase(got))
 	convIn = append(convIn, fmt.Sprintf(`output.%s = make([]%s, 0, %d)  // gcrf1
-				%s = new(sql.Rows) // gcrf1 %q`,
+		%s = sql.Out{Dest:new(sql.Rows)} // gcrf1 %q`,
 		name, GoT, tableSize,
 		paramName, got))
 
 	convOut = append(convOut, fmt.Sprintf(`
 	{
-		rset := %s.(*sql.Rows)
+		rset := %s.Dest.(*sql.Rows)
 		iterators = append(iterators, iterator{
 			Reset: func() { output.%s = nil },
 			Iterate: func() error {
@@ -791,14 +799,14 @@ func (arg Argument) getConvRec(
 ) ([]string, []string) {
 
 	if arg.IsOutput() {
-		too, varName := arg.ToOra(paramName, "&output."+name)
+		too, varName := arg.ToOra(paramName, "&output."+name, true)
 		convIn = append(convIn, too+" // gcr2 var="+varName)
 		if varName != "" {
 			convOut = append(convOut, arg.FromOra("output."+name, varName, varName))
 		}
 	} else if arg.IsInput() {
 		parts := strings.Split(name, ".")
-		too, _ := arg.ToOra(paramName, "input."+name)
+		too, _ := arg.ToOra(paramName, "input."+name, false)
 		convIn = append(convIn,
 			fmt.Sprintf(`if input.%s != nil {
 				%s
@@ -834,7 +842,7 @@ func (arg Argument) getConvTableRec(
 			amp = ""
 		}
 		lengthS = "len(input." + name[0] + ")"
-		too, _ := arg.ToOra(absName+"[i]", "v."+name[1])
+		too, _ := arg.ToOra(absName+"[i]", "v."+name[1], arg.IsOutput())
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)  // gctr1
 			for i,v := range input.%s {
