@@ -132,11 +132,22 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
-	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Println(`calling %s as`); log.Printf(`%s`, params[%d:]...) }"+`
+	fmt.Fprintf(callBuf, `
+if true || DebugLevel > 0 {
+	log.Println(`+"`calling %s as`"+`)
+	log.Printf(`+"`%s`"+`, params[%d:]...)
+}
 	qry := %s
 `,
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"), paramsIdxOff,
 		fun.getPlsqlConstName())
+	if paramsIdxOff != 0 {
+		fmt.Fprintf(callBuf, `
+	oLog := goracle.Log
+	defer func() { goracle.Log = oLog }()
+	goracle.Log = func(keyvals ...interface{}) error { log.Println(keyvals...); return nil; }
+`)
+	}
 	callBuf.WriteString(`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
