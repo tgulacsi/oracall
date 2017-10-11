@@ -89,46 +89,53 @@ func TestGenSimple(t *testing.T) {
 		{"simple_char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
 
 		{"simple_all_inout",
-			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": "0.1", "num3": "0.3", "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
-			`{"txt2":"abraka#","int2":-2,"num2":".4333333333333333333333333333333333333333","dt2":"` +
-				strings.Replace(now.Truncate(24*time.Hour).AddDate(0, 1, 0).Format(time.RFC3339), "T02:", "T00:", 1) +
-				`","txt3":"A#","int3":-1,"num3":"1.3","dt3":"2014-02-03T00:00:00` + TOff + `"}`},
+			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": "0.1", "num3": "0.3", "dt1": null, ` +
+				`"dt3": "2014-01-03T00:00:00+01:00"}`,
+			`{"txt2":"abraka#","int2":-2,"num2":".4333333333333333333333333333333333333333",` +
+				`"dt2":"` + strings.Replace(
+				now.Truncate(24*time.Hour).AddDate(0, 1, 0).Format(time.RFC3339),
+				"T02:", "T00:", 1) +
+				`","txt3":"A#","int3":-1,"num3":"1.3",` +
+				`"dt3":"2014-02-03T00:00:00` + TOff + `"}`},
 		{"simple_nums_count", `{"nums":["1","2","3","4.4"]}`, `{"ret":4}`},
 		{"simple_sum_nums", `{"nums":["1.1","2","3.3"]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
 	} {
-		if *flagOnly != "" && todo[0] != *flagOnly {
-			t.Logf("SKIP " + todo[0])
-			continue
-		}
-		got := runTest(t, outFn, "-connect="+*flagConnect, oracall.CamelCase(todo[0]), todo[1])
-		withTime := false
-		todo[2] = strings.TrimSpace(todo[2])
-		if strings.Index(todo[2], "{{NOW}}") >= 0 {
-			todo[2] = strings.Replace(todo[2],
-				"{{NOW}}", time.Now().In(fixedZone).Format(time.RFC3339), -1)
-			withTime = true
-		}
-		if strings.Index(todo[2], "{{TODAY}}") >= 0 {
-			todo[2] = strings.Replace(todo[2],
-				"{{TODAY}}", time.Now().In(time.FixedZone("", 7200)).Truncate(24*time.Hour).Format(time.RFC3339), -1)
-			withTime = true
-		}
-		gotS := strings.TrimSpace(got)
-		if gotS == todo[2] {
-			continue
-		}
-		dist := 0
-		if withTime {
-			dist, err = matchr.Hamming(gotS, todo[2])
-			if err != nil {
-				t.Errorf("compute hamming distance of %q/%q: %v", gotS, todo[2], err)
+		todo := todo
+		t.Run(todo[0], func(t *testing.T) {
+			if *flagOnly != "" && todo[0] != *flagOnly {
+				t.Logf("SKIP " + todo[0])
 				return
 			}
-			if dist <= 2 {
-				continue
+			got := runTest(t, outFn, "-connect="+*flagConnect, oracall.CamelCase(todo[0]), todo[1])
+			withTime := false
+			todo[2] = strings.TrimSpace(todo[2])
+			if strings.Index(todo[2], "{{NOW}}") >= 0 {
+				todo[2] = strings.Replace(todo[2],
+					"{{NOW}}", time.Now().In(fixedZone).Format(time.RFC3339), -1)
+				withTime = true
 			}
-		}
-		t.Errorf("%d. awaited\n\t%s\ngot (distance=%d)\n\t%s", i, todo[2], dist, got)
+			if strings.Index(todo[2], "{{TODAY}}") >= 0 {
+				todo[2] = strings.Replace(todo[2],
+					"{{TODAY}}", time.Now().In(time.FixedZone("", 3600)).Truncate(24*time.Hour).Format(time.RFC3339), -1)
+				withTime = true
+			}
+			gotS := strings.TrimSpace(got)
+			if gotS == todo[2] {
+				return
+			}
+			dist := 0
+			if withTime {
+				dist, err = matchr.Hamming(gotS, todo[2])
+				if err != nil {
+					t.Errorf("compute hamming distance of %q/%q: %v", gotS, todo[2], err)
+					return
+				}
+				if dist <= 2 {
+					return
+				}
+			}
+			t.Errorf("%d. awaited\n\t%s\ngot (distance=%d)\n\t%s", i, todo[2], dist, got)
+		})
 	}
 }
 

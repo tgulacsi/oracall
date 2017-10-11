@@ -25,7 +25,7 @@ func (n Number) Get() goracle.Number {
 
 type Date string
 
-const timeFormat = "2006-01-02 15:04:05 -0700"
+const timeFormat = time.RFC3339 //"2006-01-02 15:04:05 -0700"
 
 func NewDate(t time.Time) Date {
 	if t.IsZero() {
