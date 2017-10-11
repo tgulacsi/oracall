@@ -106,6 +106,10 @@ func (arg PlsType) ToOra(dst, src string, isOutput bool) (expr string, variable 
 		}
 	}
 	if isOutput {
+		if arg.ora == "NUMBER" {
+			return fmt.Sprintf("%s = sql.Out{Dest:(*goracle.Number)(unsafe.Pointer(%s)),In:true} // NUMBER",
+				dst, src), ""
+		}
 		return fmt.Sprintf("%s = sql.Out{Dest:%s,In:true} // %s", dst, src, arg.ora), ""
 	}
 	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora), ""

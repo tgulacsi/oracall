@@ -51,13 +51,16 @@ import (
     "fmt"
 	"strings"
 	"database/sql"
+	"os"
 	"strconv"
     "time"    // for datetimes
 	"unsafe"
 
 	"golang.org/x/net/context"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
+
     goracle "gopkg.in/goracle.v2" // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.Date
 	`+pbImport+`
@@ -79,6 +82,8 @@ var _ = errors.Wrap
 var _ = fmt.Printf
 var _ goracle.Lob
 var _ unsafe.Pointer
+var _ = spew.Sdump
+var _ = os.Stdout
 
 type iterator struct {
 	Reset func()

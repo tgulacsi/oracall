@@ -168,7 +168,7 @@ if true || DebugLevel > 0 {
 	}
     `)
 
-	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %v`, params) }\n")
+	callBuf.WriteString("\nif true || DebugLevel > 0 { fmt.Fprintf(os.Stderr, `result params: %#v\n output=%#v`, params, output) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -694,10 +694,10 @@ func (arg Argument) getConvSimpleTable(
 		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
 		if got == "[]goracle.Number" { // don't copy, hack
 			convIn = append(convIn,
-				fmt.Sprintf(`if len(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
-				fmt.Sprintf(`%s = goracle.NumbersFromStrings(output.%s) // gcst1`, paramName, name))
+				fmt.Sprintf(`if cap(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
+				fmt.Sprintf(`%s = sql.Out{Dest: goracle.NumbersFromStrings(&output.%s)}  // gcst1`, paramName, name))
 		} else {
-			convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
+			convIn = append(convIn, fmt.Sprintf(`%s = output.%s] // gcst1`, paramName, name))
 		}
 	} else {
 		in, varName := arg.ToOra(
@@ -708,7 +708,7 @@ func (arg Argument) getConvSimpleTable(
 		if arg.goType(true) == "[]goracle.Number" {
 			convIn = append(convIn,
 				fmt.Sprintf(`if len(input.%s) == 0 { %s = []goracle.Number{} } else {
-			%s = goracle.NumbersFromStrings(input.%s) // gcst2
+			%s = *goracle.NumbersFromStrings(&input.%s) // gcst2
 		}`,
 					name, paramName,
 					paramName, name))
