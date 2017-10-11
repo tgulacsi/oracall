@@ -695,7 +695,7 @@ func (arg Argument) getConvSimpleTable(
 		if got == "[]goracle.Number" { // don't copy, hack
 			convIn = append(convIn,
 				fmt.Sprintf(`if len(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
-				fmt.Sprintf(`%s = (*(*[1<<27]goracle.Number)(unsafe.Pointer(&output.%s[:1][0])))[:len(output.%s):len(output.%s)] // gcst1`, paramName, name, name, name))
+				fmt.Sprintf(`%s = goracle.NumbersFromStrings(output.%s) // gcst1`, paramName, name))
 		} else {
 			convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
 		}
@@ -708,10 +708,10 @@ func (arg Argument) getConvSimpleTable(
 		if arg.goType(true) == "[]goracle.Number" {
 			convIn = append(convIn,
 				fmt.Sprintf(`if len(input.%s) == 0 { %s = []goracle.Number{} } else {
-			%s = (*(*[1<<27]goracle.Number)(unsafe.Pointer(&input.%s[0])))[:len(input.%s):len(input.%s)] // gcst2
+			%s = goracle.NumbersFromStrings(input.%s) // gcst2
 		}`,
 					name, paramName,
-					paramName, name, name, name))
+					paramName, name))
 		} else {
 			convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
 		}
