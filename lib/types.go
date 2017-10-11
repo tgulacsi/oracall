@@ -49,11 +49,11 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	case "DATE":
 		return fmt.Sprintf("%s = string(%s)", dst, src)
 	case "PLS_INTEGER":
-		return fmt.Sprintf("%s = %s.Int64", dst, src)
+		return fmt.Sprintf("%s = int32(%s)", dst, src)
 	case "NUMBER":
-		return fmt.Sprintf("%s = custom.AsFloat64(%s)", dst, src)
+		return fmt.Sprintf("%s = string(%s)", dst, src)
 	}
-	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora)
+	return fmt.Sprintf("%s = %s // %s fromOra", dst, src, arg.ora)
 }
 
 func (arg PlsType) GetOra(src, varName string) string {

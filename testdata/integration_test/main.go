@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	oracall "github.com/tgulacsi/oracall/lib"
 	"golang.org/x/net/context"
 )
 
@@ -59,12 +60,15 @@ func main() {
 	rs := reflect.ValueOf(srv)
 	rf := rs.MethodByName(funName)
 	if !rf.IsValid() {
+		rf = rs.MethodByName(oracall.CamelCase(funName))
+	}
+	if !rf.IsValid() {
 		rt := rs.Type()
 		methods := make([]string, rt.NumMethod())
 		for i := range methods {
 			methods[i] = rt.Method(i).Name
 		}
-		log.Fatalf("cannot find function named %q, only %q", funName, methods)
+		log.Fatalf("cannot find function named %q/%q, only %q", funName, oracall.CamelCase(funName), methods)
 	}
 	log.Printf("fun to be called is %s", rf)
 

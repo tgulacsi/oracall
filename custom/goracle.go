@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"time"
+	"unsafe"
 
 	"gopkg.in/goracle.v2"
 )
@@ -21,6 +22,13 @@ func (n *Number) Set(num goracle.Number) {
 }
 func (n Number) Get() goracle.Number {
 	return goracle.Number(n)
+}
+
+func NumbersFromStrings(s *[]string) *[]goracle.Number {
+	if s == nil {
+		return nil
+	}
+	return (*[]goracle.Number)(unsafe.Pointer(s))
 }
 
 type Date string
