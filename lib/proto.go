@@ -154,16 +154,12 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		aName := arg.Name
 		got := arg.goType(false)
-		if strings.HasPrefix(got, "*") {
-			got = got[1:]
-		}
+		got = strings.TrimPrefix(got, "*")
 		if strings.HasPrefix(got, "[]") {
 			rule = "repeated "
 			got = got[2:]
 		}
-		if strings.HasPrefix(got, "*") {
-			got = got[1:]
-		}
+		got = strings.TrimPrefix(got, "*")
 		if got == "" {
 			got = mkRecTypName(arg.Name)
 		}

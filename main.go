@@ -109,8 +109,8 @@ func Main(args []string) int {
 		}
 		functions, err = oracall.ParseCsvFile("", filter)
 	} else {
-		cx, err := sql.Open("goracle", *flagConnect)
-		if err != nil {
+		var cx *sql.DB
+		if cx, err = sql.Open("goracle", *flagConnect); err != nil {
 			Log("msg", "connecting to", "dsn", *flagConnect, "error", err)
 			return 1
 		}
@@ -152,8 +152,8 @@ func Main(args []string) int {
 
 		var cw *csv.Writer
 		if *flagDump != "" {
-			fh, err := os.Create(*flagDump)
-			if err != nil {
+			var fh *os.File
+			if fh, err = os.Create(*flagDump); err != nil {
 				Log("msg", "create", "dump", *flagDump, "error", err)
 				return 3
 			}

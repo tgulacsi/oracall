@@ -29,29 +29,31 @@ import (
 
 // UserArgument represents the required info from the user_arguments view
 type UserArgument struct {
-	ObjectID     uint `sql:"OBJECT_ID"`
-	SubprogramID uint `sql:"SUBPROGRAM_ID"`
-
 	PackageName string `sql:"PACKAGE_NAME"`
 	ObjectName  string `sql:"OBJECT_NAME"`
 
-	DataLevel    uint8  `sql:"DATA_LEVEL"`
-	Position     uint8  `sql:"POSITION"`
 	ArgumentName string `sql:"ARGUMENT_NAME"`
 	InOut        string `sql:"IN_OUT"`
 
-	DataType      string `sql:"DATA_TYPE"`
-	DataPrecision uint8  `sql:"DATA_PRECISION"`
-	DataScale     uint8  `sql:"DATA_SCALE"`
+	DataType string `sql:"DATA_TYPE"`
 
 	CharacterSetName string `sql:"CHARACTER_SET_NAME"`
-	CharLength       uint   `sql:"CHAR_LENGTH"`
 
 	PlsType     string `sql:"PLS_TYPE"`
 	TypeLink    string `sql:"TYPE_LINK"`
 	TypeOwner   string `sql:"TYPE_OWNER"`
 	TypeName    string `sql:"TYPE_NAME"`
 	TypeSubname string `sql:"TYPE_SUBNAME"`
+
+	ObjectID     uint `sql:"OBJECT_ID"`
+	SubprogramID uint `sql:"SUBPROGRAM_ID"`
+
+	CharLength uint `sql:"CHAR_LENGTH"`
+
+	DataPrecision uint8 `sql:"DATA_PRECISION"`
+	DataScale     uint8 `sql:"DATA_SCALE"`
+	DataLevel     uint8 `sql:"DATA_LEVEL"`
+	Position      uint8 `sql:"POSITION"`
 }
 
 // ParseCsv reads the given csv file as user_arguments

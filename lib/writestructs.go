@@ -151,11 +151,8 @@ FunLoop:
 		io.WriteString(w, text)
 		w.Write([]byte{'\n'})
 	}
-	if _, err = io.WriteString(w, "}\n"); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = io.WriteString(w, "}\n")
+	return err
 }
 
 func (f Function) getPlsqlConstName() string {
@@ -413,10 +410,6 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 			return "string"
 		case "NUMBER":
 			return "goracle.Number"
-			if !isTable && arg.IsOutput() {
-				return "*goracle.Number"
-			}
-			return "goracle.Number"
 		case "INTEGER":
 			if !isTable && arg.IsOutput() {
 				return "*int64"
@@ -556,13 +549,13 @@ type bufPool struct {
 	sync.Pool
 }
 
-func newBufPool(size int) bufPool {
-	return bufPool{sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 1<<16)) }}}
+func newBufPool(size int) *bufPool {
+	return &bufPool{sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 1<<16)) }}}
 }
-func (bp bufPool) Get() *bytes.Buffer {
+func (bp *bufPool) Get() *bytes.Buffer {
 	return bp.Pool.Get().(*bytes.Buffer)
 }
-func (bp bufPool) Put(b *bytes.Buffer) {
+func (bp *bufPool) Put(b *bytes.Buffer) {
 	if b == nil {
 		return
 	}
@@ -583,6 +576,7 @@ func ReplOraPh(s string, params []interface{}) string {
 	)
 }
 
+/*
 func replOraPhMeta(text, sliceName string) string {
 	var i int
 	return rIdentifier.ReplaceAllStringFunc(
@@ -593,5 +587,6 @@ func replOraPhMeta(text, sliceName string) string {
 		},
 	)
 }
+*/
 
 // vim: se noet fileencoding=utf-8:

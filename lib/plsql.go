@@ -28,17 +28,9 @@ import (
 	"gopkg.in/goracle.v2"
 )
 
-// MaxTableSize is the maximum size of the array arguments
+// MaxTableSize is the maximum size of the array elements
 const MaxTableSize = 512
 const batchSize = 128
-
-//
-// OracleArgument
-//
-
-var (
-	stringTypes = make(map[string]struct{}, 16)
-)
 
 // SavePlsqlBlock saves the plsql block definition into writer
 func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
@@ -594,20 +586,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
-func (arg Argument) getIsValidCheck(name string) string {
-	got := arg.goType(false)
-	if got[0] == '*' {
-		return name + " != nil"
-	}
-	if strings.HasPrefix(got, "goracle.") {
-		return "!" + name + ".IsNull"
-	}
-	if strings.HasPrefix(got, "sql.Null") {
-		return name + ".Valid"
-	}
-	return name + " != nil /*" + got + "*/"
-}
-
 func (arg Argument) getConvSimple(
 	convIn, convOut []string,
 	name, paramName string,
@@ -791,6 +769,7 @@ func (arg Argument) getFromRset(rsetRow string) string {
 	return buf.String()
 }
 
+/*
 func getOutConvTSwitch(name, pTyp string) string {
 	parse := ""
 	if strings.HasPrefix(pTyp, "int") {
@@ -833,7 +812,7 @@ func getOutConvTSwitch(name, pTyp string) string {
 					return
 				}`, pTyp, name, pTyp)
 }
-
+*/
 func (arg Argument) getConvRec(
 	convIn, convOut []string,
 	name, paramName string,

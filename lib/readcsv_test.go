@@ -17,12 +17,11 @@ limitations under the License.
 package oracall
 
 import (
-	"flag"
 	"strings"
 	"testing"
 )
 
-var flagConnect = flag.String("connect", "", "database DSN to connect to")
+//var flagConnect = flag.String("connect", "", "database DSN to connect to")
 
 func TestParseCsv(t *testing.T) {
 	for i, tc := range testCases {

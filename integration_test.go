@@ -105,12 +105,12 @@ func TestGenSimple(t *testing.T) {
 		t.Run(todo.Name, func(t *testing.T) {
 			got := runTest(t, outFn, "-connect="+*flagConnect, oracall.CamelCase(todo.Name), todo.In)
 			todo.Await = strings.TrimSpace(todo.Await)
-			if strings.Index(todo.Await, "{{NOW}}") >= 0 {
+			if strings.Contains(todo.Await, "{{NOW}}") {
 				todo.Await = strings.Replace(todo.Await,
 					"{{NOW}}", time.Now().Format(time.RFC3339), -1)
 				todo.MaxDistance++
 			}
-			if strings.Index(todo.Await, "{{TODAY}}") >= 0 {
+			if strings.Contains(todo.Await, "{{TODAY}}") {
 				todo.Await = strings.Replace(todo.Await,
 					"{{TODAY}}", time.Now().Truncate(24*time.Hour).Format(time.RFC3339), -1)
 				todo.MaxDistance++
@@ -153,7 +153,7 @@ func TestGenRec(t *testing.T) {
 		todo := todo
 		t.Run(todo[0], func(t *testing.T) {
 			got := runTest(t, outFn, "-connect="+*flagConnect, todo[0], todo[1])
-			if strings.Index(todo[2], "{{NOW}}") >= 0 {
+			if strings.Contains(todo[2], "{{NOW}}") {
 				todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
 			}
 			if diff := jsonEqual(strings.TrimSpace(got), todo[2]); diff != "" {
@@ -582,7 +582,7 @@ func runTest(t *testing.T, prog string, args ...string) string {
 }
 
 //var dsn = flag.String("connect", "", "Oracle DSN (user/passw@sid)")
-var dbg = flag.Bool("debug", false, "print debug messages?")
+//var dbg = flag.Bool("debug", false, "print debug messages?")
 var buildOnce sync.Once
 
 func init() {
