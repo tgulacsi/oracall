@@ -297,7 +297,7 @@ func demap(plsql, callFun string, paramsIdxOff int) (string, string) {
 	callBuf.Truncate(j)
 
 	for _, v := range plusIdxs {
-		fmt.Fprintf(callBuf, "params[%d] = params[%d] // %s\n", v.New, v.Old+paramsIdxOff, v.Name)
+		fmt.Fprintf(callBuf, "params[%d] = params[%d]  // %s\n", v.New, v.Old+paramsIdxOff, v.Name)
 	}
 	callBuf.WriteString(rest)
 	return plsql, callBuf.String()
