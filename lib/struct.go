@@ -85,18 +85,20 @@ const (
 
 type Argument struct {
 	RecordOf []NamedArgument //this argument is a record (map) of this type
-	PlsType
-	Name           string
+	Name     string
+	//Level                   uint8
+	//Position                uint8
 	Type, TypeName string
 	AbsType        string
 	Charset        string
-	goTypeName     string
-	TableOf        *Argument // this argument is a table (array) of this type
 	Charlength     uint
-	Flavor         uint8
-	Direction      uint8
-	Precision      uint8
-	Scale          uint8
+	TableOf        *Argument // this argument is a table (array) of this type
+	goTypeName     string
+	PlsType
+	Flavor    uint8
+	Direction uint8
+	Precision uint8
+	Scale     uint8
 }
 type NamedArgument struct {
 	Name string
