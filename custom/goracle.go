@@ -7,9 +7,11 @@ import (
 	"log"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 	"unsafe"
 
+	"github.com/pkg/errors"
 	"gopkg.in/goracle.v2"
 )
 
@@ -51,7 +53,20 @@ func (d Date) Get() (od time.Time) {
 	if d == "" {
 		return
 	}
+	var i int
+	if i = strings.IndexByte(string(d), 'T'); i < 0 {
+		if i = strings.IndexByte(string(d), ' '); i < 0 {
+			d = d + "T00:00:00"
+			i = len(d)
+		} else {
+			d = d[:i] + "T" + d[i+1:]
+		}
+	}
+
 	t, err := time.Parse(timeFormat[:len(d)], string(d)) // TODO(tgulacsi): more robust parser
+	if err != nil {
+		panic(errors.Wrap(err, string(d)))
+	}
 	if err != nil || t.IsZero() {
 		return
 	}

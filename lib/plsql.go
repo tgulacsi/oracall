@@ -262,6 +262,9 @@ func demap(plsql, callFun string) (string, string) {
 	if err := tpl.Execute(callBuf, opts); err != nil {
 		panic(err)
 	}
+
+	return plsql, callBuf.String()
+
 	plusIdxs := make([]idxRemap, 0, len(paramsMap))
 	for k, vv := range paramsMap {
 		for _, v := range vv {
