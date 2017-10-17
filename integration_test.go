@@ -527,7 +527,7 @@ func runCommand(t *testing.T, prog string, args ...string) {
 func build(t *testing.T) {
 	buildOnce.Do(func() {
 		createStoredProc(t)
-		runCommand(t, "go", "install")
+		runCommand(t, "go", "install", "-race")
 	})
 }
 
@@ -545,7 +545,7 @@ func generateAndBuild(t *testing.T, prefix string) (outFn string) {
 		outFh.Close()
 	}
 	os.Remove(outFn)
-	runCommand(t, "go", "build", "-o="+outFn, "./testdata/integration_test")
+	runCommand(t, "go", "build", "-o="+outFn, "-race", "./testdata/integration_test")
 	return
 }
 

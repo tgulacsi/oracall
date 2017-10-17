@@ -19,6 +19,7 @@ package oracall
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
 
 // Log is discarded by default.
@@ -99,6 +100,7 @@ type Argument struct {
 	Direction uint8
 	Precision uint8
 	Scale     uint8
+	mu        sync.Mutex
 }
 type NamedArgument struct {
 	Name string

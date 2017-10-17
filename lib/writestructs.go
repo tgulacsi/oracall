@@ -387,6 +387,8 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 			typName = typName[1:]
 		}
 	}()
+	arg.mu.Lock()
+	defer arg.mu.Unlock()
 	// cached?
 	if arg.goTypeName != "" {
 		if strings.Index(arg.goTypeName, "__") > 0 {

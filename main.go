@@ -195,8 +195,8 @@ func Main(args []string) int {
 			defer close(userArgs)
 			var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString
 			var oid, seq, subid, level, pos, prec, scale, length sql.NullInt64
-			ua := oracall.UserArgument{}
 			for rows.Next() {
+				var ua oracall.UserArgument
 				err = rows.Scan(&oid, &subid, &seq, &pn, &on,
 					&level, &pos, &an, &ua.InOut,
 					&ua.DataType, &prec, &scale, &cs,
@@ -216,9 +216,6 @@ func Main(args []string) int {
 						return errors.Wrapf(err, "writing csv")
 					}
 				}
-				ua.PackageName, ua.ObjectName, ua.ArgumentName = "", "", ""
-				ua.ObjectID, ua.SubprogramID, ua.DataLevel = 0, 0, 0
-				ua.Position, ua.DataPrecision, ua.DataScale, ua.CharLength = 0, 0, 0, 0
 				if pn.Valid {
 					ua.PackageName = pn.String
 					if ua.PackageName != prevPackage {

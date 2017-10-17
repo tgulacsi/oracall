@@ -138,7 +138,7 @@ if true || DebugLevel > 0 {
 `)
 	}
 	callBuf.WriteString(`
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	stmt, stmtErr := s.db.PrepareContext(ctx, qry)
 	if stmtErr != nil {
