@@ -824,7 +824,8 @@ func (arg Argument) getConvRec(
 		too, varName := arg.ToOra(paramName, "&output."+name, true)
 		convIn = append(convIn, too+" // gcr2 var="+varName)
 		if varName != "" {
-			convOut = append(convOut, arg.FromOra("output."+name, varName, varName))
+			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest:&%s} // gcr2out", paramName, varName))
+			//convOut = append(convOut, arg.FromOra("output."+name, varName, varName)+" // gcr2out")
 		}
 	} else if arg.IsInput() {
 		parts := strings.Split(name, ".")
