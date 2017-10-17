@@ -99,7 +99,7 @@ func TestGenSimple(t *testing.T) {
 				`"dt3":"2014-02-03T00:00:00` + TOff.String() + `"}`,
 			MaxDistance: 3},
 		{Name: "simple_nums_count", In: `{"nums":["1","2","3","4.4"]}`, Await: `{"ret":4}`},
-		{Name: "simple_sum_nums", In: `{"nums":["1.1","2","3.3"]}`, Await: `{"outnums":["2.1","3","4.3"],"ret":"6.4"}`},
+		{Name: "simple_sum_nums", In: `{"nums":["1.1","2","3.3"]}`, Await: `{"outnums":["2.1","3","4.3"],"text":"1=1.1 2=2 3=3.3 ","ret":"6.4"}`},
 	} {
 		todo := todo
 		t.Run(todo.Name, func(t *testing.T) {
@@ -297,7 +297,7 @@ PROCEDURE simple_all_inout(
     txt3 IN OUT VARCHAR2, int3 IN OUT PLS_INTEGER, num3 IN OUT NUMBER, dt3 IN OUT DATE);
 
 FUNCTION simple_nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER;
-FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER;
+FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ, text OUT VARCHAR2) RETURN NUMBER;
 
 FUNCTION rec_in(rec IN mix_rec_typ) RETURN VARCHAR2;
 FUNCTION rec_tab_in(tab IN mix_tab_typ) RETURN VARCHAR2;
@@ -396,14 +396,16 @@ BEGIN
   RETURN nums.COUNT;
 END simple_nums_count;
 
-FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER IS
+FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ, text OUT VARCHAR2) RETURN NUMBER IS
   v_idx PLS_INTEGER;
   s NUMBER := 0;
 BEGIN
+  text := '';
   outnums.DELETE;
   v_idx := nums.FIRST;
   WHILE v_idx IS NOT NULL LOOP
     s := NVL(s, 0) + NVL(nums(v_idx), 0);
+	text := text||v_idx||'='||nums(v_idx)||' ';
     outnums(v_idx) := NVL(nums(v_idx), 0) + 1;
     v_idx := nums.NEXT(v_idx);
   END LOOP;
@@ -436,13 +438,15 @@ BEGIN
   RETURN nums.COUNT;
 END nums_count;
 
-FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER IS
+FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ, text OUT VARCHAR2) RETURN NUMBER IS
   v_idx PLS_INTEGER;
   s NUMBER := 0;
 BEGIN
+  text := '';
   outnums.DELETE;
   v_idx := nums.FIRST;
   WHILE v_idx IS NOT NULL LOOP
+    text := text||v_idx||'='||nums(v_idx)||' ';
     s := NVL(s, 0) + NVL(nums(v_idx), 0);
     outnums(v_idx) := NVL(nums(v_idx), 0) * 2;
     v_idx := nums.NEXT(v_idx);
@@ -545,7 +549,7 @@ func generateAndBuild(t *testing.T, prefix string) (outFn string) {
 		outFh.Close()
 	}
 	os.Remove(outFn)
-	runCommand(t, "go", "build", "-o="+outFn, "-race", "./testdata/integration_test")
+	runCommand(t, "go", "build", "-o="+outFn, "./testdata/integration_test")
 	return
 }
 
