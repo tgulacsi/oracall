@@ -433,7 +433,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		case "REF CURSOR":
 			return "*sql.Rows"
 		case "CLOB", "BLOB":
-			return "ora.Lob"
+			return "goracle.Lob"
 		case "BFILE":
 			return "ora.Bfile"
 		default:

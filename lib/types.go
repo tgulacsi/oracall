@@ -66,6 +66,13 @@ func (arg PlsType) GetOra(src, varName string) string {
 			return fmt.Sprintf("string(custom.AsDate(%s))", src)
 		}
 	}
+	switch arg.ora {
+	case "NUMBER":
+		if varName != "" {
+			return fmt.Sprintf("string(%s.(goracle.Number))", varName)
+		}
+		return fmt.Sprintf("string(%s.(goracle.Number))", src)
+	}
 	return src
 }
 
@@ -98,14 +105,14 @@ func (arg PlsType) ToOra(dst, src string, isOutput bool) (expr string, variable 
 	switch arg.ora {
 	case "PLS_INTEGER":
 		if src[0] != '&' {
-			return fmt.Sprintf("var %s sql.NullInt64; if %s != 0 { %s.Int64, %s.Valid = int64(%s), true }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+			return fmt.Sprintf("var %s sql.NullInt64; if %s != 0 { %s.Int64, %s.Valid = int64(%s), true }; %s = int32(%s.Int64)", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}
 	case "NUMBER":
 		if src[0] != '&' {
 			return fmt.Sprintf("%s := goracle.Number(%s); %s = %s", dstVar, src, dst, dstVar), dstVar
 		}
 	}
-	if isOutput {
+	if isOutput && !strings.HasSuffix(dst, "]") {
 		if arg.ora == "NUMBER" {
 			return fmt.Sprintf("%s = sql.Out{Dest:(*goracle.Number)(unsafe.Pointer(%s)),In:true} // NUMBER",
 				dst, src), ""

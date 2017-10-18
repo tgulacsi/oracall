@@ -137,6 +137,9 @@ if true || DebugLevel > 0 {
 	goracle.Log = func(keyvals ...interface{}) error { log.Println(keyvals...); return nil; }
 `)
 	}
+	if hasCursorOut {
+		callBuf.WriteString("\n\tctx := context.Background()\n")
+	}
 	callBuf.WriteString(`
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -710,7 +713,7 @@ func (arg Argument) getConvRefCursor(
 
 	convOut = append(convOut, fmt.Sprintf(`
 	{
-		rset := %s.Dest.(*sql.Rows)
+		rset := %s.(sql.Out).Dest.(*sql.Rows)
 		iterators = append(iterators, iterator{
 			Reset: func() { output.%s = nil },
 			Iterate: func() error {
@@ -758,10 +761,12 @@ func (arg Argument) getFromRset(rsetRow string) string {
 		a := a
 		got := a.Argument.goType(true)
 		if strings.Contains(got, ".") {
-			fmt.Fprintf(buf, "\t%s: %s,\n", CamelCase(a.Name),
-				a.GetOra(fmt.Sprintf("%s[%d]", rsetRow, i), ""))
+			fmt.Fprintf(buf, "\t%s: %s, // %s\n", CamelCase(a.Name),
+				a.GetOra(fmt.Sprintf("%s[%d]", rsetRow, i), ""),
+				got)
 		} else {
-			fmt.Fprintf(buf, "\t%s: custom.As%s(%s[%d]),\n", CamelCase(a.Name), CamelCase(got), rsetRow, i)
+			fmt.Fprintf(buf, "\t%s: custom.As%s(%s[%d]), // %s\n", CamelCase(a.Name), CamelCase(got), rsetRow, i,
+				got)
 		}
 	}
 	fmt.Fprintf(buf, "}")
@@ -865,7 +870,12 @@ func (arg Argument) getConvTableRec(
 			amp = ""
 		}
 		lengthS = "len(input." + name[0] + ")"
-		too, _ := arg.ToOra(absName+"[i]", "v."+name[1], arg.IsOutput())
+		too, varName := arg.ToOra(absName+"[i]", "v."+name[1], arg.IsOutput())
+		s := too
+		if varName != "" {
+			s = fmt.Sprintf("%s[i] = %s", absName, varName)
+		}
+		_ = s
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)  // gctr1
 			for i,v := range input.%s {
@@ -874,8 +884,10 @@ func (arg Argument) getConvTableRec(
 			%s = %s%s`,
 			absName,
 			oraTyp, lengthS, tableSize,
-			name[0], too,
+			name[0],
+			too,
 			paramName, amp, absName))
+		_ = too
 	}
 	if arg.IsOutput() {
 		if !arg.IsInput() {

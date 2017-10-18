@@ -234,7 +234,7 @@ func protoType(got, aName string) (string, protoOptions) {
 		return "string", nil
 	case "n":
 		return "string", nil
-	case "raw", "goracle.lob":
+	case "raw", "goracle.lob", "ora.lob":
 		return "bytes", nil
 	default:
 		return trimmed, nil
