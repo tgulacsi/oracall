@@ -674,7 +674,7 @@ func (arg Argument) getConvSimpleTable(
 				fmt.Sprintf(`if cap(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
 				fmt.Sprintf(`%s = sql.Out{Dest: custom.NumbersFromStrings(&output.%s)}  // gcst1`, paramName, name))
 		} else {
-			convIn = append(convIn, fmt.Sprintf(`%s = output.%s] // gcst1`, paramName, name))
+			convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
 		}
 	} else {
 		in, varName := arg.ToOra(
