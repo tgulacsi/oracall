@@ -51,6 +51,7 @@ import (
     "fmt"
 	"strings"
 	"database/sql"
+	"database/sql/driver"
 	"os"
 	"strconv"
     "time"    // for datetimes
@@ -84,6 +85,7 @@ var _ goracle.Lob
 var _ unsafe.Pointer
 var _ = spew.Sdump
 var _ = os.Stdout
+var _ driver.Rows
 
 type iterator struct {
 	Reset func()

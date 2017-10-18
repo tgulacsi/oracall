@@ -707,27 +707,21 @@ func (arg Argument) getConvRefCursor(
 	got := arg.goType(true)
 	GoT := withPb(CamelCase(got))
 	convIn = append(convIn, fmt.Sprintf(`output.%s = make([]%s, 0, %d)  // gcrf1
-		%s = sql.Out{Dest:new(sql.Rows)} // gcrf1 %q`,
+		%s = sql.Out{Dest:new(driver.Rows)} // gcrf1 %q`,
 		name, GoT, tableSize,
 		paramName, got))
 
 	convOut = append(convOut, fmt.Sprintf(`
 	{
-		rset := %s.(sql.Out).Dest.(*sql.Rows)
+		rset := *(%s.(sql.Out).Dest.(*driver.Rows))
 		iterators = append(iterators, iterator{
 			Reset: func() { output.%s = nil },
 			Iterate: func() error {
 		a := output.%s[:0]
-		I := make([]interface{}, %d)
+		I := make([]driver.Value, %d)
 		var err error
 		for i := 0; i < %d; i++ {
-			if !rset.Next() {
-				if err = rset.Err(); err == nil {
-					err = io.EOF
-				}
-				break
-			}
-			if err = rset.Scan(I...); err != nil {
+			if err = rset.Next(I); err != nil {
 				break
 			}
 			a = append(a, %s)
@@ -892,9 +886,9 @@ func (arg Argument) getConvTableRec(
 	if arg.IsOutput() {
 		if !arg.IsInput() {
 			convIn = append(convIn,
-				fmt.Sprintf(`%s := make([]%s, %s, %d)  // gctr2
-			%s = &%s // gctr2`,
-					absName, oraTyp, lengthS, tableSize,
+				fmt.Sprintf(`%s := make([]%s, 0, %d)  // gctr2
+				%s = sql.Out{Dest:&%s} // gctr2`,
+					absName, oraTyp, tableSize,
 					paramName, absName))
 		}
 		got := parent.goType(true)

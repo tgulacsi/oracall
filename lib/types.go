@@ -69,9 +69,11 @@ func (arg PlsType) GetOra(src, varName string) string {
 	switch arg.ora {
 	case "NUMBER":
 		if varName != "" {
-			return fmt.Sprintf("string(%s.(goracle.Number))", varName)
+			//return fmt.Sprintf("string(%s.(goracle.Number))", varName)
+			return fmt.Sprintf("custom.AsString(%s)", varName)
 		}
-		return fmt.Sprintf("string(%s.(goracle.Number))", src)
+		//return fmt.Sprintf("string(%s.(goracle.Number))", src)
+		return fmt.Sprintf("custom.AsString(%s)", src)
 	}
 	return src
 }
@@ -112,7 +114,7 @@ func (arg PlsType) ToOra(dst, src string, isOutput bool) (expr string, variable 
 			return fmt.Sprintf("%s := goracle.Number(%s); %s = %s", dstVar, src, dst, dstVar), dstVar
 		}
 	}
-	if isOutput && !strings.HasSuffix(dst, "]") {
+	if isOutput && !(strings.HasSuffix(dst, "]") && !strings.HasPrefix(dst, "params[")) {
 		if arg.ora == "NUMBER" {
 			return fmt.Sprintf("%s = sql.Out{Dest:(*goracle.Number)(unsafe.Pointer(%s)),In:true} // NUMBER",
 				dst, src), ""
