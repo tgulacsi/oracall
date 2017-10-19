@@ -111,19 +111,19 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 
 	var pls string
 	{
-	var i int
-	paramsMap := make(map[string][]int, 16)
-	first := make(map[string]int, len(paramsMap))
-	pls, _ = orahlp.MapToSlice(
-		plsBuf.String(),
-		func(key string) interface{} {
-			paramsMap[key] = append(paramsMap[key], i)
-			if _, ok := first[key]; !ok {
-				first[key] = i
-			}
-			i++
-			return key
-		})
+		var i int
+		paramsMap := make(map[string][]int, 16)
+		first := make(map[string]int, len(paramsMap))
+		pls, _ = orahlp.MapToSlice(
+			plsBuf.String(),
+			func(key string) interface{} {
+				paramsMap[key] = append(paramsMap[key], i)
+				if _, ok := first[key]; !ok {
+					first[key] = i
+				}
+				i++
+				return key
+			})
 	}
 
 	i := strings.Index(call, fun.Name())
@@ -264,6 +264,9 @@ func demap(plsql, callFun string) (string, string) {
 	if err := tpl.Execute(callBuf, opts); err != nil {
 		panic(err)
 	}
+
+	//return plsql, callBuf.String()
+
 	plusIdxs := make([]idxRemap, 0, len(paramsMap))
 	for k, vv := range paramsMap {
 		for _, v := range vv {
@@ -274,6 +277,15 @@ func demap(plsql, callFun string) (string, string) {
 	}
 	if len(plusIdxs) == 0 {
 		return plsql, callBuf.String()
+	}
+
+	paramLines := make([]string, 0, len(paramsMap))
+	for _, line := range bytes.Split(callBuf.Bytes(), []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if !bytes.HasPrefix(line, []byte("params[")) {
+			continue
+		}
+		paramLines = append(paramLines, string(bytes.Replace(line, []byte("]="), []byte("] ="), 1)))
 	}
 
 	sort.Sort(byNewRemap(plusIdxs))
@@ -288,7 +300,17 @@ func demap(plsql, callFun string) (string, string) {
 	callBuf.Truncate(j)
 
 	for _, v := range plusIdxs {
-		fmt.Fprintf(callBuf, "params[%d] = params[%d] // %s\n", v.New, v.Old, v.Name)
+		s := fmt.Sprintf("params[%d] =", v.Old)
+		for _, line := range paramLines {
+			if strings.HasPrefix(line, s) {
+				fmt.Fprintf(callBuf, "params[%d] = &%s // %s\n", v.New, line[len(s):], v.Name)
+				s = ""
+				break
+			}
+		}
+		if s != "" {
+			fmt.Fprintf(callBuf, "params[%d] = params[%d] // %s\n", v.New, v.Old, v.Name)
+		}
 	}
 	callBuf.WriteString(rest)
 	return plsql, callBuf.String()
@@ -788,7 +810,8 @@ func (arg Argument) getConvRec(
 ) ([]string, []string) {
 
 	if arg.IsOutput() {
-		too, varName := arg.ToOra(paramName, "&output."+name)
+		too, varName := arg.ToOra(paramName, "output."+name)
+		too = strings.Replace(too, ";", "\n", -1)
 		convIn = append(convIn, too+" // gcr2 var="+varName)
 		if varName != "" {
 			convOut = append(convOut, arg.FromOra("output."+name, varName, varName))
@@ -830,6 +853,7 @@ func (arg Argument) getConvTableRec(
 		if !arg.IsOutput() {
 			amp = ""
 		}
+		amp = ""
 		lengthS = "len(input." + name[0] + ")"
 		too, _ := arg.ToOra(absName+"[i]", "v."+name[1])
 		convIn = append(convIn, fmt.Sprintf(`
@@ -837,10 +861,16 @@ func (arg Argument) getConvTableRec(
 			for i,v := range input.%s {
 				%s
 			} // gctr1
-			%s = %s%s`,
+			{
+				%s%s := %s%s
+				log.Printf("%s=%%+v", %s)
+				%s = %s%s
+			}`,
 			absName,
 			oraTyp, lengthS, tableSize,
 			name[0], too,
+			amp, absName, amp, absName,
+			absName, absName,
 			paramName, amp, absName))
 	}
 	if arg.IsOutput() {
