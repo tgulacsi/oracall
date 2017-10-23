@@ -240,6 +240,40 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 
 	var cw *csv.Writer
 	if dumpFn != "" {
+		var lastOk bool
+		qry := qry[:strings.Index(qry, "FROM "+tbl)]
+		qry = strings.TrimPrefix(qry[strings.LastIndex(qry, "SELECT ")+7:], "DISTINCT ")
+		colNames := strings.Split(
+			strings.Map(
+				func(r rune) rune {
+					if 'A' <= r && r <= 'Z' || '0' <= r && r <= '9' || r == '_' {
+						lastOk = true
+						return r
+					}
+					if 'a' <= r && r <= 'z' {
+						lastOk = true
+						return unicode.ToUpper(r)
+					}
+					if r == ',' {
+						return r
+					}
+					if lastOk {
+						lastOk = false
+						return ' '
+					}
+					return -1
+				},
+				qry,
+			),
+			",",
+		)
+		for i, nm := range colNames {
+			nm = strings.TrimSpace(nm)
+			colNames[i] = nm
+			if j := strings.LastIndexByte(nm, ' '); j >= 0 {
+				colNames[i] = nm[j+1:]
+			}
+		}
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
 			Log("msg", "create", "dump", dumpFn, "error", err)
@@ -255,21 +289,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 			}
 		}()
 		cw = csv.NewWriter(fh)
-		if err = cw.Write(strings.Split(
-			strings.Map(
-				func(r rune) rune {
-					if 'A' <= r && r <= 'Z' || '0' <= r && r <= '9' || r == '_' || r == ',' {
-						return r
-					}
-					if 'a' <= r && r <= 'z' {
-						return unicode.ToUpper(r)
-					}
-					return -1
-				},
-				qry[strings.Index(qry, "SELECT ")+7:strings.Index(qry, "FROM ")],
-			),
-			",",
-		)); err != nil {
+		if err = cw.Write(colNames); err != nil {
 			Log("msg", "write header to csv", "error", err)
 			return functions, errors.Wrap(err, "write header")
 		}
@@ -295,7 +315,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 			if cw != nil {
 				N := i64ToString
 				if err = cw.Write([]string{
-					N(oid), N(subid), pn.String, on.String,
+					N(oid), N(subid), N(seq), pn.String, on.String,
 					N(level), N(pos), an.String, ua.InOut,
 					ua.DataType, N(prec), N(scale), cs.String,
 					plsT.String, N(length),
