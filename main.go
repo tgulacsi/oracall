@@ -122,209 +122,8 @@ func Main(args []string) int {
 			Log("msg", "pinging", "dsn", *flagConnect, "error", err)
 			return 1
 		}
-		tbl := "user_arguments"
-		if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
-			tbl = "all_arguments"
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
 
-		var grp syncutil.Group
-
-		qry := `
-    SELECT A.*
-	  FROM
-	(SELECT DISTINCT object_id, subprogram_id, sequence,
-	       package_name, object_name,
-           data_level, position, argument_name, in_out,
-           data_type, data_precision, data_scale, character_set_name,
-           pls_type, char_length, type_owner, type_name, type_subname, type_link
-      FROM ` + tbl + `
-	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
-     ) A
-      ORDER BY 1, 2, 3`
-		rows, err := cx.QueryContext(ctx, qry, pattern)
-		if err != nil {
-			Log("qry", qry, "error", err)
-			return 2
-		}
-		defer rows.Close()
-
-		var cw *csv.Writer
-		if *flagDump != "" {
-			var fh *os.File
-			if fh, err = os.Create(*flagDump); err != nil {
-				Log("msg", "create", "dump", *flagDump, "error", err)
-				return 3
-			}
-			defer func() {
-				cw.Flush()
-				if err := cw.Error(); err != nil {
-					Log("msg", "flush", "csv", fh.Name(), "error", err)
-				}
-				if err := fh.Close(); err != nil {
-					Log("msg", "close", "dump", fh.Name(), "error", err)
-				}
-			}()
-			cw = csv.NewWriter(fh)
-			if err = cw.Write(strings.Split(
-				strings.Map(
-					func(r rune) rune {
-						if 'A' <= r && r <= 'Z' || '0' <= r && r <= '9' || r == '_' || r == ',' {
-							return r
-						}
-						if 'a' <= r && r <= 'z' {
-							return unicode.ToUpper(r)
-						}
-						return -1
-					},
-					qry[strings.Index(qry, "SELECT ")+7:strings.Index(qry, "FROM ")],
-				),
-				",",
-			)); err != nil {
-				Log("msg", "write header to csv", "error", err)
-				return 3
-			}
-		}
-
-		var prevPackage string
-		var docsMu sync.Mutex
-		docs := make(map[string]string)
-		userArgs := make(chan oracall.UserArgument, 16)
-		grp.Go(func() error {
-			defer close(userArgs)
-			var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString
-			var oid, seq, subid, level, pos, prec, scale, length sql.NullInt64
-			for rows.Next() {
-				var ua oracall.UserArgument
-				err = rows.Scan(&oid, &subid, &seq, &pn, &on,
-					&level, &pos, &an, &ua.InOut,
-					&ua.DataType, &prec, &scale, &cs,
-					&plsT, &length, &tOwner, &tName, &tSub, &tLink)
-				if err != nil {
-					return errors.Wrapf(err, "reading row=%v", rows)
-				}
-				if cw != nil {
-					N := i64ToString
-					if err = cw.Write([]string{
-						N(oid), N(subid), pn.String, on.String,
-						N(level), N(pos), an.String, ua.InOut,
-						ua.DataType, N(prec), N(scale), cs.String,
-						plsT.String, N(length),
-						tOwner.String, tName.String, tSub.String, tLink.String,
-					}); err != nil {
-						return errors.Wrapf(err, "writing csv")
-					}
-				}
-				if pn.Valid {
-					ua.PackageName = pn.String
-					if ua.PackageName != prevPackage {
-						prevPackage = ua.PackageName
-						grp.Go(func() error {
-							buf := bufPool.Get().(*bytes.Buffer)
-							defer bufPool.Put(buf)
-							buf.Reset()
-
-							Log := log.With(logger, "package", ua.PackageName).Log
-							if err := getSource(ctx, buf, cx, ua.PackageName); err != nil {
-								Log("msg", "getSource", "error", err)
-								return errors.WithMessage(err, ua.PackageName)
-							}
-							ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-							funDocs, err := parseDocs(ctx, buf.String())
-							cancel()
-							Log("msg", "parseDocs", "docs", len(funDocs), "error", err)
-							docsMu.Lock()
-							pn := oracall.UnoCap(ua.PackageName) + "."
-							for nm, doc := range funDocs {
-								docs[pn+strings.ToLower(nm)] = doc
-							}
-							docsMu.Unlock()
-							if err == context.DeadlineExceeded {
-								err = nil
-							}
-							return err
-						})
-					}
-				}
-				if on.Valid {
-					ua.ObjectName = on.String
-				}
-				if an.Valid {
-					ua.ArgumentName = an.String
-				}
-				if cs.Valid {
-					ua.CharacterSetName = cs.String
-				}
-				if plsT.Valid {
-					ua.PlsType = plsT.String
-				}
-				if tOwner.Valid {
-					ua.TypeOwner = tOwner.String
-				}
-				if tName.Valid {
-					ua.TypeName = tName.String
-				}
-				if tSub.Valid {
-					ua.TypeSubname = tSub.String
-				}
-				if tLink.Valid {
-					ua.TypeLink = tLink.String
-				}
-				if oid.Valid {
-					ua.ObjectID = uint(oid.Int64)
-				}
-				if subid.Valid {
-					ua.SubprogramID = uint(subid.Int64)
-				}
-				if level.Valid {
-					ua.DataLevel = uint8(level.Int64)
-				}
-				if pos.Valid {
-					ua.Position = uint8(pos.Int64)
-				}
-				if prec.Valid {
-					ua.DataPrecision = uint8(prec.Int64)
-				}
-				if scale.Valid {
-					ua.DataScale = uint8(scale.Int64)
-				}
-				if length.Valid {
-					ua.CharLength = uint(length.Int64)
-				}
-				userArgs <- ua
-			}
-			if err = rows.Err(); err != nil {
-				return errors.Wrapf(err, "walking rows")
-			}
-			return nil
-		})
-		functions, err = oracall.ParseArguments(userArgs)
-		if grpErr := grp.Err(); grpErr != nil {
-			if err == nil {
-				err = grpErr
-			}
-			Log("msg", "ParseArguments", "error", grpErr)
-		}
-		docNames := make([]string, 0, len(docs))
-		for k := range docs {
-			docNames = append(docNames, k)
-		}
-		sort.Strings(docNames)
-		var any bool
-		for i, f := range functions {
-			if f.Documentation == "" {
-				if f.Documentation = docs[f.Name()]; f.Documentation == "" {
-					Log("msg", "No documentation", "function", f.Name())
-					any = true
-				} else {
-					functions[i] = f
-				}
-			}
-		}
-		if any {
-			Log("has", docNames)
-		}
+		functions, err = parseDB(cx, pattern, *flagDump)
 	}
 	if err != nil {
 		Log("msg", "read", "file", flag.Arg(0), "error", err)
@@ -407,6 +206,214 @@ func Main(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, err error) {
+	Log := logger.Log
+	tbl := "user_arguments"
+	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
+		tbl = "all_arguments"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var grp syncutil.Group
+
+	qry := `
+    SELECT A.*
+	  FROM
+	(SELECT DISTINCT object_id object_id, subprogram_id, sequence,
+	       package_name, object_name,
+           data_level, position, argument_name, in_out,
+           data_type, data_precision, data_scale, character_set_name,
+           pls_type, char_length, type_owner, type_name, type_subname, type_link
+      FROM ` + tbl + `
+	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
+     ) A
+      ORDER BY 1, 2, 3`
+	rows, err := cx.QueryContext(ctx, qry, pattern)
+	if err != nil {
+		Log("qry", qry, "error", err)
+		return functions, errors.Wrap(err, qry)
+	}
+	defer rows.Close()
+
+	var cw *csv.Writer
+	if dumpFn != "" {
+		var fh *os.File
+		if fh, err = os.Create(dumpFn); err != nil {
+			Log("msg", "create", "dump", dumpFn, "error", err)
+			return functions, errors.Wrap(err, dumpFn)
+		}
+		defer func() {
+			cw.Flush()
+			if err := cw.Error(); err != nil {
+				Log("msg", "flush", "csv", fh.Name(), "error", err)
+			}
+			if err := fh.Close(); err != nil {
+				Log("msg", "close", "dump", fh.Name(), "error", err)
+			}
+		}()
+		cw = csv.NewWriter(fh)
+		if err = cw.Write(strings.Split(
+			strings.Map(
+				func(r rune) rune {
+					if 'A' <= r && r <= 'Z' || '0' <= r && r <= '9' || r == '_' || r == ',' {
+						return r
+					}
+					if 'a' <= r && r <= 'z' {
+						return unicode.ToUpper(r)
+					}
+					return -1
+				},
+				qry[strings.Index(qry, "SELECT ")+7:strings.Index(qry, "FROM ")],
+			),
+			",",
+		)); err != nil {
+			Log("msg", "write header to csv", "error", err)
+			return functions, errors.Wrap(err, "write header")
+		}
+	}
+
+	var prevPackage string
+	var docsMu sync.Mutex
+	docs := make(map[string]string)
+	userArgs := make(chan oracall.UserArgument, 16)
+	grp.Go(func() error {
+		defer close(userArgs)
+		var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString
+		var oid, seq, subid, level, pos, prec, scale, length sql.NullInt64
+		for rows.Next() {
+			var ua oracall.UserArgument
+			err = rows.Scan(&oid, &subid, &seq, &pn, &on,
+				&level, &pos, &an, &ua.InOut,
+				&ua.DataType, &prec, &scale, &cs,
+				&plsT, &length, &tOwner, &tName, &tSub, &tLink)
+			if err != nil {
+				return errors.Wrapf(err, "reading row=%v", rows)
+			}
+			if cw != nil {
+				N := i64ToString
+				if err = cw.Write([]string{
+					N(oid), N(subid), pn.String, on.String,
+					N(level), N(pos), an.String, ua.InOut,
+					ua.DataType, N(prec), N(scale), cs.String,
+					plsT.String, N(length),
+					tOwner.String, tName.String, tSub.String, tLink.String,
+				}); err != nil {
+					return errors.Wrapf(err, "writing csv")
+				}
+			}
+			if pn.Valid {
+				ua.PackageName = pn.String
+				if ua.PackageName != prevPackage {
+					prevPackage = ua.PackageName
+					grp.Go(func() error {
+						buf := bufPool.Get().(*bytes.Buffer)
+						defer bufPool.Put(buf)
+						buf.Reset()
+
+						Log := log.With(logger, "package", ua.PackageName).Log
+						if err := getSource(ctx, buf, cx, ua.PackageName); err != nil {
+							Log("msg", "getSource", "error", err)
+							return errors.WithMessage(err, ua.PackageName)
+						}
+						ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+						funDocs, err := parseDocs(ctx, buf.String())
+						cancel()
+						Log("msg", "parseDocs", "docs", len(funDocs), "error", err)
+						docsMu.Lock()
+						pn := oracall.UnoCap(ua.PackageName) + "."
+						for nm, doc := range funDocs {
+							docs[pn+strings.ToLower(nm)] = doc
+						}
+						docsMu.Unlock()
+						if err == context.DeadlineExceeded {
+							err = nil
+						}
+						return err
+					})
+				}
+			}
+			if on.Valid {
+				ua.ObjectName = on.String
+			}
+			if an.Valid {
+				ua.ArgumentName = an.String
+			}
+			if cs.Valid {
+				ua.CharacterSetName = cs.String
+			}
+			if plsT.Valid {
+				ua.PlsType = plsT.String
+			}
+			if tOwner.Valid {
+				ua.TypeOwner = tOwner.String
+			}
+			if tName.Valid {
+				ua.TypeName = tName.String
+			}
+			if tSub.Valid {
+				ua.TypeSubname = tSub.String
+			}
+			if tLink.Valid {
+				ua.TypeLink = tLink.String
+			}
+			if oid.Valid {
+				ua.ObjectID = uint(oid.Int64)
+			}
+			if subid.Valid {
+				ua.SubprogramID = uint(subid.Int64)
+			}
+			if level.Valid {
+				ua.DataLevel = uint8(level.Int64)
+			}
+			if pos.Valid {
+				ua.Position = uint8(pos.Int64)
+			}
+			if prec.Valid {
+				ua.DataPrecision = uint8(prec.Int64)
+			}
+			if scale.Valid {
+				ua.DataScale = uint8(scale.Int64)
+			}
+			if length.Valid {
+				ua.CharLength = uint(length.Int64)
+			}
+			userArgs <- ua
+		}
+		if err = rows.Err(); err != nil {
+			return errors.Wrapf(err, "walking rows")
+		}
+		return nil
+	})
+	functions, err = oracall.ParseArguments(userArgs)
+	if grpErr := grp.Err(); grpErr != nil {
+		if err == nil {
+			err = grpErr
+		}
+		Log("msg", "ParseArguments", "error", grpErr)
+	}
+	docNames := make([]string, 0, len(docs))
+	for k := range docs {
+		docNames = append(docNames, k)
+	}
+	sort.Strings(docNames)
+	var any bool
+	for i, f := range functions {
+		if f.Documentation == "" {
+			if f.Documentation = docs[f.Name()]; f.Documentation == "" {
+				Log("msg", "No documentation", "function", f.Name())
+				any = true
+			} else {
+				functions[i] = f
+			}
+		}
+	}
+	if any {
+		Log("has", docNames)
+	}
+	return functions, nil
 }
 
 var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 1024)) }}
