@@ -19,6 +19,7 @@ package oracall
 import (
 	"bytes"
 	"fmt"
+	"go/format"
 	"io"
 	"os"
 	"sort"
@@ -265,8 +266,24 @@ func demap(plsql, callFun string) (string, string) {
 	if err := tpl.Execute(callBuf, opts); err != nil {
 		panic(err)
 	}
-
-	return plsql, callBuf.String()
+	b, err := format.Source(callBuf.Bytes())
+	if err != nil {
+		panic(err)
+	}
+	callBuf.Reset()
+	prev := make(map[string]string)
+	for _, line := range bytes.Split(b, []byte{'\n'}) {
+		if line = bytes.TrimSpace(line); bytes.HasPrefix(line, []byte("params[")) && bytes.Contains(line, []byte("] = ")) {
+			idx := string(line[:bytes.IndexByte(line, ']')+1])
+			line := line[len(idx)+2:]
+			if i := bytes.Index(line, []byte("//")); i >= 0 {
+				line = line[:i]
+			}
+			prev[idx] = string(bytes.TrimSpace(line))
+			Log("idx", idx, "line", prev[idx])
+		}
+	}
+	callBuf.Write(b)
 
 	plusIdxs := make([]idxRemap, 0, len(paramsMap))
 	for k, vv := range paramsMap {
@@ -284,7 +301,7 @@ func demap(plsql, callFun string) (string, string) {
 	plus := buffers.Get()
 	defer buffers.Put(plus)
 
-	b := callBuf.Bytes()
+	b = callBuf.Bytes()
 	i = bytes.LastIndex(b, []byte(fmt.Sprintf("params[%d] =", lastIdx)))
 	j := bytes.IndexByte(b[i:], '\n')
 	j += i + 1
@@ -292,7 +309,19 @@ func demap(plsql, callFun string) (string, string) {
 	callBuf.Truncate(j)
 
 	for _, v := range plusIdxs {
-		fmt.Fprintf(callBuf, "params[%d] = params[%d]  // %s\n", v.New, v.Old, v.Name)
+		idx := fmt.Sprintf("params[%d]", v.Old)
+		old := prev[idx]
+		if old == "" {
+			fmt.Fprintf(callBuf, "params[%d] = params[%d]  // %s\n", v.New, v.Old, v.Name)
+			Log("err", fmt.Errorf("cannot find %q in %+v", idx, prev))
+		} else {
+			if !strings.HasPrefix(old, "sql.Out{") {
+				old = "sql.Out{Dest: " + old + "}"
+			} else {
+				old = strings.Replace(old, "In: true", "", 1)
+			}
+			fmt.Fprintf(callBuf, "params[%d] = %s  // %s\n", v.New, old, v.Name)
+		}
 	}
 	callBuf.WriteString(rest)
 	return plsql, callBuf.String()
