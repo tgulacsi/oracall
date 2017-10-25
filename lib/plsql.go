@@ -280,7 +280,7 @@ func demap(plsql, callFun string) (string, string) {
 				line = line[:i]
 			}
 			prev[idx] = string(bytes.TrimSpace(line))
-			Log("idx", idx, "line", prev[idx])
+			//Log("idx", idx, "line", prev[idx])
 		}
 	}
 	callBuf.Write(b)
@@ -316,6 +316,9 @@ func demap(plsql, callFun string) (string, string) {
 			Log("err", fmt.Errorf("cannot find %q in %+v", idx, prev))
 		} else {
 			if !strings.HasPrefix(old, "sql.Out{") {
+				if old[0] != '&' {
+					old = "&" + old
+				}
 				old = "sql.Out{Dest: " + old + "}"
 			} else {
 				old = strings.Replace(old, "In: true", "", 1)
@@ -700,7 +703,9 @@ func (arg Argument) getConvSimpleTable(
 			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
 			"output."+name,
 			true)
-		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
+		convIn = append(convIn,
+			//fmt.Sprintf(`if cap(input.%s) == 0 { input.%s = append(input.%s, make(%s, 1)...)[:0] }`, name, name, name, arg.goType(true)[1:]),
+			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
 		if got == "[]goracle.Number" { // don't copy, hack
 			convIn = append(convIn,
 				fmt.Sprintf(`if cap(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
@@ -713,7 +718,8 @@ func (arg Argument) getConvSimpleTable(
 			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
 			"output."+name,
 			false)
-		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
+		convIn = append(convIn,
+			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
 		if arg.goType(true) == "[]goracle.Number" {
 			convIn = append(convIn,
 				fmt.Sprintf(`if len(input.%s) == 0 { %s = []goracle.Number{} } else {
