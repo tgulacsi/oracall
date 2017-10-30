@@ -176,7 +176,7 @@ if true || DebugLevel > 0 {
 		for {
 			for _, it := range iterators {
 				if err = it.Iterate(); err != nil {
-					if err != io.EOF {
+					if errors.Cause(err) != io.EOF {
 						_ = stream.Send(output)
 						return
 					}
@@ -378,7 +378,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
 	convIn = append(convIn,
 		"params := make([]interface{}, {{.ParamsArrLen}}, {{.ParamsArrLen}}+1)",
-		"var x, v interface{}\n _,_ = x,v")
+	)
 
 	addParam := func(paramName string) string {
 		if paramName == "" {
