@@ -49,11 +49,11 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	case "DATE":
 		return fmt.Sprintf("%s = string(%s)", dst, src)
 	case "PLS_INTEGER":
-		return fmt.Sprintf("%s = %s.Value", dst, src)
+		return fmt.Sprintf("%s = int32(%s)", dst, src)
 	case "NUMBER":
-		return fmt.Sprintf("%s = custom.AsFloat64(%s.Value)", dst, src)
+		return fmt.Sprintf("%s = string(%s)", dst, src)
 	}
-	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora)
+	return fmt.Sprintf("%s = %s // %s fromOra", dst, src, arg.ora)
 }
 
 func (arg PlsType) GetOra(src, varName string) string {
@@ -66,11 +66,20 @@ func (arg PlsType) GetOra(src, varName string) string {
 			return fmt.Sprintf("string(custom.AsDate(%s))", src)
 		}
 	}
+	switch arg.ora {
+	case "NUMBER":
+		if varName != "" {
+			//return fmt.Sprintf("string(%s.(goracle.Number))", varName)
+			return fmt.Sprintf("custom.AsString(%s)", varName)
+		}
+		//return fmt.Sprintf("string(%s.(goracle.Number))", src)
+		return fmt.Sprintf("custom.AsString(%s)", src)
+	}
 	return src
 }
 
 // ToOra adds the value of the argument with arg type, from src variable to dst variable.
-func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
+func (arg PlsType) ToOra(dst, src string, isOutput bool) (expr string, variable string) {
 	dstVar := mkVarName(dst)
 	if Gogo {
 		switch arg.ora {
@@ -78,6 +87,14 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 			var pointer string
 			if src[0] == '&' {
 				pointer = "&"
+			}
+			if isOutput {
+				return fmt.Sprintf(`%s := custom.Date(%s).Get() // toOra D
+			%s = sql.Out{Dest:%s%s, In:true}`,
+						dstVar, strings.TrimPrefix(src, "&"),
+						dst, pointer, dstVar,
+					),
+					dstVar
 			}
 			return fmt.Sprintf(`%s := custom.Date(%s).Get() // toOra D
 			%s = %s%s`,
@@ -90,12 +107,19 @@ func (arg PlsType) ToOra(dst, src string) (expr string, variable string) {
 	switch arg.ora {
 	case "PLS_INTEGER":
 		if src[0] != '&' {
-			return fmt.Sprintf("%s := ora.Int32{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+			return fmt.Sprintf("var %s sql.NullInt64; if %s != 0 { %s.Int64, %s.Valid = int64(%s), true }; %s = int32(%s.Int64)", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}
 	case "NUMBER":
 		if src[0] != '&' {
-			return fmt.Sprintf("%s := ora.Float64{IsNull:true}; if %s != 0 { %s.Value, %s.IsNull = %s, false }; %s = %s", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+			return fmt.Sprintf("%s := goracle.Number(%s); %s = %s", dstVar, src, dst, dstVar), dstVar
 		}
+	}
+	if isOutput && !(strings.HasSuffix(dst, "]") && !strings.HasPrefix(dst, "params[")) {
+		if arg.ora == "NUMBER" {
+			return fmt.Sprintf("%s = sql.Out{Dest:(*goracle.Number)(unsafe.Pointer(%s)),In:true} // NUMBER",
+				dst, src), ""
+		}
+		return fmt.Sprintf("%s = sql.Out{Dest:%s,In:true} // %s", dst, src, arg.ora), ""
 	}
 	return fmt.Sprintf("%s = %s // %s", dst, src, arg.ora), ""
 }

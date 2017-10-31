@@ -19,26 +19,19 @@ package oracall
 import (
 	"bytes"
 	"fmt"
+	"go/format"
 	"io"
 	"os"
 	"sort"
 	"strings"
 	"text/template"
 
-	"github.com/tgulacsi/go/orahlp"
+	"gopkg.in/goracle.v2"
 )
 
-// MaxTableSize is the maximum size of the array arguments
+// MaxTableSize is the maximum size of the array elements
 const MaxTableSize = 512
 const batchSize = 128
-
-//
-// OracleArgument
-//
-
-var (
-	stringTypes = make(map[string]struct{}, 16)
-)
 
 // SavePlsqlBlock saves the plsql block definition into writer
 func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
@@ -111,55 +104,64 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 
 	var pls string
 	{
-	var i int
-	paramsMap := make(map[string][]int, 16)
-	first := make(map[string]int, len(paramsMap))
-	pls, _ = orahlp.MapToSlice(
-		plsBuf.String(),
-		func(key string) interface{} {
-			paramsMap[key] = append(paramsMap[key], i)
-			if _, ok := first[key]; !ok {
-				first[key] = i
-			}
-			i++
-			return key
-		})
+		var i int
+		paramsMap := make(map[string][]int, 16)
+		first := make(map[string]int, len(paramsMap))
+		pls, _ = goracle.MapToSlice(
+			plsBuf.String(),
+			func(key string) interface{} {
+				paramsMap[key] = append(paramsMap[key], i)
+				if _, ok := first[key]; !ok {
+					first[key] = i
+				}
+				i++
+				return key
+			})
 	}
 
 	i := strings.Index(call, fun.Name())
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
-	fmt.Fprintf(callBuf, "\nif true || DebugLevel > 0 { log.Println(`calling %s as`); log.Printf(`%s`, params...) }"+`
-	ses, err := s.OraSesPool.Get()
-	if err != nil {
-		err = errors.Wrap(err, "Get")
-		return
-	}
-	defer s.OraSesPool.Put(ses)
+	fmt.Fprintf(callBuf, `
+if true || DebugLevel > 0 {
+	log.Println(`+"`calling %s as`"+`)
+	log.Printf(`+"`%s`"+`, params...)
+}
 	qry := %s
-	stmt, err := ses.Prep(qry)
-	if err != nil {
-		err = errors.Wrap(err, qry)
+`,
+		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
+		fun.getPlsqlConstName())
+	if len(convIn) > 100 {
+		fmt.Fprintf(callBuf, `
+	oLog := goracle.Log
+	defer func() { goracle.Log = oLog }()
+	goracle.Log = func(keyvals ...interface{}) error { log.Println(keyvals...); return nil; }
+`)
+	}
+	if hasCursorOut {
+		callBuf.WriteString("\n\tctx := context.Background()\n")
+	}
+	callBuf.WriteString(`
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stmt, stmtErr := s.db.PrepareContext(ctx, qry)
+	if stmtErr != nil {
+		err = errors.Wrap(stmtErr, qry)
 		return
 	}
-	if _, err = stmt.ExeP(params...); err != nil {
+	defer stmt.Close()
+	if _, err = stmt.ExecContext(ctx, append(params, goracle.PlSQLArrays)...); err != nil {
 		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
 			// "existing state of packages has been discarded"
-			_, err= stmt.ExeP(params...)
+			_, err = stmt.ExecContext(ctx, params...)
 		}
-		if err != nil && strings.Contains(err.Error(), "state of") {
-			log.Println("!!! discard session !!!")
-			ses.Close()
-			ses = nil
-		}
-		if err = errors.Wrapf(err, "%%s %%#v", qry, params); err != nil {
+		if err != nil {
 			return
 		}
 	}
-	defer stmt.Close()
-    `,
-		call[i:j], rIdentifier.ReplaceAllString(pls, "'%+v'"), fun.getPlsqlConstName())
-	callBuf.WriteString("\nif true || DebugLevel > 0 { log.Printf(`result params: %v`, params) }\n")
+    `)
+
+	callBuf.WriteString("\nif true || DebugLevel > 0 { fmt.Fprintf(os.Stderr, `result params: %#v\n output=%#v`, params, output) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -174,7 +176,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		for {
 			for _, it := range iterators {
 				if err = it.Iterate(); err != nil {
-					if err != io.EOF {
+					if errors.Cause(err) != io.EOF {
 						_ = stream.Send(output)
 						return
 					}
@@ -217,7 +219,7 @@ func demap(plsql, callFun string) (string, string) {
 	var i int
 	paramsMap := make(map[string][]int, 16)
 	first := make(map[string]int, len(paramsMap))
-	plsql, paramsArr := orahlp.MapToSlice(
+	plsql, paramsArr := goracle.MapToSlice(
 		plsql,
 		func(key string) interface{} {
 			paramsMap[key] = append(paramsMap[key], i)
@@ -264,6 +266,25 @@ func demap(plsql, callFun string) (string, string) {
 	if err := tpl.Execute(callBuf, opts); err != nil {
 		panic(err)
 	}
+	b, err := format.Source(callBuf.Bytes())
+	if err != nil {
+		panic(err)
+	}
+	callBuf.Reset()
+	prev := make(map[string]string)
+	for _, line := range bytes.Split(b, []byte{'\n'}) {
+		if line = bytes.TrimSpace(line); bytes.HasPrefix(line, []byte("params[")) && bytes.Contains(line, []byte("] = ")) {
+			idx := string(line[:bytes.IndexByte(line, ']')+1])
+			line := line[len(idx)+2:]
+			if i := bytes.Index(line, []byte("//")); i >= 0 {
+				line = line[:i]
+			}
+			prev[idx] = string(bytes.TrimSpace(line))
+			//Log("idx", idx, "line", prev[idx])
+		}
+	}
+	callBuf.Write(b)
+
 	plusIdxs := make([]idxRemap, 0, len(paramsMap))
 	for k, vv := range paramsMap {
 		for _, v := range vv {
@@ -280,7 +301,7 @@ func demap(plsql, callFun string) (string, string) {
 	plus := buffers.Get()
 	defer buffers.Put(plus)
 
-	b := callBuf.Bytes()
+	b = callBuf.Bytes()
 	i = bytes.LastIndex(b, []byte(fmt.Sprintf("params[%d] =", lastIdx)))
 	j := bytes.IndexByte(b[i:], '\n')
 	j += i + 1
@@ -288,7 +309,22 @@ func demap(plsql, callFun string) (string, string) {
 	callBuf.Truncate(j)
 
 	for _, v := range plusIdxs {
-		fmt.Fprintf(callBuf, "params[%d] = params[%d] // %s\n", v.New, v.Old, v.Name)
+		idx := fmt.Sprintf("params[%d]", v.Old)
+		old := prev[idx]
+		if old == "" {
+			fmt.Fprintf(callBuf, "params[%d] = params[%d]  // %s\n", v.New, v.Old, v.Name)
+			Log("err", fmt.Errorf("cannot find %q in %+v", idx, prev))
+		} else {
+			if !strings.HasPrefix(old, "sql.Out{") {
+				if old[0] != '&' {
+					old = "&" + old
+				}
+				old = "sql.Out{Dest: " + old + "}"
+			} else {
+				old = strings.Replace(old, "In: true", "", 1)
+			}
+			fmt.Fprintf(callBuf, "params[%d] = %s  // %s\n", v.New, old, v.Name)
+		}
 	}
 	callBuf.WriteString(rest)
 	return plsql, callBuf.String()
@@ -321,13 +357,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		return typ
 	}
 	//fStructIn, fStructOut := fun.getStructName(false), fun.getStructName(true)
-	var (
-		vn, tmp, typ string
-		ok           bool
-	)
-	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
-	convIn = append(convIn, "params := make([]interface{}, {{.ParamsArrLen}})", "var x, v interface{}\n _,_ = x,v")
-
 	args := make([]Argument, 0, len(fun.Args)+1)
 	for _, arg := range fun.Args {
 		arg.Name = replHidden(arg.Name)
@@ -336,11 +365,26 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	if fun.Returns != nil {
 		args = append(args, *fun.Returns)
 	}
+	for _, arg := range args {
+		if arg.Flavor == FLAVOR_TABLE {
+			break
+		}
+	}
+
+	var (
+		vn, tmp, typ string
+		ok           bool
+	)
+	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
+	convIn = append(convIn,
+		"params := make([]interface{}, {{.ParamsArrLen}}, {{.ParamsArrLen}}+1)",
+	)
+
 	addParam := func(paramName string) string {
 		if paramName == "" {
 			panic("empty param name")
 		}
-		return `params[{{paramsIdx "` + paramName + `"}}]`
+		return fmt.Sprintf(`params[{{paramsIdx %q}}]`, paramName)
 	}
 	for _, arg := range args {
 		switch arg.Flavor {
@@ -576,20 +620,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
-func (arg Argument) getIsValidCheck(name string) string {
-	got := arg.goType(false)
-	if got[0] == '*' {
-		return name + " != nil"
-	}
-	if strings.HasPrefix(got, "ora.") {
-		return "!" + name + ".IsNull"
-	}
-	if strings.HasPrefix(got, "sql.Null") {
-		return name + ".Valid"
-	}
-	return name + " != nil /*" + got + "*/"
-}
-
 func (arg Argument) getConvSimple(
 	convIn, convOut []string,
 	name, paramName string,
@@ -605,13 +635,15 @@ func (arg Argument) getConvSimple(
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s  // gcs3`, name, name))
 		}
 		src := "output." + name
-		in, varName := arg.ToOra(paramName, "&"+src)
-		convIn = append(convIn, in+"  // gcs3")
+		in, varName := arg.ToOra(paramName, "&"+src, true)
+		convIn = append(convIn, in)
+		//fmt.Sprintf("%s = sql.Out{Dest:%s,In:%t}  // gcs3", paramName, "&"+src, arg.IsInput()))
 		if varName != "" {
-			convOut = append(convOut, arg.FromOra(src, paramName, varName))
+			convOut = append(convOut,
+				fmt.Sprintf("%s  // gcs4", arg.FromOra(src, paramName, varName)))
 		}
 	} else {
-		in, _ := arg.ToOra(paramName, "input."+name)
+		in, _ := arg.ToOra(paramName, "input."+name, false)
 		convIn = append(convIn, in+"  // gcs4")
 	}
 	return convIn, convOut
@@ -627,8 +659,13 @@ func (arg Argument) getConvSimpleTable(
 		if arg.Type == "REF CURSOR" {
 			return arg.getConvRefCursor(convIn, convOut, name, paramName, tableSize)
 		}
-		if got == "*[]string" {
-			got = "[]string"
+		if strings.HasPrefix(got, "*[]") { // FIXME(tgulacsi): just a hack, ProtoBuf never generates a pointer to a slice
+			got = got[1:]
+		}
+		if false {
+			if got == "*[]string" {
+				got = "[]string"
+			}
 		}
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf(`
@@ -653,16 +690,46 @@ func (arg Argument) getConvSimpleTable(
 				convIn = append(convIn, fmt.Sprintf("output.%s = input.%s", name, name))
 			} else {
 				got = CamelCase(got)
-				convIn = append(convIn, fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
+				if got == "[]goracle.Number" {
+					convIn = append(convIn,
+						fmt.Sprintf("output.%s = make([]string, 0, %d) // gcst3", name, tableSize))
+				} else {
+					convIn = append(convIn,
+						fmt.Sprintf("output.%s = make(%s, 0, %d) // gcst3", name, got, tableSize))
+				}
 			}
 		}
-		in, varName := arg.ToOra(strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1), "output."+name)
-		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
-		convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
+		in, varName := arg.ToOra(
+			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
+			"output."+name,
+			true)
+		convIn = append(convIn,
+			//fmt.Sprintf(`if cap(input.%s) == 0 { input.%s = append(input.%s, make(%s, 1)...)[:0] }`, name, name, name, arg.goType(true)[1:]),
+			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
+		if got == "[]goracle.Number" { // don't copy, hack
+			convIn = append(convIn,
+				fmt.Sprintf(`if cap(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
+				fmt.Sprintf(`%s = sql.Out{Dest: custom.NumbersFromStrings(&output.%s)}  // gcst1`, paramName, name))
+		} else {
+			convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
+		}
 	} else {
-		in, varName := arg.ToOra(strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1), "output."+name)
-		convIn = append(convIn, fmt.Sprintf(`// in=%q varName=%q`, in, varName))
-		convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
+		in, varName := arg.ToOra(
+			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
+			"output."+name,
+			false)
+		convIn = append(convIn,
+			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
+		if arg.goType(true) == "[]goracle.Number" {
+			convIn = append(convIn,
+				fmt.Sprintf(`if len(input.%s) == 0 { %s = []goracle.Number{} } else {
+			%s = *custom.NumbersFromStrings(&input.%s) // gcst2
+		}`,
+					name, paramName,
+					paramName, name))
+		} else {
+			convIn = append(convIn, fmt.Sprintf("%s = input.%s // gcst2", paramName, name))
+		}
 	}
 	return convIn, convOut
 }
@@ -675,24 +742,21 @@ func (arg Argument) getConvRefCursor(
 	got := arg.goType(true)
 	GoT := withPb(CamelCase(got))
 	convIn = append(convIn, fmt.Sprintf(`output.%s = make([]%s, 0, %d)  // gcrf1
-				%s = new(ora.Rset) // gcrf1 %q`,
+		%s = sql.Out{Dest:new(driver.Rows)} // gcrf1 %q`,
 		name, GoT, tableSize,
 		paramName, got))
 
 	convOut = append(convOut, fmt.Sprintf(`
 	{
-		rset := %s.(*ora.Rset)
-		if rset.IsOpen() {
+		rset := *(%s.(sql.Out).Dest.(*driver.Rows))
 		iterators = append(iterators, iterator{
 			Reset: func() { output.%s = nil },
 			Iterate: func() error {
 		a := output.%s[:0]
+		I := make([]driver.Value, %d)
 		var err error
 		for i := 0; i < %d; i++ {
-			if !rset.Next() {
-				if err = rset.Err(); err == nil {
-					err = io.EOF
-				}
+			if err = rset.Next(I); err != nil {
 				break
 			}
 			a = append(a, %s)
@@ -701,13 +765,13 @@ func (arg Argument) getConvRefCursor(
 		return err
 		},
 		})
-		}
 	}`,
 		paramName,
 		name,
 		name,
+		len(arg.TableOf.RecordOf),
 		batchSize,
-		arg.getFromRset("rset.Row"),
+		arg.getFromRset("I"),
 		name,
 	))
 	return convIn, convOut
@@ -726,16 +790,19 @@ func (arg Argument) getFromRset(rsetRow string) string {
 		a := a
 		got := a.Argument.goType(true)
 		if strings.Contains(got, ".") {
-			fmt.Fprintf(buf, "\t%s: %s,\n", CamelCase(a.Name),
-				a.GetOra(fmt.Sprintf("%s[%d]", rsetRow, i), ""))
+			fmt.Fprintf(buf, "\t%s: %s, // %s\n", CamelCase(a.Name),
+				a.GetOra(fmt.Sprintf("%s[%d]", rsetRow, i), ""),
+				got)
 		} else {
-			fmt.Fprintf(buf, "\t%s: custom.As%s(%s[%d]),\n", CamelCase(a.Name), CamelCase(got), rsetRow, i)
+			fmt.Fprintf(buf, "\t%s: custom.As%s(%s[%d]), // %s\n", CamelCase(a.Name), CamelCase(got), rsetRow, i,
+				got)
 		}
 	}
 	fmt.Fprintf(buf, "}")
 	return buf.String()
 }
 
+/*
 func getOutConvTSwitch(name, pTyp string) string {
 	parse := ""
 	if strings.HasPrefix(pTyp, "int") {
@@ -778,7 +845,7 @@ func getOutConvTSwitch(name, pTyp string) string {
 					return
 				}`, pTyp, name, pTyp)
 }
-
+*/
 func (arg Argument) getConvRec(
 	convIn, convOut []string,
 	name, paramName string,
@@ -788,14 +855,15 @@ func (arg Argument) getConvRec(
 ) ([]string, []string) {
 
 	if arg.IsOutput() {
-		too, varName := arg.ToOra(paramName, "&output."+name)
+		too, varName := arg.ToOra(paramName, "&output."+name, true)
 		convIn = append(convIn, too+" // gcr2 var="+varName)
 		if varName != "" {
-			convOut = append(convOut, arg.FromOra("output."+name, varName, varName))
+			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest:&%s} // gcr2out", paramName, varName))
+			//convOut = append(convOut, arg.FromOra("output."+name, varName, varName)+" // gcr2out")
 		}
 	} else if arg.IsInput() {
 		parts := strings.Split(name, ".")
-		too, _ := arg.ToOra(paramName, "input."+name)
+		too, _ := arg.ToOra(paramName, "input."+name, false)
 		convIn = append(convIn,
 			fmt.Sprintf(`if input.%s != nil {
 				%s
@@ -819,11 +887,11 @@ func (arg Argument) getConvTableRec(
 	oraTyp := typ
 	switch oraTyp {
 	case "custom.Date":
-		oraTyp = "ora.Date"
+		oraTyp = "time.Time"
 	case "float64":
-		oraTyp = "ora.Float64"
+		oraTyp = "float64"
 	case "int32":
-		oraTyp = "ora.Int32"
+		oraTyp = "int32"
 	}
 	if arg.IsInput() {
 		amp := "&"
@@ -831,7 +899,12 @@ func (arg Argument) getConvTableRec(
 			amp = ""
 		}
 		lengthS = "len(input." + name[0] + ")"
-		too, _ := arg.ToOra(absName+"[i]", "v."+name[1])
+		too, varName := arg.ToOra(absName+"[i]", "v."+name[1], arg.IsOutput())
+		s := too
+		if varName != "" {
+			s = fmt.Sprintf("%s[i] = %s", absName, varName)
+		}
+		_ = s
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)  // gctr1
 			for i,v := range input.%s {
@@ -840,15 +913,17 @@ func (arg Argument) getConvTableRec(
 			%s = %s%s`,
 			absName,
 			oraTyp, lengthS, tableSize,
-			name[0], too,
+			name[0],
+			too,
 			paramName, amp, absName))
+		_ = too
 	}
 	if arg.IsOutput() {
 		if !arg.IsInput() {
 			convIn = append(convIn,
-				fmt.Sprintf(`%s := make([]%s, %s, %d)  // gctr2
-			%s = &%s // gctr2`,
-					absName, oraTyp, lengthS, tableSize,
+				fmt.Sprintf(`%s := make([]%s, 0, %d)  // gctr2
+				%s = sql.Out{Dest:&%s} // gctr2`,
+					absName, oraTyp, tableSize,
 					paramName, absName))
 		}
 		got := parent.goType(true)

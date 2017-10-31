@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2017 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,14 +25,16 @@ Package main for minimal is a minimal example for oracall usage
 package main
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"encoding/xml"
 	"flag"
 	"io/ioutil"
 	"log"
 	"os"
-
-	"gopkg.in/rana/ora.v4"
+	"reflect"
+	"time"
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")
@@ -46,18 +48,30 @@ func main() {
 	if *flagConnect == "" {
 		log.Fatalf("connect string is needed")
 	}
+	db, err := sql.Open("ora", *flagConnect)
+	if err != nil {
+		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
+	}
+	defer db.Close()
+
+	srv := NewServer(db)
 	funName := flag.Arg(0)
-	fun, ok := Functions[funName]
-	if !ok {
+	rf := reflect.ValueOf(srv).MethodByName(funName)
+	if !rf.IsValid() {
 		log.Fatalf("cannot find function named %q", funName)
 	}
-	log.Printf("fun to be called is %v", fun)
+	log.Printf("fun to be called is %q", funName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer tx.Rollback()
 
 	// parse stdin as json into the proper input struct
-	var (
-		input []byte
-		err   error
-	)
+	var input []byte
 	if flag.NArg() < 2 {
 		if input, err = ioutil.ReadAll(os.Stdin); err != nil {
 			log.Fatalf("error reading from stdin: %s", err)
@@ -65,8 +79,18 @@ func main() {
 	} else {
 		input = []byte(flag.Arg(1))
 	}
-	inp := InputFactories[funName]()
-	if err = inp.FromJSON(input); err != nil {
+
+	rft := rf.Type()
+	args := make([]reflect.Value, 0, rft.NumIn())
+	if rft.In(0).Name() == "Context" {
+		args = append(args, reflect.ValueOf(ctx))
+	}
+	args = append(args, reflect.ValueOf(tx))
+	rinp := reflect.Zero(rft.In(len(args)).Elem())
+	inp := rinp.Interface()
+	args = append(args, rinp)
+
+	if err = json.Unmarshal(input, inp); err != nil {
 		log.Fatalf("error unmarshaling %s into %T: %s", input, inp, err)
 	}
 	b, err := xml.Marshal(inp)
@@ -75,25 +99,16 @@ func main() {
 	}
 	log.Printf("input marshaled to xml: %s", b)
 
-	DebugLevel = 1
 	log.Printf("calling %s(%#v)", funName, inp)
 
-	// get cursor
-	env, srv, ses, err := ora.NewEnvSrvSes(*flagConnect, nil)
-	if err != nil {
-		log.Fatalf("error creating connection to %s: %s", *flagConnect, err)
-	}
-	defer env.Close()
-	defer srv.Close()
-	defer ses.Close()
-
 	// call the function
-	out, err := fun(ses, inp)
-	if err != nil {
+	outs := rf.Call(args)
+	if err := outs[1].Interface(); err != nil {
 		log.Fatalf("error calling %s(%s): %s", funName, inp, err)
 	}
 
 	// present the output as json
+	out := outs[0].Interface()
 	if b, err = json.Marshal(out); err != nil {
 		log.Fatalf("error marshaling output: %s", err)
 	}

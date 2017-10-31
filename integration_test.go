@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2017 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,18 +33,19 @@ import (
 
 	"github.com/antzucaro/matchr"
 	"github.com/kylelemons/godebug/pretty"
-	_ "gopkg.in/rana/ora.v4"
+	oracall "github.com/tgulacsi/oracall/lib"
+	_ "gopkg.in/goracle.v2"
 )
 
 var (
 	finish = false
-	TOff   = "Z"
-
-	flagOnly = flag.String("only", "", "run only this specific test case, only")
+	TOff   = time.UTC
 )
 
 func init() {
 	flag.Parse()
+
+	os.Setenv("NLS_LANG", "american_america.AL32UTF8")
 
 	now := time.Now()
 	f := "2006-01-02T15:04:05"
@@ -53,15 +54,15 @@ func init() {
 		panic(err)
 	}
 	d := now.Sub(m)
-	if -time.Second < d && d < time.Second {
-		TOff = "Z"
-	} else {
+	if !(-time.Second < d && d < time.Second) {
 		sign := "+"
 		if d < 0 {
 			sign = "-"
 			d *= -1
 		}
-		TOff = fmt.Sprintf("%s%02d:%02d", sign, d/time.Hour, (d%time.Hour)/time.Minute)
+		TOff = time.FixedZone(
+			fmt.Sprintf("%s%02d:%02d", sign, d/time.Hour, (d%time.Hour)/time.Minute),
+			int(d/time.Second))
 	}
 }
 
@@ -72,60 +73,65 @@ func TestGenSimple(t *testing.T) {
 	build(t)
 	outFn := generateAndBuild(t, "SIMPLE_")
 	var err error
-	fixedZone := time.FixedZone("", 7200)
-	now := time.Now().In(fixedZone)
+	now := time.Now()
 
-	for i, todo := range [][3]string{
-		{"simple_char_in", `{"txt": "abraka dabra"}`, `{}`},
-		{"simple_char_out", `{}`, `{"ret":"A"}`},
-		{"simple_char_inout", `{"txt": "abraka dabra"}`, `{"txt":"ABRAKA DABRA#"}`},
-		{"simple_num_in", `{"num": 33}`, `{}`},
-		{"simple_num_out", `{}`, `{"ret":0.6666666666666665}`},
-		{"simple_date_in", `{"dat": "2013-12-25T21:15:00+01:00"}`, `{}`},
-		{"simple_date_out", `{}`, `{"ret":"{{TODAY}}"}`}, // 5.
-		{"simple_char_in_char_ret", `{"txt": "abraka dabra"}`, `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
+	for i, todo := range []struct {
+		Name, In, Await string
+		MaxDistance     int
+	}{
+		{Name: "simple_char_in", In: `{"txt": "abraka dabra"}`, Await: `{}`},
+		{Name: "simple_char_out", In: `{}`, Await: `{"ret":"A"}`},
+		{Name: "simple_char_inout", In: `{"txt": "abraka dabra"}`, Await: `{"txt":"ABRAKA DABRA#"}`},
+		{Name: "simple_num_in", In: `{"num": "33"}`, Await: `{}`},
+		{Name: "simple_num_out", In: `{}`, Await: `{"ret":"0.6666666666666666666666666666666666666667"}`},
+		{Name: "simple_date_in", In: `{"dat": "2013-12-25T21:15:00+01:00"}`, Await: `{}`, MaxDistance: 1},
+		{Name: "simple_date_out", In: `{}`, Await: `{"ret":"{{TODAY}}"}`}, // 5.
+		{Name: "simple_char_in_char_ret", In: `{"txt": "abraka dabra"}`, Await: `{"ret":"Typ=1 Len=12: 97,98,114,97,107,97,32,100,97,98,114,97"}`},
 
-		{"simple_all_inout",
-			`{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": 0.1, "num3": 0.3, "dt1": null, "dt3": "2014-01-03T00:00:00+01:00"}`,
-			`{"txt2":"abraka#","int2":-2,"num2":0.4333333333333333,"dt2":"` +
-				strings.Replace(now.Truncate(24*time.Hour).AddDate(0, 1, 0).Format(time.RFC3339), "T02:", "T00:", 1) +
-				`","txt3":"A#","int3":-1,"num3":1.3,"dt3":"2014-02-03T00:00:00` + TOff + `"}`},
-		{"simple_nums_count", `{"nums":[1,2,3,4.4]}`, `{"ret":4}`},
-		{"simple_sum_nums", `{"nums":[1.1,2,3.3]}`, `{"outnums":[2.1,3,4.3],"ret":6.4}`},
+		{Name: "simple_all_inout",
+			In: `{"txt1": "abraka", "txt3": "A", "int1": -1, "int3": -2, "num1": "0.1", "num3": "0.3", "dt1": null, ` +
+				`"dt3": "2014-01-03T00:00:00+01:00"}`,
+			Await: `{"txt2":"abraka#","int2":-2,"num2":"0.4333333333333333333333333333333333333333",` +
+				`"dt2":"` + strings.Replace(
+				now.Truncate(24*time.Hour).Format(time.RFC3339),
+				"T02:", "T00:", 1) +
+				`","txt3":"A#","int3":-1,"num3":"1.3",` +
+				`"dt3":"2014-02-03T00:00:00` + TOff.String() + `"}`,
+			MaxDistance: 3},
+		{Name: "simple_nums_count", In: `{"nums":["1","2","3","4.4"]}`, Await: `{"ret":4}`},
+		{Name: "simple_sum_nums", In: `{"nums":["1.1","2","3.3"]}`, Await: `{"outnums":["2.1","3","4.3"],"text":"1=1.1 2=2 3=3.3 ","ret":"6.4"}`},
 	} {
-		if *flagOnly != "" && todo[0] != *flagOnly {
-			t.Logf("SKIP " + todo[0])
-			continue
-		}
-		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
-		withTime := false
-		todo[2] = strings.TrimSpace(todo[2])
-		if strings.Index(todo[2], "{{NOW}}") >= 0 {
-			todo[2] = strings.Replace(todo[2],
-				"{{NOW}}", time.Now().In(fixedZone).Format(time.RFC3339), -1)
-			withTime = true
-		}
-		if strings.Index(todo[2], "{{TODAY}}") >= 0 {
-			todo[2] = strings.Replace(todo[2],
-				"{{TODAY}}", time.Now().In(time.FixedZone("", 7200)).Truncate(24*time.Hour).Format(time.RFC3339), -1)
-			withTime = true
-		}
-		gotS := strings.TrimSpace(got)
-		if gotS == todo[2] {
-			continue
-		}
-		dist := 0
-		if withTime {
-			dist, err = matchr.Hamming(gotS, todo[2])
-			if err != nil {
-				t.Errorf("compute hamming distance of %q/%q: %v", gotS, todo[2], err)
+		todo := todo
+		t.Run(todo.Name, func(t *testing.T) {
+			got := runTest(t, outFn, "-connect="+*flagConnect, oracall.CamelCase(todo.Name), todo.In)
+			todo.Await = strings.TrimSpace(todo.Await)
+			if strings.Contains(todo.Await, "{{NOW}}") {
+				todo.Await = strings.Replace(todo.Await,
+					"{{NOW}}", time.Now().Format(time.RFC3339), -1)
+				todo.MaxDistance++
+			}
+			if strings.Contains(todo.Await, "{{TODAY}}") {
+				todo.Await = strings.Replace(todo.Await,
+					"{{TODAY}}", time.Now().Truncate(24*time.Hour).Format(time.RFC3339), -1)
+				todo.MaxDistance++
+			}
+			gotS := strings.TrimSpace(got)
+			if gotS == todo.Await {
 				return
 			}
-			if dist <= 2 {
-				continue
+			dist := 0
+			if todo.MaxDistance != 0 {
+				dist, err = matchr.Hamming(gotS, todo.Await)
+				if err != nil {
+					t.Errorf("compute hamming distance of %q/%q: %v", gotS, todo.Await, err)
+					return
+				}
+				if dist <= todo.MaxDistance {
+					return
+				}
 			}
-		}
-		t.Errorf("%d. awaited\n\t%s\ngot (distance=%d)\n\t%s", i, todo[2], dist, got)
+			t.Errorf("%d. awaited\n\t%s\ngot (distance=%d)\n\t%s", i, todo.Await, dist, got)
+		})
 	}
 }
 
@@ -137,33 +143,32 @@ func TestGenRec(t *testing.T) {
 	outFn := generateAndBuild(t, "REC_")
 
 	for i, todo := range [][3]string{
-		{"rec_in", `{"rec":{"num":33,"text":"xxx","dt":"2006-08-26T00:00:00+01:00"}}`,
-			`{"ret":"33;\"2006-08-26 00:00:00\";\"xxx\""}`},
-		{"rec_tab_in", `{"tab":[{"num":1,"text":"A","dt":"2006-08-26T00:00:00+01:00"},{"num":2,"text":"B"},{"num":3,"text":"C"}]}`,
-			`{"ret":"\n1;\"2006-08-26 01:00:00\";\"A\"\n2;\"0001-01-01 01:00:00\";\"B\"\n3;\"0001-01-01 01:00:00\";\"C\""}`},
+		{"rec_in", `{"rec":{"num":"33","text":"xxx","dt":"2006-08-26T01:00:00+01:00"}}`,
+			`{"ret":"33;\"2006-08-26 01:00:00\";\"xxx\""}`},
+		{"rec_tab_in", `{"tab":[{"num":"1","text":"A","dt":"2006-08-26T01:00:00+01:00"},{"num":"2","text":"B"},{"num":"3","text":"C"}]}`,
+			`{"ret":"\n1;\"2006-08-26 01:00:00\";\"A\"\n2;\"\";\"B\"\n3;\"\";\"C\""}`},
 		{"rec_sendpreoffer_31101", `{"p_vonalkod":1}`,
-			`{"p_vonalkod":1,"p_kotveny":{"szerkot":"0001-01-01T00:00:00Z","halaszt_kockezd":"0001-01-01T00:00:00Z","halaszt_dijfiz":"0001-01-01T00:00:00Z","szamlaszam":"","szamla_limit":0,"e_komm_email":"","evfordulo":"0001-01-01T00:00:00Z","evfordulo_tipus":"","dijbekerot_ker":"","ajanlati_evesdij":0,"kockezd":"0001-01-01T00:00:00Z","btkezd":"0001-01-01T00:00:00Z","dijkod":"","dijfizmod":"","dijfizgyak":"","szerlejar":"0001-01-01T00:00:00Z"},"p_kotveny_gfb":{"bm_tipus":0,"kotes_oka":0},"p_gepjarmu":{"jelleg":"","rendszam":"","gyartev":"","tulajdon_visz":"","teljesitmeny":0,"ossztomeg":0,"ferohely":0,"uzjelleg":"","alvazszam":"","gyartmany":"","tulajdon_ido":"0001-01-01T00:00:00Z"},"p_szerz_azon":0,"p_ajanlat_url":"","p_evesdij":0,"p_hiba_kod":0}`},
+			`{"p_vonalkod":1,"p_kotveny":{},"p_kotveny_gfb":{},"p_gepjarmu":{}}`},
 	} {
-		if *flagOnly != "" && todo[0] != *flagOnly {
-			t.Logf("SKIP " + todo[0])
-			continue
-		}
-		got := runTest(t, outFn, "-connect="+*flagConnect, "TST_oracall."+todo[0], todo[1])
-		if strings.Index(todo[2], "{{NOW}}") >= 0 {
-			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
-		}
-		if diff := jsonEqual(strings.TrimSpace(got), todo[2]); diff != "" {
-			t.Errorf("%d. awaited\n\t%s\ngot\n\t%s\ndiff\n\t%s", i, todo[2], got, diff)
-		}
+		todo := todo
+		t.Run(todo[0], func(t *testing.T) {
+			got := runTest(t, outFn, "-connect="+*flagConnect, todo[0], todo[1])
+			if strings.Contains(todo[2], "{{NOW}}") {
+				todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
+			}
+			if diff := jsonEqual(strings.TrimSpace(got), todo[2]); diff != "" {
+				t.Errorf("%d. awaited\n\t%s\ngot\n\t%s\ndiff\n\t%s", i, todo[2], got, diff)
+			}
+		})
 	}
 }
 
 func createStoredProc(t *testing.T) {
 	compile(t, `CREATE OR REPLACE PACKAGE TST_oracall AS
-TYPE num_tab_typ IS TABLE OF NUMBER INDEX BY BINARY_INTEGER;
+TYPE num_tab_typ IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
 
 TYPE mix_rec_typ IS RECORD (num NUMBER, dt DATE, text VARCHAR2(1000));
-TYPE mix_tab_typ IS TABLE OF mix_rec_typ INDEX BY BINARY_INTEGER;
+TYPE mix_tab_typ IS TABLE OF mix_rec_typ INDEX BY PLS_INTEGER;
 
   TYPE kotveny_rec_typ IS RECORD (
     dijkod VARCHAR2(2),
@@ -292,7 +297,7 @@ PROCEDURE simple_all_inout(
     txt3 IN OUT VARCHAR2, int3 IN OUT PLS_INTEGER, num3 IN OUT NUMBER, dt3 IN OUT DATE);
 
 FUNCTION simple_nums_count(nums IN num_tab_typ) RETURN PLS_INTEGER;
-FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER;
+FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ, text OUT VARCHAR2) RETURN NUMBER;
 
 FUNCTION rec_in(rec IN mix_rec_typ) RETURN VARCHAR2;
 FUNCTION rec_tab_in(tab IN mix_tab_typ) RETURN VARCHAR2;
@@ -391,14 +396,16 @@ BEGIN
   RETURN nums.COUNT;
 END simple_nums_count;
 
-FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER IS
+FUNCTION simple_sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ, text OUT VARCHAR2) RETURN NUMBER IS
   v_idx PLS_INTEGER;
   s NUMBER := 0;
 BEGIN
+  text := '';
   outnums.DELETE;
   v_idx := nums.FIRST;
   WHILE v_idx IS NOT NULL LOOP
     s := NVL(s, 0) + NVL(nums(v_idx), 0);
+	text := text||v_idx||'='||nums(v_idx)||' ';
     outnums(v_idx) := NVL(nums(v_idx), 0) + 1;
     v_idx := nums.NEXT(v_idx);
   END LOOP;
@@ -431,13 +438,15 @@ BEGIN
   RETURN nums.COUNT;
 END nums_count;
 
-FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ) RETURN NUMBER IS
+FUNCTION sum_nums(nums IN num_tab_typ, outnums OUT num_tab_typ, text OUT VARCHAR2) RETURN NUMBER IS
   v_idx PLS_INTEGER;
   s NUMBER := 0;
 BEGIN
+  text := '';
   outnums.DELETE;
   v_idx := nums.FIRST;
   WHILE v_idx IS NOT NULL LOOP
+    text := text||v_idx||'='||nums(v_idx)||' ';
     s := NVL(s, 0) + NVL(nums(v_idx), 0);
     outnums(v_idx) := NVL(nums(v_idx), 0) * 2;
     v_idx := nums.NEXT(v_idx);
@@ -522,14 +531,14 @@ func runCommand(t *testing.T, prog string, args ...string) {
 func build(t *testing.T) {
 	buildOnce.Do(func() {
 		createStoredProc(t)
-		runCommand(t, "go", "build")
+		runCommand(t, "go", "install", "-race")
 	})
 }
 
 func generateAndBuild(t *testing.T, prefix string) (outFn string) {
 	runCommand(t, "sh", "-c",
-		"oracall -F -connect='"+*flagConnect+
-			"' TST_ORACALL."+strings.ToUpper(prefix)+"%"+
+		"oracall -connect='"+*flagConnect+"' -pb-out=github.com/tgulacsi/oracall/testdata/integration_test/pb:pb"+
+			" TST_ORACALL."+strings.ToUpper(prefix)+"%"+
 			" >./testdata/integration_test/generated_functions.go")
 
 	if outFh, err := ioutil.TempFile("", "oracall-integration_test"); err != nil {
@@ -577,7 +586,7 @@ func runTest(t *testing.T, prog string, args ...string) string {
 }
 
 //var dsn = flag.String("connect", "", "Oracle DSN (user/passw@sid)")
-var dbg = flag.Bool("debug", false, "print debug messages?")
+//var dbg = flag.Bool("debug", false, "print debug messages?")
 var buildOnce sync.Once
 
 func init() {
@@ -596,7 +605,7 @@ func getConnection(t *testing.T) *sql.DB {
 		t.FailNow()
 	}
 	var err error
-	db, err = sql.Open("ora", *flagConnect)
+	db, err = sql.Open("goracle", *flagConnect)
 	if err != nil {
 		log.Panicf("error creating connection to %s: %s", *flagConnect, err)
 	}

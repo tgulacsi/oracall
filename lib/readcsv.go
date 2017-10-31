@@ -25,33 +25,37 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // UserArgument represents the required info from the user_arguments view
 type UserArgument struct {
-	ObjectID     uint `sql:"OBJECT_ID"`
-	SubprogramID uint `sql:"SUBPROGRAM_ID"`
-
 	PackageName string `sql:"PACKAGE_NAME"`
 	ObjectName  string `sql:"OBJECT_NAME"`
 
-	DataLevel    uint8  `sql:"DATA_LEVEL"`
-	Position     uint8  `sql:"POSITION"`
 	ArgumentName string `sql:"ARGUMENT_NAME"`
 	InOut        string `sql:"IN_OUT"`
 
-	DataType      string `sql:"DATA_TYPE"`
-	DataPrecision uint8  `sql:"DATA_PRECISION"`
-	DataScale     uint8  `sql:"DATA_SCALE"`
+	DataType string `sql:"DATA_TYPE"`
 
 	CharacterSetName string `sql:"CHARACTER_SET_NAME"`
-	CharLength       uint   `sql:"CHAR_LENGTH"`
 
 	PlsType     string `sql:"PLS_TYPE"`
 	TypeLink    string `sql:"TYPE_LINK"`
 	TypeOwner   string `sql:"TYPE_OWNER"`
 	TypeName    string `sql:"TYPE_NAME"`
 	TypeSubname string `sql:"TYPE_SUBNAME"`
+
+	ObjectID     uint `sql:"OBJECT_ID"`
+	SubprogramID uint `sql:"SUBPROGRAM_ID"`
+
+	CharLength uint `sql:"CHAR_LENGTH"`
+
+	DataPrecision uint8 `sql:"DATA_PRECISION"`
+	DataScale     uint8 `sql:"DATA_SCALE"`
+	DataLevel     uint8 `sql:"DATA_LEVEL"`
+	Position      uint8 `sql:"POSITION"`
 }
 
 // ParseCsv reads the given csv file as user_arguments
@@ -76,33 +80,26 @@ func ParseCsvFile(filename string, filter func(string) bool) (functions []Functi
 // ParseCsv parses the csv
 func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err error) {
 	userArgs := make(chan UserArgument, 16)
-	errch := make(chan error, 2)
-	defer close(errch)
-	go func() {
-		for lastErr := range errch {
-			if lastErr != nil && err == nil {
-				err = lastErr
-			}
-		}
-	}()
-	go func() { errch <- ReadCsv(userArgs, r) }()
+	var grp errgroup.Group
+	grp.Go(func() error { return ReadCsv(userArgs, r) })
 	filteredArgs := userArgs
 	if filter != nil {
 		filteredArgs = make(chan UserArgument, 16)
-		go func() {
+		grp.Go(func() error {
 			defer close(filteredArgs)
 			for ua := range userArgs {
 				if filter(ua.PackageName + "." + ua.ObjectName) {
 					filteredArgs <- ua
 				}
 			}
-		}()
+			return nil
+		})
 	}
 	functions, err = ParseArguments(filteredArgs)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		err = grp.Wait()
 	}
-	return
+	return functions, err
 }
 
 // OpenCsv opens the filename
@@ -142,7 +139,8 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	if bytes.IndexByte(b, ';') >= 0 {
 		csvr.Comma = ';'
 	}
-	csvr.LazyQuotes, csvr.TrailingComma, csvr.TrimLeadingSpace = true, true, true
+	csvr.LazyQuotes, csvr.TrimLeadingSpace = true, true
+	csvr.ReuseRecord = true
 	var (
 		rec       []string
 		csvFields = make(map[string]int, 20)
@@ -158,16 +156,19 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	if rec, err = csvr.Read(); err != nil {
 		return fmt.Errorf("cannot read head: %s", err)
 	}
+	csvr.FieldsPerRecord = len(rec)
 	for i, h := range rec {
 		h = strings.ToUpper(h)
 		if j, ok := csvFields[h]; ok && j < 0 {
 			csvFields[h] = i
 		}
 	}
-	//Log("msg", "field order", "fields", csvFields)
+	Log("msg", "field order", "fields", csvFields)
 
 	for {
-		if rec, err = csvr.Read(); err != nil {
+		rec, err = csvr.Read()
+		Log("rec", rec, "err", err)
+		if err != nil {
 			if err == io.EOF {
 				err = nil
 			}
@@ -199,7 +200,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
 		}
 	}
-	return nil
+	return err
 }
 
 func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err error) {
@@ -294,7 +295,7 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		fun.Args = args
 		functions = append(functions, fun)
 	}
-	Log("msg", fmt.Sprintf("found %d functions.", len(functions)))
+	Log("msg", fmt.Sprintf("found %d functions (from %d args).", len(functions), row))
 	return
 }
 

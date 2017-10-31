@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"unicode/utf8"
 )
 
 func parseDocs(ctx context.Context, text string) (map[string]string, error) {
@@ -51,7 +50,6 @@ func parseDocs(ctx context.Context, text string) (map[string]string, error) {
 			buf.Reset()
 		}
 	}
-	return m, nil
 }
 
 var rDecl = regexp.MustCompile(`(FUNCTION|PROCEDURE) +([^ (;]+)`)
@@ -68,7 +66,7 @@ const (
 	bcEnd   = "*/"
 	lcBegin = "--"
 	lcEnd   = "\n"
-	eol     = "\n"
+	//eol     = "\n"
 )
 
 type itemType uint8
@@ -162,22 +160,24 @@ func (i item) String() string {
 
 // lexer holds the state of the scanner.
 type lexer struct {
-	name  string    // used only for error reports.
-	input string    // the string being scanned.
-	start int       // start position of this item.
-	pos   int       // current position in the input.
-	width int       // width of last rune read from input.
+	name  string // used only for error reports.
+	input string // the string being scanned.
+	start int    // start position of this item.
+	pos   int    // current position in the input.
+	//width int       // width of last rune read from input.
 	items chan item // channel of scanned items.
 	state stateFn
 }
 
 // run lexes the input by executing state functions until
 // the state is nil.
+/*
 func (l *lexer) run() {
 	for state := lexText; state != nil; {
 		state = state(l)
 	}
 }
+*/
 
 // emit passes an item back to the client.
 func (l *lexer) emit(t itemType) {
@@ -217,6 +217,7 @@ func lex(name, input string) *lexer {
 }
 
 // next returns the next rune in the input.
+/*
 func (l *lexer) next() rune {
 	if l.pos >= len(l.input) {
 		l.width = 0
@@ -238,3 +239,4 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	}
 	return nil
 }
+*/

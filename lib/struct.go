@@ -19,6 +19,7 @@ package oracall
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
 
 // Log is discarded by default.
@@ -84,21 +85,22 @@ const (
 )
 
 type Argument struct {
-	Name   string
-	Flavor uint8
+	RecordOf []NamedArgument //this argument is a record (map) of this type
+	Name     string
 	//Level                   uint8
 	//Position                uint8
-	Direction      uint8
 	Type, TypeName string
 	AbsType        string
-	Precision      uint8
-	Scale          uint8
 	Charset        string
 	Charlength     uint
-	TableOf        *Argument       // this argument is a table (array) of this type
-	RecordOf       []NamedArgument //this argument is a record (map) of this type
+	TableOf        *Argument // this argument is a table (array) of this type
 	goTypeName     string
 	PlsType
+	Flavor    uint8
+	Direction uint8
+	Precision uint8
+	Scale     uint8
+	mu        sync.Mutex
 }
 type NamedArgument struct {
 	Name string

@@ -44,18 +44,25 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 		io.WriteString(w,
 			"package "+pkg+`
 import (
+	"encoding/json"
 	"encoding/xml"
 	"io"
     "log"
     "fmt"
 	"strings"
+	"database/sql"
+	"database/sql/driver"
+	"os"
 	"strconv"
     "time"    // for datetimes
+	"unsafe"
 
 	"golang.org/x/net/context"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
-    "gopkg.in/rana/ora.v4"    // Oracle
+
+    goracle "gopkg.in/goracle.v2" // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.Date
 	`+pbImport+`
 )
@@ -63,8 +70,8 @@ import (
 var DebugLevel = uint(0)
 
 // against "unused import" error
+var _ json.Marshaler
 var _ = io.EOF
-var _ ora.Ses
 var _ context.Context
 var _ custom.Date
 var _ strconv.NumError
@@ -74,23 +81,23 @@ var _ xml.Name
 var _ log.Logger
 var _ = errors.Wrap
 var _ = fmt.Printf
-
-type OraSesPool interface {
-	Get() (*ora.Ses, error)
-	Put(*ora.Ses)
-}
-
-type oracallServer struct {
-	OraSesPool
-}
-
-func NewServer(p OraSesPool) *oracallServer {
-	return &oracallServer{OraSesPool: p}
-}
+var _ goracle.Lob
+var _ unsafe.Pointer
+var _ = spew.Sdump
+var _ = os.Stdout
+var _ driver.Rows
 
 type iterator struct {
 	Reset func()
 	Iterate func() error
+}
+
+type oracallServer struct {
+	db *sql.DB
+}
+
+func NewServer(db *sql.DB) *oracallServer {
+	return &oracallServer{db: db}
 }
 
 `)
@@ -146,11 +153,8 @@ FunLoop:
 		io.WriteString(w, text)
 		w.Write([]byte{'\n'})
 	}
-	if _, err = io.WriteString(w, "}\n"); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = io.WriteString(w, "}\n")
+	return err
 }
 
 func (f Function) getPlsqlConstName() string {
@@ -302,14 +306,14 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
-		case "ora.String":
+		case "sql.NullString":
 			checks = append(checks,
-				fmt.Sprintf(`if !%s.IsNull && len(%s.Value) > %d {
+				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
         return errors.New("%s is longer than accepted (%d)")
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
-		case "NullString", "sql.NullString":
+		case "NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
         return errors.New("%s is longer than accepted (%d)")
@@ -324,16 +328,6 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
         return errors.New("%s is out of bounds (-%s..%s)")
     }`,
 						name, cons, name, cons,
-						name, cons, cons))
-			}
-		case "ora.Int32", "ora.Int64", "ora.Float32", "ora.Float64":
-			if arg.Precision > 0 {
-				cons := strings.Repeat("9", int(arg.Precision))
-				checks = append(checks,
-					fmt.Sprintf(`if !%s.IsNull && (%s.Value <= -%s || %s.Value > %s) {
-        return errors.New("%s is out of bounds (-%s..%s)")
-    }`,
-						name, name, cons, name, cons,
 						name, cons, cons))
 			}
 		case "NullInt64", "NullFloat64", "sql.NullInt64", "sql.NullFloat64":
@@ -395,6 +389,8 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 			typName = typName[1:]
 		}
 	}()
+	arg.mu.Lock()
+	defer arg.mu.Unlock()
 	// cached?
 	if arg.goTypeName != "" {
 		if strings.Index(arg.goTypeName, "__") > 0 {
@@ -417,11 +413,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		case "RAW":
 			return "string"
 		case "NUMBER":
-			return "float64"
-			if !isTable && arg.IsOutput() {
-				return "*float64"
-			}
-			return "float64"
+			return "goracle.Number"
 		case "INTEGER":
 			if !isTable && arg.IsOutput() {
 				return "*int64"
@@ -441,9 +433,9 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
 			return "custom.Date"
 		case "REF CURSOR":
-			return "*ora.Rset"
+			return "*sql.Rows"
 		case "CLOB", "BLOB":
-			return "ora.Lob"
+			return "goracle.Lob"
 		case "BFILE":
 			return "ora.Bfile"
 		default:
@@ -532,7 +524,7 @@ func CamelCase(text string) string {
 			}
 			return '_'
 		}
-		if last == 0 || last == '_' || '0' <= last && last <= '9' {
+		if last == 0 || last == '_' || last == '.' || '0' <= last && last <= '9' {
 			return unicode.ToUpper(r)
 		}
 		return unicode.ToLower(r)
@@ -561,13 +553,13 @@ type bufPool struct {
 	sync.Pool
 }
 
-func newBufPool(size int) bufPool {
-	return bufPool{sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 1<<16)) }}}
+func newBufPool(size int) *bufPool {
+	return &bufPool{sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 1<<16)) }}}
 }
-func (bp bufPool) Get() *bytes.Buffer {
+func (bp *bufPool) Get() *bytes.Buffer {
 	return bp.Pool.Get().(*bytes.Buffer)
 }
-func (bp bufPool) Put(b *bytes.Buffer) {
+func (bp *bufPool) Put(b *bytes.Buffer) {
 	if b == nil {
 		return
 	}
@@ -588,6 +580,7 @@ func ReplOraPh(s string, params []interface{}) string {
 	)
 }
 
+/*
 func replOraPhMeta(text, sliceName string) string {
 	var i int
 	return rIdentifier.ReplaceAllStringFunc(
@@ -598,5 +591,6 @@ func replOraPhMeta(text, sliceName string) string {
 		},
 	)
 }
+*/
 
 // vim: se noet fileencoding=utf-8:

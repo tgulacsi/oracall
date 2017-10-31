@@ -72,7 +72,7 @@ FunLoop:
 		name := CamelCase(dot2D.Replace(fName))
 		var comment string
 		if fun.Documentation != "" {
-			comment = "\n/// " + strings.Replace(fun.Documentation , "\n", "\n/// ", -1)+ "\n\t"
+			comment = "\n/// " + strings.Replace(fun.Documentation, "\n", "\n/// ", -1) + "\n\t"
 		}
 		services = append(services,
 			fmt.Sprintf(`%srpc %s (%s) returns (%s%s) {}`,
@@ -154,16 +154,12 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		aName := arg.Name
 		got := arg.goType(false)
-		if strings.HasPrefix(got, "*") {
-			got = got[1:]
-		}
+		got = strings.TrimPrefix(got, "*")
 		if strings.HasPrefix(got, "[]") {
 			rule = "repeated "
 			got = got[2:]
 		}
-		if strings.HasPrefix(got, "*") {
-			got = got[1:]
-		}
+		got = strings.TrimPrefix(got, "*")
 		if got == "" {
 			got = mkRecTypName(arg.Name)
 		}
@@ -209,19 +205,19 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 
 func protoType(got, aName string) (string, protoOptions) {
 	switch trimmed := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")); trimmed {
-	case "ora.time", "time.time":
+	case "time.time":
 		return "string", nil
-	case "ora.string":
+	case "string":
 		return "string", nil
 
-	case "int32", "ora.int32":
+	case "int32":
 		if NumberAsString {
 			return "sint32", protoOptions{
 				"gogoproto.jsontag": aName + ",string,omitempty",
 			}
 		}
 		return "sint32", nil
-	case "float64", "ora.float64":
+	case "float64", "sql.nullfloat64":
 		if NumberAsString {
 			return "double", protoOptions{
 				"gogoproto.jsontag": aName + ",string,omitempty",
@@ -229,11 +225,16 @@ func protoType(got, aName string) (string, protoOptions) {
 		}
 		return "double", nil
 
-	case "ora.date", "custom.date":
+	case "goracle.number":
+		return "string", protoOptions{
+			"gogoproto.jsontag": aName + ",omitempty",
+		}
+
+	case "custom.date":
 		return "string", nil
-	case "n", "ora.n":
+	case "n":
 		return "string", nil
-	case "raw", "ora.lob", "ora.bfile":
+	case "raw", "goracle.lob", "ora.lob":
 		return "bytes", nil
 	default:
 		return trimmed, nil
