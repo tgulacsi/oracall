@@ -47,7 +47,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"io"
-    "log"
     "fmt"
 	"strings"
 	"database/sql"
@@ -78,7 +77,7 @@ var _ strconv.NumError
 var _ time.Time
 var _ strings.Reader
 var _ xml.Name
-var _ log.Logger
+var Log = func(keyvals ...interface{}) error { return nil } // logger.Log of github.com/go-kit/kit/log
 var _ = errors.Wrap
 var _ = fmt.Printf
 var _ goracle.Lob
@@ -229,7 +228,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		fmt.Fprintf(w, `func (s *%s) FromJSON(data []byte) error {
 			err := json.Unmarshal(data, &s)
 			if DebugLevel > 0 {
-				log.Printf("Unmarshal %%s: %%#v (%%v)", data, s, err)
+				Log("msg", "unmarshal", "data", data, "into", s, "error", err)
 			}
 			return err
 }`, structName)

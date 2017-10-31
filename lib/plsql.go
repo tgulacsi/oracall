@@ -124,20 +124,12 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
 if true || DebugLevel > 0 {
-	log.Println(`+"`calling %s as`"+`)
-	log.Printf(`+"`%s`"+`, params...)
+	Log("calling", `+"`%s`"+`, "stmt", `+"`%s`"+`, "params", params)
 }
 	qry := %s
 `,
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
 		fun.getPlsqlConstName())
-	if len(convIn) > 100 {
-		fmt.Fprintf(callBuf, `
-	oLog := goracle.Log
-	defer func() { goracle.Log = oLog }()
-	goracle.Log = func(keyvals ...interface{}) error { log.Println(keyvals...); return nil; }
-`)
-	}
 	if hasCursorOut {
 		callBuf.WriteString("\n\tctx := context.Background()\n")
 	}
@@ -161,7 +153,7 @@ if true || DebugLevel > 0 {
 	}
     `)
 
-	callBuf.WriteString("\nif true || DebugLevel > 0 { fmt.Fprintf(os.Stderr, `result params: %#v\n output=%#v`, params, output) }\n")
+	callBuf.WriteString("\nif true || DebugLevel > 0 { Log(`result params`, params, `output`, output) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -828,7 +820,7 @@ func getOutConvTSwitch(name, pTyp string) string {
 				case float32: y = `+pTyp+`(xi)
 				case float64: y = `+pTyp+`(xi)
 				case string:
-					//log.Printf("converting %%q to `+pTyp+`", xi)
+					//Log("converting", %q,  "to", `+pTyp+`", "xi", xi)
 					z, e := strconv.`+parse+`
 					y, err = `+pTyp+`(z), e
 				default:
