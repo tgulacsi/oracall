@@ -139,15 +139,23 @@ func AsFloat64(v interface{}) float64 {
 		result = float64(x)
 	case sql.NullFloat64:
 		result = x.Float64
-	case string:
-		if x == "" {
+	case string, goracle.Number:
+		var s string
+		switch x := x.(type) {
+		case string:
+			s = x
+		case goracle.Number:
+			s = string(x)
+		}
+		if s == "" {
 			return 0
 		}
-		f, err := strconv.ParseFloat(x, 64)
+		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			log.Printf("ERROR parsing %q as Float64", x)
+			log.Printf("ERROR parsing %q as Float64", s)
 		}
 		result = f
+
 	default:
 		log.Printf("WARN: unknown Int64 type %T", v)
 		return 0
@@ -172,13 +180,20 @@ func AsInt32(v interface{}) int32 {
 		return int32(x)
 	case sql.NullInt64:
 		return int32(x.Int64)
-	case string:
-		if x == "" {
+	case string, goracle.Number:
+		var s string
+		switch x := x.(type) {
+		case string:
+			s = x
+		case goracle.Number:
+			s = string(x)
+		}
+		if s == "" {
 			return 0
 		}
-		i, err := strconv.ParseInt(x, 10, 32)
+		i, err := strconv.ParseInt(s, 10, 32)
 		if err != nil {
-			log.Printf("ERROR parsing %q as Int32", x)
+			log.Printf("ERROR parsing %q as Int32", s)
 		}
 		return int32(i)
 	default:
@@ -198,13 +213,20 @@ func AsInt64(v interface{}) int64 {
 		return int64(x)
 	case sql.NullInt64:
 		return x.Int64
-	case string:
-		if x == "" {
+	case string, goracle.Number:
+		var s string
+		switch x := x.(type) {
+		case string:
+			s = x
+		case goracle.Number:
+			s = string(x)
+		}
+		if s == "" {
 			return 0
 		}
-		i, err := strconv.ParseInt(x, 10, 64)
+		i, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			log.Printf("ERROR parsing %q as Int64", x)
+			log.Printf("ERROR parsing %q as Int64", s)
 		}
 		return i
 	default:
