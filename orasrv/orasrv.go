@@ -1,0 +1,174 @@
+package orasrv
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"sync"
+
+	"github.com/go-kit/kit/log"
+	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/oklog/ulid"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
+	goracle "gopkg.in/goracle.v2"
+)
+
+var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 4096)) }}
+
+func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
+	erroredMethods := make(map[string]struct{})
+	var erroredMethodsMu sync.RWMutex
+
+	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context) {
+		reqID := ContextGetReqID(ctx)
+		ctx = ContextWithReqID(ctx, reqID)
+		logger := log.With(logger, "reqID", reqID)
+		ctx = ContextWithLogger(ctx, logger)
+		verbose := verbose
+		var wasThere bool
+		if !verbose {
+			erroredMethodsMu.RLock()
+			_, verbose = erroredMethods[fullMethod]
+			erroredMethodsMu.RUnlock()
+			wasThere = verbose
+		}
+		if verbose {
+			ctx = goracle.ContextWithLog(ctx, log.With(logger, "lib", "goracle").Log)
+		}
+		commit := func(err error) {
+			if wasThere && err == nil {
+				erroredMethodsMu.Lock()
+				delete(erroredMethods, fullMethod)
+				erroredMethodsMu.Unlock()
+			} else if err != nil && !wasThere {
+				erroredMethodsMu.Lock()
+				erroredMethods[fullMethod] = struct{}{}
+				erroredMethodsMu.Unlock()
+			}
+		}
+		return logger, commit, ctx
+	}
+
+	opts := []grpc.ServerOption{
+		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
+		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
+		grpc.StreamInterceptor(
+			func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						err = errors.Errorf("%+v", r)
+						logger.Log("PANIC", fmt.Sprintf("%+v", err))
+					}
+				}()
+				logger, commit, ctx := getLogger(ss.Context(), info.FullMethod)
+
+				buf := bufPool.Get().(*bytes.Buffer)
+				defer func() {
+					buf.Reset()
+					bufPool.Put(buf)
+				}()
+				buf.Reset()
+				jenc := json.NewEncoder(buf)
+				if err = jenc.Encode(srv); err != nil {
+					logger.Log("marshal error", err, "srv", srv)
+				}
+				logger.Log("REQ", info.FullMethod, "srv", buf.String())
+				if err = checkAuth(ctx, info.FullMethod); err != nil {
+					return err
+				}
+
+				wss := grpc_middleware.WrapServerStream(ss)
+				wss.WrappedContext = ctx
+				err = handler(srv, wss)
+
+				logger.Log("RESP", info.FullMethod, "error", err)
+				commit(err)
+				return err
+			}),
+
+		grpc.UnaryInterceptor(
+			func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						err = errors.Errorf("%+v", r)
+						logger.Log("PANIC", fmt.Sprintf("%+v", err))
+					}
+				}()
+				logger, commit, ctx := getLogger(ctx, info.FullMethod)
+
+				if err = checkAuth(ctx, info.FullMethod); err != nil {
+					return nil, err
+				}
+
+				buf := bufPool.Get().(*bytes.Buffer)
+				defer func() {
+					buf.Reset()
+					bufPool.Put(buf)
+				}()
+				buf.Reset()
+				jenc := json.NewEncoder(buf)
+				if err = jenc.Encode(req); err != nil {
+					logger.Log("marshal error", err, "req", req)
+				}
+				logger.Log("REQ", info.FullMethod, "req", buf.String())
+
+				// Fill PArgsHidden
+				if r := reflect.ValueOf(req).Elem(); r.Kind() != reflect.Struct {
+					logger.Log("error", "not struct", "req", fmt.Sprintf("%T %#v", req, req))
+				} else {
+					if f := r.FieldByName("PArgsHidden"); f.IsValid() {
+						f.Set(reflect.ValueOf(buf.String()))
+					}
+				}
+
+				res, err := handler(ctx, req)
+				resp = res
+
+				logger.Log("RESP", info.FullMethod, "error", err)
+				commit(err)
+
+				buf.Reset()
+				if err := jenc.Encode(res); err != nil {
+					logger.Log("marshal error", err, "res", res)
+				}
+				logger.Log("RESP", res, "error", err)
+
+				return res, err
+			}),
+	}
+	return grpc.NewServer(opts...)
+}
+
+type ctxKey string
+
+const reqIDCtxKey = ctxKey("reqID")
+const loggerCtxKey = ctxKey("logger")
+
+func ContextWithLogger(ctx context.Context, logger log.Logger) context.Context {
+	return context.WithValue(ctx, loggerCtxKey, logger)
+}
+func ContextGetLogger(ctx context.Context) log.Logger {
+	if lgr, ok := ctx.Value(loggerCtxKey).(log.Logger); ok {
+		return lgr
+	}
+	return nil
+}
+func ContextWithReqID(ctx context.Context, reqID string) context.Context {
+	if reqID == "" {
+		reqID = NewULID()
+	}
+	return context.WithValue(ctx, reqIDCtxKey, reqID)
+}
+func ContextGetReqID(ctx context.Context) string {
+	if reqID, ok := ctx.Value(reqIDCtxKey).(string); ok {
+		return reqID
+	}
+	return NewULID()
+}
+func NewULID() string {
+	return ulid.MustNew(ulid.Now(), rand.Reader).String()
+}
