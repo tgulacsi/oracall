@@ -9,11 +9,18 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/go-kit/kit/log"
-	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/oklog/ulid"
+	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
+	oracall "github.com/tgulacsi/oracall/lib"
+
+	"github.com/go-kit/kit/log"
+	"github.com/oklog/ulid"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	goracle "gopkg.in/goracle.v2"
 )
 
@@ -78,7 +85,7 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				}
 				logger.Log("REQ", info.FullMethod, "srv", buf.String())
 				if err = checkAuth(ctx, info.FullMethod); err != nil {
-					return err
+					return status.Error(codes.Unauthenticated, err.Error())
 				}
 
 				wss := grpc_middleware.WrapServerStream(ss)
@@ -87,7 +94,7 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 
 				logger.Log("RESP", info.FullMethod, "error", err)
 				commit(err)
-				return err
+				return StatusError(err)
 			}),
 
 		grpc.UnaryInterceptor(
@@ -101,7 +108,7 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				logger, commit, ctx := getLogger(ctx, info.FullMethod)
 
 				if err = checkAuth(ctx, info.FullMethod); err != nil {
-					return nil, err
+					return nil, status.Error(codes.Unauthenticated, err.Error())
 				}
 
 				buf := bufPool.Get().(*bytes.Buffer)
@@ -137,11 +144,42 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				}
 				logger.Log("RESP", res, "error", err)
 
-				return res, err
+				return res, StatusError(err)
 			}),
 	}
 	return grpc.NewServer(opts...)
 }
+
+func StatusError(err error) error {
+	if err == nil {
+		return err
+	}
+	var code codes.Code
+	cerr := errors.Cause(err)
+	if cerr == oracall.ErrInvalidArgument {
+		code = codes.InvalidArgument
+	} else if sc, ok := cerr.(interface {
+		Code() codes.Code
+	}); ok {
+		code = sc.Code()
+	}
+	if code == 0 {
+		return err
+	}
+	s := status.New(code, err.Error())
+	if sd, sErr := s.WithDetails(&pbMessage{Message: fmt.Sprintf("%+v", err)}); sErr == nil {
+		s = sd
+	}
+	return s.Err()
+}
+
+type pbMessage struct {
+	Message string
+}
+
+func (m pbMessage) ProtoMessage()   {}
+func (m *pbMessage) Reset()         { m.Message = "" }
+func (m *pbMessage) String() string { return proto.MarshalTextString(m) }
 
 type ctxKey string
 

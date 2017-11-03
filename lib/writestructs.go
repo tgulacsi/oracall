@@ -32,6 +32,7 @@ import (
 )
 
 var ErrMissingTableOf = errors.New("missing TableOf info")
+var ErrInvalidArgument = errors.New("invalid argument")
 
 func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool) error {
 	var err error
@@ -301,21 +302,21 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 		case "*string":
 			checks = append(checks,
 				fmt.Sprintf(`if %s != nil && len(*%s) > %d {
-        return errors.New("%s is longer than accepted (%d)")
+        return errors.Wrap(oracall.ErrInvalidArgument, "%s is longer than accepted (%d)")
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
 		case "sql.NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
-        return errors.New("%s is longer than accepted (%d)")
+        return errors.Wrap(oracall.ErrInvalidArgument, "%s is longer than accepted (%d)")
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
 		case "NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
-        return errors.New("%s is longer than accepted (%d)")
+        return errors.Wrap(oracall.ErrInvalidArgument, "%s is longer than accepted (%d)")
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
@@ -324,7 +325,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 				cons := strings.Repeat("9", int(arg.Precision))
 				checks = append(checks,
 					fmt.Sprintf(`if (%s <= -%s || %s > %s) {
-        return errors.New("%s is out of bounds (-%s..%s)")
+        return errors.Wrap(oracall.ErrInvalidArgument, "%s is out of bounds (-%s..%s)")
     }`,
 						name, cons, name, cons,
 						name, cons, cons))
@@ -335,7 +336,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 				cons := strings.Repeat("9", int(arg.Precision))
 				checks = append(checks,
 					fmt.Sprintf(`if %s.Valid && (%s.%s <= -%s || %s.%s > %s) {
-        return errors.New("%s is out of bounds (-%s..%s)")
+        return errors.Wrap(oracall.ErrInvalidArgument, "%s is out of bounds (-%s..%s)")
     }`,
 						name, name, vn, cons, name, vn, cons,
 						name, cons, cons))
