@@ -63,7 +63,11 @@ func (d Date) Get() (od time.Time) {
 		}
 	}
 
-	t, err := time.Parse(timeFormat[:len(d)], string(d)) // TODO(tgulacsi): more robust parser
+	n := len(d)
+	if n > len(timeFormat) {
+		n = len(timeFormat)
+	}
+	t, err := time.Parse(timeFormat[:n], string(d)) // TODO(tgulacsi): more robust parser
 	if err != nil {
 		panic(errors.Wrap(err, string(d)))
 	}
