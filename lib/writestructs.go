@@ -64,6 +64,7 @@ import (
 
     goracle "gopkg.in/goracle.v2" // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.Date
+	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 	`+pbImport+`
 )
 
@@ -86,6 +87,7 @@ var _ unsafe.Pointer
 var _ = spew.Sdump
 var _ = os.Stdout
 var _ driver.Rows
+var _ = oracall.ErrInvalidArgument
 
 type iterator struct {
 	Reset func()

@@ -49,7 +49,7 @@ func (d *Date) Set(t time.Time) {
 	}
 	*d = NewDate(t)
 }
-func (d Date) Get() (od time.Time) {
+func (d Date) Get() (od time.Time, err error) {
 	if d == "" {
 		return
 	}
@@ -69,12 +69,9 @@ func (d Date) Get() (od time.Time) {
 	}
 	t, err := time.Parse(timeFormat[:n], string(d)) // TODO(tgulacsi): more robust parser
 	if err != nil {
-		panic(errors.Wrap(err, string(d)))
+		return t, errors.Wrap(err, string(d))
 	}
-	if err != nil || t.IsZero() {
-		return
-	}
-	return t
+	return t, nil
 }
 
 type Lob struct {

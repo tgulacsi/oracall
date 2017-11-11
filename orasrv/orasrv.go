@@ -67,6 +67,11 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 			func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				defer func() {
 					if r := recover(); r != nil {
+						var ok bool
+						if err, ok = r.(error); ok {
+							logger.Log("PANIC", err)
+							return
+						}
 						err = errors.Errorf("%+v", r)
 						logger.Log("PANIC", fmt.Sprintf("%+v", err))
 					}
@@ -101,6 +106,11 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 			func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 				defer func() {
 					if r := recover(); r != nil {
+						var ok bool
+						if err, ok = r.(error); ok {
+							logger.Log("PANIC", err)
+							return
+						}
 						err = errors.Errorf("%+v", r)
 						logger.Log("PANIC", fmt.Sprintf("%+v", err))
 					}

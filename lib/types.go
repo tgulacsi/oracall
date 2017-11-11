@@ -89,14 +89,22 @@ func (arg PlsType) ToOra(dst, src string, isOutput bool) (expr string, variable 
 				pointer = "&"
 			}
 			if isOutput {
-				return fmt.Sprintf(`%s := custom.Date(%s).Get() // toOra D
+				return fmt.Sprintf(`%s, convErr := custom.Date(%s).Get()
+			if convErr != nil { // toOra D
+				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
+				return
+			}
 			%s = sql.Out{Dest:%s%s, In:true}`,
 						dstVar, strings.TrimPrefix(src, "&"),
 						dst, pointer, dstVar,
 					),
 					dstVar
 			}
-			return fmt.Sprintf(`%s := custom.Date(%s).Get() // toOra D
+			return fmt.Sprintf(`%s, convErr := custom.Date(%s).Get() // toOra D
+			if convErr != nil {
+				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
+				return
+			}
 			%s = %s%s`,
 					dstVar, strings.TrimPrefix(src, "&"),
 					dst, pointer, dstVar,
