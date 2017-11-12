@@ -189,6 +189,8 @@ func AsString(v interface{}) string {
 	switch x := v.(type) {
 	case string:
 		return x
+	case Number:
+		return string(x)
 	case sql.NullString:
 		return x.String
 	case fmt.Stringer:
@@ -226,7 +228,7 @@ func AsFloat64(v interface{}) float64 {
 		}
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			log.Printf("ERROR parsing %q as Float64", s)
+			log.Printf("ERROR parsing %q as Float64: %v", s, err)
 		}
 		result = f
 
@@ -267,7 +269,7 @@ func AsInt32(v interface{}) int32 {
 		}
 		i, err := strconv.ParseInt(s, 10, 32)
 		if err != nil {
-			log.Printf("ERROR parsing %q as Int32", s)
+			log.Printf("ERROR parsing %q as Int32: %v", s, err)
 		}
 		return int32(i)
 	default:
@@ -300,7 +302,7 @@ func AsInt64(v interface{}) int64 {
 		}
 		i, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			log.Printf("ERROR parsing %q as Int64", s)
+			log.Printf("ERROR parsing %q as Int64: %v", s, err)
 		}
 		return i
 	default:
@@ -324,4 +326,18 @@ func AsDate(v interface{}) Date {
 	}
 
 	return Date("")
+}
+
+func AsTime(v interface{}) time.Time {
+	if v == nil {
+		return time.Time{}
+	}
+	if t, ok := v.(time.Time); ok {
+		return t
+	}
+	t, err := AsDate(v).Get()
+	if err != nil {
+		log.Printf("ERROR parsing %q as Date: %v", v, err)
+	}
+	return t
 }
