@@ -3,6 +3,7 @@ package custom
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -24,6 +25,24 @@ func (n *Number) Set(num goracle.Number) {
 }
 func (n Number) Get() goracle.Number {
 	return goracle.Number(n)
+}
+
+// Scan assigns a value from a database driver.
+func (n *Number) Scan(src interface{}) error {
+	switch x := src.(type) {
+	case Number:
+		*n = Number(x)
+	case string:
+		*n = Number(x)
+	case []byte:
+		*n = Number(x)
+	case int, int8, int16, int32, int64,
+		uint, uint16, uint32, uint64:
+		*n = Number(fmt.Sprintf("%d", x))
+	case float32, float64:
+		*n = Number(fmt.Sprintf("%f", x))
+	}
+	return nil
 }
 
 func NumbersFromStrings(s *[]string) *[]goracle.Number {
@@ -74,6 +93,21 @@ func (d Date) Get() (od time.Time, err error) {
 	return t, nil
 }
 
+// Scan assigns a value from a database driver.
+func (d *Date) Scan(src interface{}) error {
+	switch x := src.(type) {
+	case string:
+		*d = Date(x)
+	case []byte:
+		*d = Date(x)
+	case time.Time:
+		*d = Date(x.Format(timeFormat))
+	default:
+		return errors.Errorf("unknown type %T", src)
+	}
+	return nil
+}
+
 type Lob struct {
 	*goracle.Lob
 	data []byte
@@ -106,6 +140,25 @@ func (L *Lob) MarshalTo(p []byte) (int, error) {
 }
 func (L *Lob) Unmarshal(p []byte) error {
 	L.data = p
+	return nil
+}
+
+// Scan assigns a value from a database driver.
+func (L *Lob) Scan(src interface{}) error {
+	switch x := src.(type) {
+	case Lob:
+		L.data, L.err = ioutil.ReadAll(L.Lob)
+	case *Lob:
+		L.data, L.err = ioutil.ReadAll(L.Lob)
+	case io.Reader:
+		L.data, L.err = ioutil.ReadAll(x)
+	case []byte:
+		L.data = x
+	case string:
+		L.data = []byte(x)
+	default:
+		return errors.Errorf("unknown type %T", src)
+	}
 	return nil
 }
 
