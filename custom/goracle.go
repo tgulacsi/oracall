@@ -2,6 +2,7 @@ package custom
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,6 +26,11 @@ func (n *Number) Set(num goracle.Number) {
 }
 func (n Number) Get() goracle.Number {
 	return goracle.Number(n)
+}
+
+// Value returns a driver Value.
+func (n Number) Value() (driver.Value, error) {
+	return string(n), nil
 }
 
 // Scan assigns a value from a database driver.
@@ -93,6 +99,11 @@ func (d Date) Get() (od time.Time, err error) {
 	return t, nil
 }
 
+// Value returns a driver Value.
+func (d Date) Value() (driver.Value, error) {
+	return d.Get()
+}
+
 // Scan assigns a value from a database driver.
 func (d *Date) Scan(src interface{}) error {
 	switch x := src.(type) {
@@ -141,6 +152,15 @@ func (L *Lob) MarshalTo(p []byte) (int, error) {
 func (L *Lob) Unmarshal(p []byte) error {
 	L.data = p
 	return nil
+}
+
+// Value returns a driver Value.
+func (L *Lob) Value() (driver.Value, error) {
+	err := L.read()
+	if L.Lob.IsClob {
+		return string(L.data), err
+	}
+	return L.data, err
 }
 
 // Scan assigns a value from a database driver.
