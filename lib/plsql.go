@@ -741,6 +741,7 @@ func (arg Argument) getConvRefCursor(
 	convOut = append(convOut, fmt.Sprintf(`
 	{
 		rset := *(%s.(sql.Out).Dest.(*driver.Rows))
+		if rset != nil { defer rset.Close() }
 		iterators = append(iterators, iterator{
 			Reset: func() { output.%s = nil },
 			Iterate: func() error {
