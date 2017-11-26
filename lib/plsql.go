@@ -173,7 +173,6 @@ if true || DebugLevel > 0 {
 						return
 					}
 					reseters = append(reseters, it.Reset)
-					err = nil
 					continue
 				}
 				iterators2 = append(iterators2, it)
@@ -527,7 +526,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					for _, a := range arg.TableOf.RecordOf {
 						a := a
 						k, v := a.Name, a.Argument
-						typ = getTableType(v.AbsType)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
 
@@ -874,7 +872,6 @@ func (arg Argument) getConvTableRec(
 	key string,
 	parent Argument,
 ) ([]string, []string) {
-	lengthS := "0"
 	absName := "x__" + name[0] + "__" + name[1]
 	typ := arg.goType(true)
 	oraTyp := typ
@@ -891,7 +888,7 @@ func (arg Argument) getConvTableRec(
 		if !arg.IsOutput() {
 			amp = ""
 		}
-		lengthS = "len(input." + name[0] + ")"
+		lengthS := "len(input." + name[0] + ")"
 		too, varName := arg.ToOra(absName+"[i]", "v."+name[1], arg.IsOutput())
 		s := too
 		if varName != "" {

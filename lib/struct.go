@@ -115,7 +115,7 @@ func (a Argument) String() string {
 	case FLAVOR_TABLE:
 		typ = fmt.Sprintf("%s[%s]", a.PlsType, a.TableOf)
 	}
-	dir := ""
+	var dir string
 	switch a.Direction {
 	case DIR_IN:
 		dir = "IN"

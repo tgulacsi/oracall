@@ -103,7 +103,7 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 			}),
 
 		grpc.UnaryInterceptor(
-			func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+			func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ interface{}, err error) {
 				defer func() {
 					if r := recover(); r != nil {
 						var ok bool
@@ -143,7 +143,6 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				}
 
 				res, err := handler(ctx, req)
-				resp = res
 
 				logger.Log("RESP", info.FullMethod, "error", err)
 				commit(err)
