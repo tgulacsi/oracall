@@ -301,6 +301,12 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 	switch arg.Flavor {
 	case FLAVOR_SIMPLE:
 		switch got {
+		case "string":
+			checks = append(checks,
+				fmt.Sprintf(`if len(%s) > %d {
+        return errors.Wrap(oracall.ErrInvalidArgument, "%s is longer than accepted (%d)")
+    }`,
+					name, arg.Charlength, name, arg.Charlength))
 		case "*string":
 			checks = append(checks,
 				fmt.Sprintf(`if %s != nil && len(*%s) > %d {
@@ -322,6 +328,11 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
+		case "goracle.Number":
+			checks = append(checks,
+				fmt.Sprintf(`if err := oracall.ParseDigits(%s, %d, %d); err != nil { return errors.Wrap(oracall.ErrInvalidArgument, %s) }`, name, arg.Precision, arg.Scale, name))
+
+			case "int32": // no check is needed
 		case "int64", "float64":
 			if arg.Precision > 0 {
 				cons := strings.Repeat("9", int(arg.Precision))
@@ -343,6 +354,15 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 						name, name, vn, cons, name, vn, cons,
 						name, cons, cons))
 			}
+
+		case "custom.Date":
+			checks = append(checks,
+			  fmt.Sprintf(`if _, err := custom.Date(%s).Get(); err != nil {
+				  return errors.Wrapf(oracall.ErrInvalidArgument, "%s has bad format: " + err.Error())
+			  }`,
+			  name, name))
+		default:
+			checks = append(checks, fmt.Sprintf("// No check for %q (%q)", arg.Name, got))
 		}
 	case FLAVOR_RECORD:
 		if parentIsTable || got[0] == '*' {
@@ -356,7 +376,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 		}
 	case FLAVOR_TABLE:
 		if got[0] == '*' {
-			checks = append(checks, "if "+name+" != nil {")
+			checks = append(checks, fmt.Sprintf("if %s != nil {  // genChecks[T] %q", name, got))
 		}
 		plus := strings.Join(
 			genChecks(nil, *arg.TableOf, "v", true),

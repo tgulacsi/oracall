@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Tamás Gulácsi
+Copyright 2017 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -139,6 +139,39 @@ func mkVarName(dst string) string {
 	var enc [8 * 2]byte
 	hex.Encode(enc[:], h.Sum(raw[:0]))
 	return fmt.Sprintf("var_%s", enc[:])
+}
+
+func ParseDigits(s string, precision, scale int) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	if s[0] == '-' || s[0] == '+' {
+		s = s[1:]
+	}
+	var dotSeen bool
+	bucket := precision
+	if precision == 0 && scale == 0 {
+		bucket = 38
+	}
+	for _, r := range s {
+		if !dotSeen && r == '.' {
+			dotSeen = true
+			if !(precision == 0 && scale == 0) {
+				bucket = scale
+			}
+			continue
+		}
+		if '0' <= r && r <= '9' {
+			bucket--
+			if bucket < 0 {
+				return fmt.Errorf("want NUMBER(%d,%d), has %q", precision, scale, s)
+			}
+		} else {
+			return fmt.Errorf("want number, has %c in %q", r, s)
+		}
+	}
+	return nil
 }
 
 // vim: set fileencoding=utf-8 noet:
