@@ -116,7 +116,7 @@ FunLoop:
 		}
 		var checkName string
 		for _, dir := range []bool{false, true} {
-			if err := fun.SaveStruct(structW, dir); err != nil {
+			if err = fun.SaveStruct(structW, dir); err != nil {
 				if SkipMissingTableOf && errors.Cause(err) == ErrMissingTableOf {
 					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name(), "error", err)
 					continue FunLoop
@@ -332,7 +332,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 			checks = append(checks,
 				fmt.Sprintf(`if err := oracall.ParseDigits(%s, %d, %d); err != nil { return errors.Wrap(oracall.ErrInvalidArgument, %s) }`, name, arg.Precision, arg.Scale, name))
 
-			case "int32": // no check is needed
+		case "int32": // no check is needed
 		case "int64", "float64":
 			if arg.Precision > 0 {
 				cons := strings.Repeat("9", int(arg.Precision))
@@ -357,10 +357,10 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 
 		case "custom.Date":
 			checks = append(checks,
-			  fmt.Sprintf(`if _, err := custom.Date(%s).Get(); err != nil {
+				fmt.Sprintf(`if _, err := custom.Date(%s).Get(); err != nil {
 				  return errors.Wrapf(oracall.ErrInvalidArgument, "%s has bad format: " + err.Error())
 			  }`,
-			  name, name))
+					name, name))
 		default:
 			checks = append(checks, fmt.Sprintf("// No check for %q (%q)", arg.Name, got))
 		}

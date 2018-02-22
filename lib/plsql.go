@@ -254,20 +254,20 @@ func demap(plsql, callFun string) (string, string) {
 		fmt.Fprintf(os.Stderr, callFun)
 		panic(err)
 	}
-	if err := tpl.Execute(callBuf, opts); err != nil {
+	if err = tpl.Execute(callBuf, opts); err != nil {
 		panic(err)
 	}
-	b, err := format.Source(callBuf.Bytes())
-	if err != nil {
-		panic(err)
+	b, fmtErr := format.Source(callBuf.Bytes())
+	if fmtErr != nil {
+		panic(fmtErr)
 	}
 	callBuf.Reset()
 	prev := make(map[string]string)
 	for _, line := range bytes.Split(b, []byte{'\n'}) {
 		if line = bytes.TrimSpace(line); bytes.HasPrefix(line, []byte("params[")) && bytes.Contains(line, []byte("] = ")) {
 			idx := string(line[:bytes.IndexByte(line, ']')+1])
-			line := line[len(idx)+2:]
-			if i := bytes.Index(line, []byte("//")); i >= 0 {
+			line = line[len(idx)+2:]
+			if i = bytes.Index(line, []byte("//")); i >= 0 {
 				line = line[:i]
 			}
 			prev[idx] = string(bytes.TrimSpace(line))
@@ -279,7 +279,7 @@ func demap(plsql, callFun string) (string, string) {
 	plusIdxs := make([]idxRemap, 0, len(paramsMap))
 	for k, vv := range paramsMap {
 		for _, v := range vv {
-			if i := first[k]; i != v {
+			if i = first[k]; i != v {
 				plusIdxs = append(plusIdxs, idxRemap{Name: k, New: v, Old: i})
 			}
 		}

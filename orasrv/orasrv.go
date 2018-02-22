@@ -1,7 +1,6 @@
 package orasrv
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
+	bp "github.com/tgulacsi/go/bufpool"
 	oracall "github.com/tgulacsi/oracall/lib"
 
 	"github.com/go-kit/kit/log"
@@ -24,7 +24,7 @@ import (
 	goracle "gopkg.in/goracle.v2"
 )
 
-var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 4096)) }}
+var bufpool = bp.New(4096)
 
 func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
 	erroredMethods := make(map[string]struct{})
@@ -33,8 +33,8 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context) {
 		reqID := ContextGetReqID(ctx)
 		ctx = ContextWithReqID(ctx, reqID)
-		logger := log.With(logger, "reqID", reqID)
-		ctx = ContextWithLogger(ctx, logger)
+		lgr := log.With(logger, "reqID", reqID)
+		ctx = ContextWithLogger(ctx, lgr)
 		verbose := verbose
 		var wasThere bool
 		if !verbose {
@@ -44,7 +44,7 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 			wasThere = verbose
 		}
 		if verbose {
-			ctx = goracle.ContextWithLog(ctx, log.With(logger, "lib", "goracle").Log)
+			ctx = goracle.ContextWithLog(ctx, log.With(lgr, "lib", "goracle").Log)
 		}
 		commit := func(err error) {
 			if wasThere && err == nil {
@@ -57,7 +57,7 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				erroredMethodsMu.Unlock()
 			}
 		}
-		return logger, commit, ctx
+		return lgr, commit, ctx
 	}
 
 	opts := []grpc.ServerOption{
@@ -76,19 +76,15 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 						logger.Log("PANIC", fmt.Sprintf("%+v", err))
 					}
 				}()
-				logger, commit, ctx := getLogger(ss.Context(), info.FullMethod)
+				lgr, commit, ctx := getLogger(ss.Context(), info.FullMethod)
 
-				buf := bufPool.Get().(*bytes.Buffer)
-				defer func() {
-					buf.Reset()
-					bufPool.Put(buf)
-				}()
-				buf.Reset()
+				buf := bufpool.Get()
+				defer bufpool.Put(buf)
 				jenc := json.NewEncoder(buf)
 				if err = jenc.Encode(srv); err != nil {
-					logger.Log("marshal error", err, "srv", srv)
+					lgr.Log("marshal error", err, "srv", srv)
 				}
-				logger.Log("REQ", info.FullMethod, "srv", buf.String())
+				lgr.Log("REQ", info.FullMethod, "srv", buf.String())
 				if err = checkAuth(ctx, info.FullMethod); err != nil {
 					return status.Error(codes.Unauthenticated, err.Error())
 				}
@@ -97,7 +93,7 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				wss.WrappedContext = ctx
 				err = handler(srv, wss)
 
-				logger.Log("RESP", info.FullMethod, "error", err)
+				lgr.Log("RESP", info.FullMethod, "error", err)
 				commit(err)
 				return StatusError(err)
 			}),
@@ -121,12 +117,8 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 					return nil, status.Error(codes.Unauthenticated, err.Error())
 				}
 
-				buf := bufPool.Get().(*bytes.Buffer)
-				defer func() {
-					buf.Reset()
-					bufPool.Put(buf)
-				}()
-				buf.Reset()
+				buf := bufpool.Get()
+				defer bufpool.Put(buf)
 				jenc := json.NewEncoder(buf)
 				if err = jenc.Encode(req); err != nil {
 					logger.Log("marshal error", err, "req", req)
@@ -148,7 +140,7 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				commit(err)
 
 				buf.Reset()
-				if err := jenc.Encode(res); err != nil {
+				if err = jenc.Encode(res); err != nil {
 					logger.Log("marshal error", err, "res", res)
 				}
 				logger.Log("RESP", res, "error", err)

@@ -194,8 +194,8 @@ func (l *lexer) emit(t itemType) {
 func (l *lexer) nextItem() item {
 	for {
 		select {
-		case item := <-l.items:
-			return item
+		case it := <-l.items:
+			return it
 		default:
 			if l.state == nil {
 				return item{typ: itemEOF}

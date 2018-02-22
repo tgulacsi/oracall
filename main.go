@@ -209,7 +209,6 @@ func Main(args []string) int {
 }
 
 func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, err error) {
-	Log := logger.Log
 	tbl := "user_arguments"
 	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
 		tbl = "all_arguments"
@@ -233,7 +232,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
       ORDER BY 1, 2, 3`
 	rows, err := cx.QueryContext(ctx, qry, pattern)
 	if err != nil {
-		Log("qry", qry, "error", err)
+		logger.Log("qry", qry, "error", err)
 		return functions, errors.Wrap(err, qry)
 	}
 	defer rows.Close()
@@ -241,7 +240,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 	var cw *csv.Writer
 	if dumpFn != "" {
 		var lastOk bool
-		qry := qry[:strings.Index(qry, "FROM "+tbl)]
+		qry = qry[:strings.Index(qry, "FROM "+tbl)]
 		qry = strings.TrimPrefix(qry[strings.LastIndex(qry, "SELECT ")+7:], "DISTINCT ")
 		colNames := strings.Split(
 			strings.Map(
@@ -276,21 +275,21 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 		}
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
-			Log("msg", "create", "dump", dumpFn, "error", err)
+			logger.Log("msg", "create", "dump", dumpFn, "error", err)
 			return functions, errors.Wrap(err, dumpFn)
 		}
 		defer func() {
 			cw.Flush()
-			if err := cw.Error(); err != nil {
-				Log("msg", "flush", "csv", fh.Name(), "error", err)
+			if err = cw.Error(); err != nil {
+				logger.Log("msg", "flush", "csv", fh.Name(), "error", err)
 			}
-			if err := fh.Close(); err != nil {
-				Log("msg", "close", "dump", fh.Name(), "error", err)
+			if err = fh.Close(); err != nil {
+				logger.Log("msg", "close", "dump", fh.Name(), "error", err)
 			}
 		}()
 		cw = csv.NewWriter(fh)
 		if err = cw.Write(colNames); err != nil {
-			Log("msg", "write header to csv", "error", err)
+			logger.Log("msg", "write header to csv", "error", err)
 			return functions, errors.Wrap(err, "write header")
 		}
 	}
@@ -334,24 +333,24 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 						buf.Reset()
 
 						Log := log.With(logger, "package", ua.PackageName).Log
-						if err := getSource(ctx, buf, cx, ua.PackageName); err != nil {
-							Log("msg", "getSource", "error", err)
-							return errors.WithMessage(err, ua.PackageName)
+						if srcErr := getSource(ctx, buf, cx, ua.PackageName); srcErr != nil {
+							Log("msg", "getSource", "error", srcErr)
+							return errors.WithMessage(srcErr, ua.PackageName)
 						}
-						ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-						funDocs, err := parseDocs(ctx, buf.String())
-						cancel()
-						Log("msg", "parseDocs", "docs", len(funDocs), "error", err)
+						subCtx, subCancel := context.WithTimeout(ctx, 1*time.Second)
+						funDocs, docsErr := parseDocs(subCtx, buf.String())
+						subCancel()
+						Log("msg", "parseDocs", "docs", len(funDocs), "error", docsErr)
 						docsMu.Lock()
 						pn := oracall.UnoCap(ua.PackageName) + "."
 						for nm, doc := range funDocs {
 							docs[pn+strings.ToLower(nm)] = doc
 						}
 						docsMu.Unlock()
-						if err == context.DeadlineExceeded {
-							err = nil
+						if docsErr == context.DeadlineExceeded {
+							docsErr = nil
 						}
-						return err
+						return docsErr
 					})
 				}
 			}
@@ -412,7 +411,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 		if err == nil {
 			err = grpErr
 		}
-		Log("msg", "ParseArguments", "error", grpErr)
+		logger.Log("msg", "ParseArguments", "error", grpErr)
 	}
 	docNames := make([]string, 0, len(docs))
 	for k := range docs {
@@ -423,7 +422,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 	for i, f := range functions {
 		if f.Documentation == "" {
 			if f.Documentation = docs[f.Name()]; f.Documentation == "" {
-				Log("msg", "No documentation", "function", f.Name())
+				logger.Log("msg", "No documentation", "function", f.Name())
 				any = true
 			} else {
 				functions[i] = f
@@ -431,7 +430,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 		}
 	}
 	if any {
-		Log("has", docNames)
+		logger.Log("has", docNames)
 	}
 	return functions, nil
 }
