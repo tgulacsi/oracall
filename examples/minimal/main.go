@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate sh -c "oracall <../../one.csv >generated_functions.go"
+
 /*
 Package main for minimal is a minimal example for oracall usage
 
@@ -38,7 +40,6 @@ import (
 )
 
 var flagConnect = flag.String("connect", "", "Oracle database connection string")
-var flagBypassMultipleArgs = flag.Bool("bypassmultipleargs", false, "bypass multiple args - experimental, probably worsens ORA-01008")
 
 func main() {
 	flag.Parse()

@@ -368,7 +368,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	)
 	decls = append(decls, "i1 PLS_INTEGER;", "i2 PLS_INTEGER;")
 	convIn = append(convIn,
-		"params := make([]interface{}, {{.ParamsArrLen}}, {{.ParamsArrLen}}+1)",
+		"params := make([]interface{}, {{.ParamsArrLen}}, {{.ParamsArrLen}}+2)",
 	)
 
 	addParam := func(paramName string) string {
@@ -377,11 +377,13 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		}
 		return fmt.Sprintf(`params[{{paramsIdx %q}}]`, paramName)
 	}
+	var hasLob bool
 	for _, arg := range args {
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
 			name := (CamelCase(arg.Name))
 			//name := capitalize(replHidden(arg.Name))
+			hasLob = hasLob || arg.AbsType == "CLOB" || arg.AbsType == "BLOB"
 			convIn, convOut = arg.getConvSimple(convIn, convOut,
 				name, addParam(arg.Name))
 
@@ -422,6 +424,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			for _, a := range arg.RecordOf {
 				a := a
 				k, v := a.Name, a.Argument
+				hasLob = hasLob || v.AbsType == "CLOB" || v.AbsType == "BLOB"
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				kName := (CamelCase(k))
 				//kName := capitalize(replHidden(k))
@@ -450,6 +453,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
 					typ = getTableType(arg.TableOf.AbsType)
+					hasLob = hasLob || arg.TableOf.AbsType == "CLOB" || arg.TableOf.AbsType == "BLOB"
 					setvar := ""
 					if arg.IsInput() {
 						setvar = " := :" + arg.Name
@@ -511,6 +515,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						a := a
 						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
+						hasLob = hasLob || v.AbsType == "BLOB" || v.AbsType == "CLOB"
 						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D="+arg.Name)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
@@ -587,6 +592,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			Log("msg", "unkown flavor", "flavor", arg.Flavor)
 			os.Exit(1)
 		}
+	}
+	if hasLob {
+		convIn = append(convIn, "params = append(params, goracle.ClobAsString())")
 	}
 
 	callb := buffers.Get()

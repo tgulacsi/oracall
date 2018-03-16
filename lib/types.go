@@ -46,6 +46,10 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		}
 	}
 	switch arg.ora {
+	case "BLOB":
+		return fmt.Sprintf("%s = goracle.Lob{Reader:bytes.NewReader(%s)}", dst, src)
+	case "CLOB":
+		return fmt.Sprintf("%s = goracle.Lob{IsClob:true, Reader:strings.NewReader(%s)}", dst, src)
 	case "DATE":
 		return fmt.Sprintf("%s = string(%s)", dst, src)
 	case "PLS_INTEGER":

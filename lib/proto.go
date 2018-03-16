@@ -163,7 +163,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		if got == "" {
 			got = mkRecTypName(arg.Name)
 		}
-		typ, pOpts := protoType(got, arg.Name)
+		typ, pOpts := protoType(got, arg.Name, arg.AbsType)
 		var optS string
 		if s := pOpts.String(); s != "" {
 			optS = " " + s
@@ -203,7 +203,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 	return err
 }
 
-func protoType(got, aName string) (string, protoOptions) {
+func protoType(got, aName, absType string) (string, protoOptions) {
 	switch trimmed := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")); trimmed {
 	case "time.time":
 		return "string", nil
@@ -234,7 +234,12 @@ func protoType(got, aName string) (string, protoOptions) {
 		return "string", nil
 	case "n":
 		return "string", nil
-	case "raw", "goracle.lob", "ora.lob":
+	case "raw":
+		return "bytes", nil
+	case "goracle.lob", "ora.lob":
+		if absType == "CLOB" {
+			return "string", nil
+		}
 		return "bytes", nil
 	default:
 		return trimmed, nil
