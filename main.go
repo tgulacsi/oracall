@@ -37,8 +37,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"go4.org/syncutil"
-
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
 	"github.com/tgulacsi/go/loghlp/kitloghlp"
@@ -216,7 +214,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var grp syncutil.Group
+	var grp errgroup.Group
 
 	qry := `
     SELECT A.*
@@ -407,7 +405,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 		return nil
 	})
 	functions, err = oracall.ParseArguments(userArgs)
-	if grpErr := grp.Err(); grpErr != nil {
+	if grpErr := grp.Wait(); grpErr != nil {
 		if err == nil {
 			err = grpErr
 		}

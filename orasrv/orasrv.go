@@ -61,7 +61,9 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 	}
 
 	opts := []grpc.ServerOption{
+		//lint:ignore SA1019 the UseCompressor API is experimental yet.
 		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
+		//lint:ignore SA1019 the UseCompressor API is experimental yet.
 		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
 		grpc.StreamInterceptor(
 			func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
