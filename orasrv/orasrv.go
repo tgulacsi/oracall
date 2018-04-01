@@ -142,8 +142,8 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				commit(err)
 
 				buf.Reset()
-				if err = jenc.Encode(res); err != nil {
-					logger.Log("marshal error", err, "res", res)
+				if jErr := jenc.Encode(res); err != nil {
+					logger.Log("marshal error", jErr, "res", res)
 				}
 				logger.Log("RESP", res, "error", err)
 
