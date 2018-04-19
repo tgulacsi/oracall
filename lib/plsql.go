@@ -892,28 +892,23 @@ func (arg Argument) getConvTableRec(
 		oraTyp = "int32"
 	}
 	if arg.IsInput() {
-		amp := "&"
-		if !arg.IsOutput() {
-			amp = ""
-		}
 		lengthS := "len(input." + name[0] + ")"
-		too, varName := arg.ToOra(absName+"[i]", "v."+name[1], arg.IsOutput())
-		s := too
-		if varName != "" {
-			s = fmt.Sprintf("%s[i] = %s", absName, varName)
+		too, _ := arg.ToOra(absName+"[i]", "v."+name[1], false)
+		setParams := absName
+		if arg.IsOutput() {
+			setParams = fmt.Sprintf("sql.Out{Dest:&%s,In:true}", absName)
 		}
-		_ = s
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)  // gctr1
 			for i,v := range input.%s {
 				%s
 			} // gctr1
-			%s = %s%s`,
+			%s = %s`,
 			absName,
 			oraTyp, lengthS, tableSize,
 			name[0],
 			too,
-			paramName, amp, absName))
+			paramName, setParams))
 		_ = too
 	}
 	if arg.IsOutput() {

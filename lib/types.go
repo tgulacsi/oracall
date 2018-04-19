@@ -98,9 +98,9 @@ func (arg PlsType) ToOra(dst, src string, isOutput bool) (expr string, variable 
 				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
 				return
 			}
-			%s = sql.Out{Dest:%s%s, In:true}`,
+			%s = sql.Out{Dest:&%s, In:true}`,
 						dstVar, strings.TrimPrefix(src, "&"),
-						dst, pointer, dstVar,
+						dst, dstVar,
 					),
 					dstVar
 			}
