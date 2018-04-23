@@ -36,11 +36,11 @@ func Main() error {
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(os.Stdout, "syntax = \"proto3\";\npackage gdpr;\n")
 	return (&ObjPrinter{}).Print(os.Stdout, ot)
 }
 
 type ObjPrinter struct {
-	Prefix  string
 	printed map[string]struct{}
 }
 
@@ -57,33 +57,33 @@ func (p *ObjPrinter) Print(w io.Writer, ot goracle.ObjectType) error {
 		return errors.Errorf("EMPTY %+v", ot)
 	}
 	if ot.Attributes == nil && ot.NativeTypeNum != 3009 {
-		_, err := fmt.Fprintf(w, p.Prefix+"type %s %s\n", ot.Name, nativeToGo(int(ot.NativeTypeNum)))
+		_, err := fmt.Fprintf(w, "message %s { %s item = 1; }\n", ot.Name, nativeToGo(int(ot.NativeTypeNum)))
 		return err
 	}
-	fmt.Fprintf(w, p.Prefix+"type %s struct {\n", ot.Name)
+	fmt.Fprintf(w, "message %s {\n", ot.Name)
 	var later []goracle.ObjectType
-	for _, attr := range ot.Attributes {
+	for i, attr := range ot.Attributes {
 		prefix := ""
 		ot := attr.ObjectType
 		if attr.ObjectType.CollectionOf != nil {
-			prefix = "[]"
+			prefix = "repeated "
 			ot = *attr.ObjectType.CollectionOf
 		}
 		if attr.ObjectType.Attributes == nil {
 			typ := nativeToGo(int(ot.NativeTypeNum))
-			_, err := fmt.Fprintf(w, p.Prefix+"\t%s %s%s,\n", attr.Name, prefix, typ)
+			_, err := fmt.Fprintf(w, "\t%s%s %s = %d;\n", prefix, typ, attr.Name, i+1)
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		_, err := fmt.Fprintf(w, p.Prefix+"\t%s %s%s,\n", attr.Name, prefix, ot.Name)
+		_, err := fmt.Fprintf(w, "\t%s%s %s = %d;\n", prefix, ot.Name, attr.Name, i+1)
 		if err != nil {
 			return err
 		}
 		later = append(later, ot)
 	}
-	_, err := fmt.Fprintf(w, p.Prefix+"}\n")
+	_, err := fmt.Fprintf(w, "}\n")
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func (p *ObjPrinter) Print(w io.Writer, ot goracle.ObjectType) error {
 func nativeToGo(nativeTypeNum int) string {
 	switch nativeTypeNum {
 	case 3005:
-		return "time.Time"
+		return "string"
 	default:
 		return "string"
 	}
