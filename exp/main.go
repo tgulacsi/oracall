@@ -36,8 +36,7 @@ func Main() error {
 	if err != nil {
 		return err
 	}
-	(&ObjPrinter{}).Print(os.Stdout, ot)
-	return nil
+	return (&ObjPrinter{}).Print(os.Stdout, ot)
 }
 
 type ObjPrinter struct {
@@ -45,30 +44,62 @@ type ObjPrinter struct {
 	printed map[string]struct{}
 }
 
-func (p *ObjPrinter) Print(w io.Writer, ot goracle.ObjectType) {
+func (p *ObjPrinter) Print(w io.Writer, ot goracle.ObjectType) error {
 	if p.printed == nil {
 		p.printed = make(map[string]struct{})
 	}
+	if _, seen := p.printed[ot.FullName()]; seen {
+		return nil
+	}
+	p.printed[ot.FullName()] = struct{}{}
 	// FIXME: print protobuf syntax
-	fmt.Fprintf(w, p.Prefix+"type %s struct {\n", ot.Info.Name())
-	later := make(map[string]goracle.ObjectType)
+	if ot.Name == "" {
+		return errors.Errorf("EMPTY %+v", ot)
+	}
+	if ot.Attributes == nil && ot.NativeTypeNum != 3009 {
+		_, err := fmt.Fprintf(w, p.Prefix+"type %s %s\n", ot.Name, nativeToGo(int(ot.NativeTypeNum)))
+		return err
+	}
+	fmt.Fprintf(w, p.Prefix+"type %s struct {\n", ot.Name)
+	var later []goracle.ObjectType
 	for _, attr := range ot.Attributes {
-		// FIXME: handle Collection types
+		prefix := ""
+		ot := attr.ObjectType
+		if attr.ObjectType.CollectionOf != nil {
+			prefix = "[]"
+			ot = *attr.ObjectType.CollectionOf
+		}
 		if attr.ObjectType.Attributes == nil {
-			typ := "string"
-			switch attr.NativeTypeNum {
-			case 3004:
-			case 3005:
-				typ = "time.Time"
+			typ := nativeToGo(int(ot.NativeTypeNum))
+			_, err := fmt.Fprintf(w, p.Prefix+"\t%s %s%s,\n", attr.Name, prefix, typ)
+			if err != nil {
+				return err
 			}
-			fmt.Fprintf(w, p.Prefix+"\t%s %s,\n", attr.Name, typ)
 			continue
 		}
-		fmt.Fprintf(w, p.Prefix+"\t%s %s,\n", attr.Name, attr.ObjectType.Info.Name())
-		later[attr.ObjectType.Info.Name()] = attr.ObjectType
+		_, err := fmt.Fprintf(w, p.Prefix+"\t%s %s%s,\n", attr.Name, prefix, ot.Name)
+		if err != nil {
+			return err
+		}
+		later = append(later, ot)
 	}
-	fmt.Fprintf(w, p.Prefix+"}\n")
+	_, err := fmt.Fprintf(w, p.Prefix+"}\n")
+	if err != nil {
+		return err
+	}
 	for _, ot := range later {
-		p.Print(w, ot)
+		if err := p.Print(w, ot); err != nil {
+			return errors.Wrap(err, ot.FullName())
+		}
+	}
+	return nil
+}
+
+func nativeToGo(nativeTypeNum int) string {
+	switch nativeTypeNum {
+	case 3005:
+		return "time.Time"
+	default:
+		return "string"
 	}
 }
