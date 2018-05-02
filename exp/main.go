@@ -37,7 +37,51 @@ func Main() error {
 		return err
 	}
 	fmt.Fprintf(os.Stdout, "syntax = \"proto3\";\npackage gdpr;\n")
-	return (&ObjPrinter{}).Print(os.Stdout, ot)
+	if err = (&ObjPrinter{}).Print(os.Stdout, ot); err != nil {
+		return err
+	}
+
+	obj, err := ot.NewObject()
+	if err != nil {
+		return err
+	}
+	log.Printf("obj=%+v", obj)
+	for i, attr := range obj.Attributes {
+		var data goracle.Data
+		if err := obj.GetAttribute(&data, i); err != nil {
+			return err
+		}
+		log.Printf("  %d. %+v: %+v", i, attr, data)
+		sub := data.GetObject()
+		if len(sub.Attributes) == 0 {
+			continue
+		}
+		var sd goracle.Data
+		if err = sub.GetAttribute(&sd, 0); err != nil {
+			return err
+		}
+		if sd.NativeTypeNum != 3004 {
+			continue
+		}
+		sd.SetBytes([]byte("aaa"))
+		if err = sub.SetAttribute(0, &sd); err != nil {
+			return err
+		}
+		if obj.SetAttribute(0, &sd); err != nil {
+			return err
+		}
+
+		log.Printf(" !!! %d. %+v", i, attr)
+	}
+
+	var str string
+	if _, err = db.Exec(`BEGIN :1 := XMLType(:2).getClobVal; END;`,
+		sql.Out{Dest: &str}, obj,
+	); err != nil {
+		return err
+	}
+	log.Println("str:", str)
+	return nil
 }
 
 type ObjPrinter struct {
