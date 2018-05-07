@@ -106,7 +106,7 @@ func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}) error {
 	return err
 }
 func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out bool) error {
-	dirmap, dirname := uint8(DIR_IN), "input"
+	dirmap, dirname := DIR_IN, "input"
 	if out {
 		dirmap, dirname = DIR_OUT, "output"
 	}

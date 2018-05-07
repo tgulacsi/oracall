@@ -148,6 +148,7 @@ if true || DebugLevel > 0 {
 			_, err = stmt.ExecContext(ctx, params...)
 		}
 		if err != nil {
+			err = errors.Wrapf(err, "%q %+v", qry, params)
 			return
 		}
 	}
@@ -377,13 +378,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		}
 		return fmt.Sprintf(`params[{{paramsIdx %q}}]`, paramName)
 	}
-	var hasLob bool
 	for _, arg := range args {
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
 			name := (CamelCase(arg.Name))
 			//name := capitalize(replHidden(arg.Name))
-			hasLob = hasLob || arg.AbsType == "CLOB" || arg.AbsType == "BLOB"
 			convIn, convOut = arg.getConvSimple(convIn, convOut,
 				name, addParam(arg.Name))
 
@@ -424,7 +423,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			for _, a := range arg.RecordOf {
 				a := a
 				k, v := a.Name, a.Argument
-				hasLob = hasLob || v.AbsType == "CLOB" || v.AbsType == "BLOB"
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				kName := (CamelCase(k))
 				//kName := capitalize(replHidden(k))
@@ -453,7 +451,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
 					typ = getTableType(arg.TableOf.AbsType)
-					hasLob = hasLob || arg.TableOf.AbsType == "CLOB" || arg.TableOf.AbsType == "BLOB"
 					setvar := ""
 					if arg.IsInput() {
 						setvar = " := :" + arg.Name
@@ -515,7 +512,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						a := a
 						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
-						hasLob = hasLob || v.AbsType == "BLOB" || v.AbsType == "CLOB"
 						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D="+arg.Name)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
@@ -593,9 +589,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			os.Exit(1)
 		}
 	}
-	if hasLob {
-		convIn = append(convIn, "params = append(params, goracle.ClobAsString())")
-	}
 
 	callb := buffers.Get()
 	defer buffers.Put(callb)
@@ -633,7 +626,7 @@ func (arg Argument) getConvSimple(
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s  // gcs3`, name, name))
 		}
 		src := "output." + name
-		in, varName := arg.ToOra(paramName, "&"+src, true)
+		in, varName := arg.ToOra(paramName, "&"+src, arg.Direction)
 		convIn = append(convIn, in)
 		//fmt.Sprintf("%s = sql.Out{Dest:%s,In:%t}  // gcs3", paramName, "&"+src, arg.IsInput()))
 		if varName != "" {
@@ -641,8 +634,8 @@ func (arg Argument) getConvSimple(
 				fmt.Sprintf("%s  // gcs4", arg.FromOra(src, paramName, varName)))
 		}
 	} else {
-		in, _ := arg.ToOra(paramName, "input."+name, false)
-		convIn = append(convIn, in+"  // gcs4")
+		in, _ := arg.ToOra(paramName, "input."+name, arg.Direction)
+		convIn = append(convIn, in+"  // gcs4i")
 	}
 	return convIn, convOut
 }
@@ -700,7 +693,7 @@ func (arg Argument) getConvSimpleTable(
 		in, varName := arg.ToOra(
 			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
 			"output."+name,
-			true)
+			arg.Direction)
 		convIn = append(convIn,
 			//fmt.Sprintf(`if cap(input.%s) == 0 { input.%s = append(input.%s, make(%s, 1)...)[:0] }`, name, name, name, arg.goType(true)[1:]),
 			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
@@ -715,7 +708,7 @@ func (arg Argument) getConvSimpleTable(
 		in, varName := arg.ToOra(
 			strings.Replace(strings.Replace(paramName, `[{{paramsIdx "`, "__", 1), `"}}]`, "", 1),
 			"output."+name,
-			false)
+			arg.Direction)
 		convIn = append(convIn,
 			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
 		if arg.goType(true) == "[]goracle.Number" {
@@ -854,7 +847,7 @@ func (arg Argument) getConvRec(
 ) ([]string, []string) {
 
 	if arg.IsOutput() {
-		too, varName := arg.ToOra(paramName, "&output."+name, true)
+		too, varName := arg.ToOra(paramName, "&output."+name, arg.Direction)
 		convIn = append(convIn, too+" // gcr2 var="+varName)
 		if varName != "" {
 			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest:&%s} // gcr2out", paramName, varName))
@@ -862,7 +855,7 @@ func (arg Argument) getConvRec(
 		}
 	} else if arg.IsInput() {
 		parts := strings.Split(name, ".")
-		too, _ := arg.ToOra(paramName, "input."+name, false)
+		too, _ := arg.ToOra(paramName, "input."+name, arg.Direction)
 		convIn = append(convIn,
 			fmt.Sprintf(`if input.%s != nil {
 				%s
@@ -893,10 +886,10 @@ func (arg Argument) getConvTableRec(
 	}
 	if arg.IsInput() {
 		lengthS := "len(input." + name[0] + ")"
-		too, _ := arg.ToOra(absName+"[i]", "v."+name[1], false)
+		too, _ := arg.ToOra(absName+"[i]", "v."+name[1], arg.Direction)
 		setParams := absName
 		if arg.IsOutput() {
-			setParams = fmt.Sprintf("sql.Out{Dest:&%s,In:true}", absName)
+			setParams = fmt.Sprintf("sql.Out{Dest:&%s,In:true} //gctr1", absName)
 		}
 		convIn = append(convIn, fmt.Sprintf(`
 			%s := make([]%s, %s, %d)  // gctr1

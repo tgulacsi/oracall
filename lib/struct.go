@@ -75,9 +75,15 @@ func (f Function) HasCursorOut() bool {
 	return false
 }
 
+type direction uint8
+
+func (dir direction) IsInput() bool  { return dir&DIR_IN > 0 }
+func (dir direction) IsOutput() bool { return dir&DIR_OUT > 0 }
+
 const (
-	DIR_IN  = 1
-	DIR_OUT = 2
+	DIR_IN    = direction(1)
+	DIR_OUT   = direction(2)
+	DIR_INOUT = direction(3)
 
 	FLAVOR_SIMPLE = 0
 	FLAVOR_RECORD = 1
@@ -97,7 +103,7 @@ type Argument struct {
 	goTypeName     string
 	PlsType
 	Flavor    uint8
-	Direction uint8
+	Direction direction
 	Precision uint8
 	Scale     uint8
 	mu        sync.Mutex
@@ -134,7 +140,7 @@ func (a Argument) IsOutput() bool {
 	return a.Direction&DIR_OUT > 0
 }
 
-func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
+func NewArgument(name, dataType, plsType, typeName, dirName string, dir direction,
 	charset string, precision, scale uint8, charlength uint) Argument {
 
 	name = strings.ToLower(name)
@@ -148,7 +154,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir uint8,
 	if dirName != "" {
 		switch dirName {
 		case "IN/OUT":
-			dir = DIR_IN | DIR_OUT
+			dir = DIR_INOUT
 		case "OUT":
 			dir = DIR_OUT
 		default:

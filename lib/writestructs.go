@@ -48,6 +48,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"io"
+	"io/ioutil"
     "fmt"
 	"strings"
 	"database/sql"
@@ -88,6 +89,7 @@ var _ = spew.Sdump
 var _ = os.Stdout
 var _ driver.Rows
 var _ = oracall.ErrInvalidArgument
+var _ = ioutil.ReadAll
 
 type iterator struct {
 	Reset func()
@@ -177,7 +179,7 @@ func (f Function) getStructName(out, withPackage bool) string {
 var buffers = newBufPool(1 << 16)
 
 func (f Function) SaveStruct(dst io.Writer, out bool) error {
-	dirmap, dirname := uint8(DIR_IN), "input"
+	dirmap, dirname := DIR_IN, "input"
 	if out {
 		dirmap, dirname = DIR_OUT, "output"
 	}
