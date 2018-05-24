@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
@@ -24,6 +25,10 @@ import (
 	goracle "gopkg.in/goracle.v2"
 )
 
+var Timeout = DefaultTimeout
+
+const DefaultTimeout = time.Hour
+
 var bufpool = bp.New(4096)
 
 func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
@@ -31,6 +36,9 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 	var erroredMethodsMu sync.RWMutex
 
 	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context) {
+		if _, ok := ctx.Deadline(); !ok && Timeout > 0 {
+			ctx, _ = context.WithTimeout(ctx, Timeout)
+		}
 		reqID := ContextGetReqID(ctx)
 		ctx = ContextWithReqID(ctx, reqID)
 		lgr := log.With(logger, "reqID", reqID)
