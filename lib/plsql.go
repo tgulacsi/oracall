@@ -78,6 +78,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	hasCursorOut := fun.HasCursorOut()
 	if hasCursorOut {
 		fmt.Fprintf(callBuf, `func (s *oracallServer) %s(input *pb.%s, stream pb.%s_%sServer) (err error) {
+			ctx := stream.Context()
 			%s
 			output := new(pb.%s)
 			iterators := make([]iterator, 0, 1)
@@ -98,6 +99,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 			CamelCase(fun.getStructName(true, false)),
 		)
 	}
+	fmt.Fprintf(callBuf, "\nif err = ctx.Err(); err != nil { return }\n")
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -130,9 +132,6 @@ if true || DebugLevel > 0 {
 `,
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
 		fun.getPlsqlConstName())
-	if hasCursorOut {
-		callBuf.WriteString("\n\tctx := context.Background()\n")
-	}
 	callBuf.WriteString(`
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -168,6 +167,7 @@ if true || DebugLevel > 0 {
 		iterators2 := make([]iterator, 0, len(iterators))
 		for {
 			for _, it := range iterators {
+				if err = ctx.Err(); err != nil { return }
 				if err = it.Iterate(); err != nil {
 					if errors.Cause(err) != io.EOF {
 						_ = stream.Send(output)

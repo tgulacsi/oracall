@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LK4D4/joincontext"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	bp "github.com/tgulacsi/go/bufpool"
@@ -20,6 +21,7 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	_ "google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/status"
 
 	goracle "gopkg.in/goracle.v2"
@@ -31,14 +33,16 @@ const DefaultTimeout = time.Hour
 
 var bufpool = bp.New(4096)
 
-func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
+func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
 	erroredMethods := make(map[string]struct{})
 	var erroredMethodsMu sync.RWMutex
 
-	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context) {
+	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context, context.CancelFunc) {
 		if _, ok := ctx.Deadline(); !ok && Timeout > 0 {
 			ctx, _ = context.WithTimeout(ctx, Timeout)
 		}
+		var cancel context.CancelFunc
+		ctx, cancel = joincontext.Join(ctx, globalCtx)
 		reqID := ContextGetReqID(ctx)
 		ctx = ContextWithReqID(ctx, reqID)
 		lgr := log.With(logger, "reqID", reqID)
@@ -65,14 +69,14 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 				erroredMethodsMu.Unlock()
 			}
 		}
-		return lgr, commit, ctx
+		return lgr, commit, ctx, cancel
 	}
 
 	opts := []grpc.ServerOption{
 		//lint:ignore SA1019 the UseCompressor API is experimental yet.
-		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
+		//grpc.RPCCompressor(grpc.NewGZIPCompressor()),
 		//lint:ignore SA1019 the UseCompressor API is experimental yet.
-		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
+		//grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
 		grpc.StreamInterceptor(
 			func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				defer func() {
@@ -86,7 +90,8 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 						logger.Log("PANIC", fmt.Sprintf("%+v", err))
 					}
 				}()
-				lgr, commit, ctx := getLogger(ss.Context(), info.FullMethod)
+				lgr, commit, ctx, cancel := getLogger(ss.Context(), info.FullMethod)
+				defer cancel()
 
 				buf := bufpool.Get()
 				defer bufpool.Put(buf)
@@ -121,7 +126,8 @@ func GRPCServer(logger log.Logger, verbose bool, checkAuth func(ctx context.Cont
 						logger.Log("PANIC", fmt.Sprintf("%+v", err))
 					}
 				}()
-				logger, commit, ctx := getLogger(ctx, info.FullMethod)
+				logger, commit, ctx, cancel := getLogger(ctx, info.FullMethod)
+				defer cancel()
 
 				if err = checkAuth(ctx, info.FullMethod); err != nil {
 					return nil, status.Error(codes.Unauthenticated, err.Error())
