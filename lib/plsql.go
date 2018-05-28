@@ -157,7 +157,9 @@ if true || DebugLevel > 0 {
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
-	if hasCursorOut {
+	if !hasCursorOut {
+		fmt.Fprintf(callBuf, "\nreturn\n")
+	} else {
 		fmt.Fprintf(callBuf, `
 		if len(iterators) == 0 {
 			err = stream.Send(output)
@@ -197,9 +199,7 @@ if true || DebugLevel > 0 {
 		}
 		`)
 	}
-	fmt.Fprintf(callBuf, `
-        return
-    }`)
+	callBuf.WriteString("\n}\n")
 	callFun = callBuf.String()
 	plsql = plsBuf.String()
 

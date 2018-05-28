@@ -39,7 +39,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 
 	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context, context.CancelFunc) {
 		if _, ok := ctx.Deadline(); !ok && Timeout > 0 {
-			ctx, _ = context.WithTimeout(ctx, Timeout)
+			ctx, _ = context.WithTimeout(ctx, Timeout) //nolint:govet
 		}
 		var cancel context.CancelFunc
 		ctx, cancel = joincontext.Join(ctx, globalCtx)

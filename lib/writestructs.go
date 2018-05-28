@@ -45,6 +45,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 		io.WriteString(w,
 			"package "+pkg+`
 import (
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"io"
@@ -57,8 +58,6 @@ import (
 	"strconv"
     "time"    // for datetimes
 	"unsafe"
-
-	"golang.org/x/net/context"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
@@ -413,6 +412,9 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 			typName = typName[1:]
 		}
 	}()
+	if arg.mu == nil {
+		arg.mu = new(sync.Mutex)
+	}
 	arg.mu.Lock()
 	defer arg.mu.Unlock()
 	// cached?

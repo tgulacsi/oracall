@@ -106,7 +106,7 @@ type Argument struct {
 	Direction direction
 	Precision uint8
 	Scale     uint8
-	mu        sync.Mutex
+	mu        *sync.Mutex
 }
 type NamedArgument struct {
 	Name string
@@ -168,7 +168,9 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 	arg := Argument{Name: name, Type: dataType, PlsType: NewPlsType(plsType),
 		TypeName: typeName, Direction: dir,
 		Precision: precision, Scale: scale, Charlength: charlength,
-		Charset: charset}
+		Charset: charset,
+		mu:      new(sync.Mutex),
+	}
 	switch arg.Type {
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD

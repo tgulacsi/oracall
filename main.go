@@ -216,8 +216,8 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 
 	var grp errgroup.Group
 
-	qry := `
-    SELECT A.*
+	qry := `` + //nolint:gas
+		`SELECT A.*
 	  FROM
 	(SELECT DISTINCT object_id object_id, subprogram_id, sequence,
 	       package_name, object_name,
@@ -238,7 +238,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 	var cw *csv.Writer
 	if dumpFn != "" {
 		var lastOk bool
-		qry = qry[:strings.Index(qry, "FROM "+tbl)]
+		qry = qry[:strings.Index(qry, "FROM "+tbl)] //nolint:gas
 		qry = strings.TrimPrefix(qry[strings.LastIndex(qry, "SELECT ")+7:], "DISTINCT ")
 		colNames := strings.Split(
 			strings.Map(
