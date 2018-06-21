@@ -103,12 +103,24 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 				pointer = "&"
 			}
 			if dir.IsOutput() {
+				if strings.HasSuffix(dst, "]") {
+					return fmt.Sprintf(`%s, convErr := custom.Date(%s).Get()
+			if convErr != nil { // toOra D
+				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
+				return
+			}
+			%s = %s //a`,
+							dstVar, strings.TrimPrefix(src, "&"),
+							dst, dstVar,
+						),
+						dstVar
+				}
 				return fmt.Sprintf(`%s, convErr := custom.Date(%s).Get()
 			if convErr != nil { // toOra D
 				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
 				return
 			}
-			%s = sql.Out{Dest:&%s%s}`,
+			%s = sql.Out{Dest:&%s%s} //b`,
 						dstVar, strings.TrimPrefix(src, "&"),
 						dst, dstVar, inTrue,
 					),
@@ -119,7 +131,7 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
 				return
 			}
-			%s = %s%s`,
+			%s = %s%s //c`,
 					dstVar, strings.TrimPrefix(src, "&"),
 					dst, pointer, dstVar,
 				),
