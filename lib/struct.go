@@ -117,9 +117,9 @@ func (a Argument) String() string {
 	typ := a.Type
 	switch a.Flavor {
 	case FLAVOR_RECORD:
-		typ = fmt.Sprintf("%s{%s}", a.PlsType, a.RecordOf)
+		typ = fmt.Sprintf("%s{%v}", a.PlsType, a.RecordOf)
 	case FLAVOR_TABLE:
-		typ = fmt.Sprintf("%s[%s]", a.PlsType, a.TableOf)
+		typ = fmt.Sprintf("%s[%v]", a.PlsType, a.TableOf)
 	}
 	var dir string
 	switch a.Direction {
