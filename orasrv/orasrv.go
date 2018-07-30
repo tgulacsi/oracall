@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 	_ "google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/status"
+	"gopkg.in/stack.v1"
 
 	goracle "gopkg.in/goracle.v2"
 )
@@ -81,13 +82,14 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 			func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				defer func() {
 					if r := recover(); r != nil {
+						trace := stack.Trace().String()
 						var ok bool
 						if err, ok = r.(error); ok {
-							logger.Log("PANIC", err)
+							logger.Log("PANIC", err, "trace", trace)
 							return
 						}
 						err = errors.Errorf("%+v", r)
-						logger.Log("PANIC", fmt.Sprintf("%+v", err))
+						logger.Log("PANIC", fmt.Sprintf("%+v", err), "trace", trace)
 					}
 				}()
 				lgr, commit, ctx, cancel := getLogger(ss.Context(), info.FullMethod)
@@ -117,13 +119,14 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 			func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ interface{}, err error) {
 				defer func() {
 					if r := recover(); r != nil {
+						trace := stack.Trace().String()
 						var ok bool
 						if err, ok = r.(error); ok {
-							logger.Log("PANIC", err)
+							logger.Log("PANIC", err, "trace", trace)
 							return
 						}
 						err = errors.Errorf("%+v", r)
-						logger.Log("PANIC", fmt.Sprintf("%+v", err))
+						logger.Log("PANIC", fmt.Sprintf("%+v", err), "trace", trace)
 					}
 				}()
 				logger, commit, ctx, cancel := getLogger(ctx, info.FullMethod)
