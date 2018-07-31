@@ -75,6 +75,9 @@ func (d *Date) Set(t time.Time) {
 	*d = NewDate(t)
 }
 func (d Date) Get() (od time.Time, err error) {
+	//defer func() {
+	//	fmt.Printf("GET %q: %v (%+v)\n", string(d), od, err)
+	//}()
 	if d == "" {
 		return
 	}
