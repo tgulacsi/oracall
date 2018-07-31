@@ -103,7 +103,7 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 				pointer = "&"
 			}
 			if dir.IsOutput() {
-				if strings.HasSuffix(dst, "]") {
+				if !strings.HasPrefix(dst, "params[") {
 					return fmt.Sprintf(`%s, convErr := custom.Date(%s).Get()
 			if convErr != nil { // toOra D
 				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
