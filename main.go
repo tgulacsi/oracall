@@ -62,11 +62,12 @@ func main() {
 
 func Main(args []string) int {
 	os.Args = args
-	GopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
+
+	gopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
 
 	flag.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", true, "skip functions with missing TableOf info")
 	flagDump := flag.String("dump", "", "dump to this csv")
-	flagBaseDir := flag.String("base-dir", GopSrc, "base dir for the -pb-out, -db-out flags")
+	flagBaseDir := flag.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
 	flagGenerator := flag.String("protoc-gen", "gofast", "use protoc-gen-<generator>")
@@ -187,7 +188,7 @@ func Main(args []string) int {
 		goOut := *flagGenerator + "_out"
 		cmd := exec.Command(
 			"protoc",
-			"--proto_path="+GopSrc+":.",
+			"--proto_path="+*flagBaseDir+":.",
 			"--"+goOut+"=plugins=grpc:"+*flagBaseDir,
 			fn,
 		)
