@@ -20,6 +20,6 @@ require (
 	golang.org/x/text v0.3.0 // indirect
 	google.golang.org/genproto v0.0.0-20180722052100-02b4e9547331 // indirect
 	google.golang.org/grpc v1.13.0
-	gopkg.in/goracle.v2 v2.5.10
+	gopkg.in/goracle.v2 v2.7.0
 	gopkg.in/stack.v1 v1.7.0
 )
