@@ -56,5 +56,7 @@ gopkg.in/goracle.v2 v2.7.0 h1:gkHDNVYt+LgBxM9B+ftkurtTCvHQ4CVV0OEfaK888cg=
 gopkg.in/goracle.v2 v2.7.0/go.mod h1:P7H2i9qEUPNsdsM39SpnDZhkU/lvp5Rks9BrPdQJC0Q=
 gopkg.in/goracle.v2 v2.8.0 h1:0+o7dIOp9zVmnz0pu+FkAydCg1Rac4S0KP2SpifayQ4=
 gopkg.in/goracle.v2 v2.8.0/go.mod h1:P7H2i9qEUPNsdsM39SpnDZhkU/lvp5Rks9BrPdQJC0Q=
+gopkg.in/goracle.v2 v2.9.0 h1:U0xaanJK93ZmrL+hEbNQcAql5IxDb9VHB7lDepIRzrQ=
+gopkg.in/goracle.v2 v2.9.0/go.mod h1:P7H2i9qEUPNsdsM39SpnDZhkU/lvp5Rks9BrPdQJC0Q=
 gopkg.in/stack.v1 v1.7.0 h1:mHdJTxlEmhrTr3dka+FlxGOSaaQDDvCKXAUwR2vBBAg=
 gopkg.in/stack.v1 v1.7.0/go.mod h1:QtWz4C5wbvhA63ngux3942W/ppRxtyYjHvvhz02s7+M=
