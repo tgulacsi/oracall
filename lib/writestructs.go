@@ -101,10 +101,11 @@ type iterator struct {
 
 type oracallServer struct {
 	db *sql.DB
+	DBLog func(context.Context, *sql.DB, string, interface{}) error
 }
 
-func NewServer(db *sql.DB) *oracallServer {
-	return &oracallServer{db: db}
+func NewServer(db *sql.DB, dbLog func(context.Context, *sql.DB, string, interface{}) error) *oracallServer {
+	return &oracallServer{db: db, DBLog: dbLog}
 }
 
 `)

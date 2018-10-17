@@ -107,7 +107,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	var pls string
 	{
 		var i int
-		paramsMap := make(map[string][]int, 16)
+		paramsMap := make(map[string][]int, bytes.Count(plsBuf.Bytes(), []byte{':'}))
 		first := make(map[string]int, len(paramsMap))
 		pls, _ = goracle.MapToSlice(
 			plsBuf.String(),
@@ -125,8 +125,14 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
+const callText = `+"`%s`"+`
+if s.DBLog != nil {
+	if err := s.DBLog(ctx, s.db, callText, input); err != nil {
+		Log("dbLog", callText, "error", err)
+	}
+}
 if true || DebugLevel > 0 {
-	Log("calling", `+"`%s`"+`, "stmt", `+"`%s`"+`, "params", params)
+	Log("calling", callText, "stmt", `+"`%s`"+`, "params", params)
 }
 	qry := %s
 `,
