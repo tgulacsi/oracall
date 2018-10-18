@@ -125,17 +125,19 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
-const callText = `+"`%s`"+`
 if s.DBLog != nil {
-	if err := s.DBLog(ctx, s.db, callText, input); err != nil {
-		Log("dbLog", callText, "error", err)
+	const funName = "%s"
+	if err := s.DBLog(ctx, s.db, funName, input); err != nil {
+		Log("dbLog", funName, "error", err)
 	}
 }
+const callText = `+"`%s`"+`
 if true || DebugLevel > 0 {
 	Log("calling", callText, "stmt", `+"`%s`"+`, "params", params)
 }
 	qry := %s
 `,
+		fun.Name(),
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
 		fun.getPlsqlConstName())
 	callBuf.WriteString(`
