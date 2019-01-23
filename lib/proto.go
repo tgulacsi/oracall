@@ -59,11 +59,12 @@ FunLoop:
 	for _, fun := range functions {
 		fName := strings.ToLower(fun.name)
 		if err := fun.SaveProtobuf(w, seen); err != nil {
-			if SkipMissingTableOf && errors.Cause(err) == ErrMissingTableOf {
+			if SkipMissingTableOf && (errors.Cause(err) == ErrMissingTableOf ||
+				errors.Cause(err) == UnknownSimpleType) {
 				Log("msg", "SKIP function, missing TableOf info", "function", fName)
 				continue FunLoop
 			}
-			return err
+			return errors.WithMessage(err, fun.name)
 		}
 		var streamQual string
 		if fun.HasCursorOut() {
@@ -153,7 +154,10 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			rule = "repeated "
 		}
 		aName := arg.Name
-		got := arg.goType(false)
+		got, err := arg.GoType(false)
+		if err != nil {
+			return err
+		}
 		got = strings.TrimPrefix(got, "*")
 		if strings.HasPrefix(got, "[]") {
 			rule = "repeated "

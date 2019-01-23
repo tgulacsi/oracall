@@ -95,7 +95,7 @@ func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err 
 			return nil
 		})
 	}
-	functions, err = ParseArguments(filteredArgs)
+	functions, err = ParseArguments(filteredArgs, filter)
 	if err == nil {
 		err = grp.Wait()
 	}
@@ -203,7 +203,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	return err
 }
 
-func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err error) {
+func ParseArguments(userArgs <-chan UserArgument, filter func(string) bool) (functions []Function, err error) {
 	var (
 		prev, level uint8
 		fun         Function
@@ -211,12 +211,15 @@ func ParseArguments(userArgs <-chan UserArgument) (functions []Function, err err
 		lastArgs    = make([]*Argument, 0, 3)
 		row         int
 	)
-	functions = make([]Function, 0, 8)
+	functions = make([]Function, 0, 32)
 	seen := make(map[string]uint8, 64)
 	for ua := range userArgs {
 		row++
 		funName := ua.ObjectName
 		if funName[len(funName)-1] == '#' { //hidden
+			continue
+		}
+		if !filter(funName) {
 			continue
 		}
 		nameFun := Function{Package: ua.PackageName, name: ua.ObjectName}

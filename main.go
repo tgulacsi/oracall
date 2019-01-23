@@ -74,6 +74,7 @@ func Main(args []string) int {
 	flag.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
 	flag.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
+	flagExcept := flag.String("except", "", "except these functions")
 
 	flag.Parse()
 	if *flagPbOut == "" {
@@ -98,13 +99,33 @@ func Main(args []string) int {
 	var functions []oracall.Function
 	var err error
 
+	filters := [](func(string) bool){func(string) bool { return true }}
+	filter := func(s string) bool {
+		for _, f := range filters {
+			if !f(s) {
+				return false
+			}
+		}
+		return true
+	}
+	if *flagExcept != "" {
+		except := strings.Fields(*flagExcept)
+		filters = append(filters, func(s string) bool {
+			for _, e := range except {
+				if strings.EqualFold(e, s) {
+					return false
+				}
+			}
+			return true
+		})
+	}
+
 	if *flagConnect == "" {
-		var filter func(string) bool
 		if pattern != "%" {
 			rPattern := regexp.MustCompile("(?i)" + strings.Replace(strings.Replace(pattern, ".", "[.]", -1), "%", ".*", -1))
-			filter = func(s string) bool {
+			filters = append(filters, func(s string) bool {
 				return rPattern.MatchString(s)
-			}
+			})
 		}
 		functions, err = oracall.ParseCsvFile("", filter)
 	} else {
@@ -122,7 +143,7 @@ func Main(args []string) int {
 			return 1
 		}
 
-		functions, err = parseDB(cx, pattern, *flagDump)
+		functions, err = parseDB(cx, pattern, *flagDump, filter)
 	}
 	if err != nil {
 		Log("msg", "read", "file", flag.Arg(0), "error", err)
@@ -207,7 +228,7 @@ func Main(args []string) int {
 	return 0
 }
 
-func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, err error) {
+func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, err error) {
 	tbl := "user_arguments"
 	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
 		tbl = "all_arguments"
@@ -405,7 +426,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 		}
 		return nil
 	})
-	functions, err = oracall.ParseArguments(userArgs)
+	functions, err = oracall.ParseArguments(userArgs, filter)
 	if grpErr := grp.Wait(); grpErr != nil {
 		if err == nil {
 			err = grpErr
@@ -421,7 +442,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string) (functions []oracall.Function, 
 	for i, f := range functions {
 		if f.Documentation == "" {
 			if f.Documentation = docs[f.Name()]; f.Documentation == "" {
-				logger.Log("msg", "No documentation", "function", f.Name())
+				//logger.Log("msg", "No documentation", "function", f.Name())
 				any = true
 			} else {
 				functions[i] = f

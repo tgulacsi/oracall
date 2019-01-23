@@ -123,7 +123,8 @@ FunLoop:
 		var checkName string
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(structW, dir); err != nil {
-				if SkipMissingTableOf && errors.Cause(err) == ErrMissingTableOf {
+				if SkipMissingTableOf && (errors.Cause(err) == ErrMissingTableOf ||
+					errors.Cause(err) == UnknownSimpleType) {
 					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name(), "error", err)
 					continue FunLoop
 				}
@@ -222,7 +223,9 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		}
 		//aName = capitalize(goName(arg.Name))
 		aName = capitalize(replHidden(arg.Name))
-		got = arg.goType(arg.Flavor == FLAVOR_TABLE)
+		if got, err = arg.GoType(arg.Flavor == FLAVOR_TABLE); err != nil {
+			return errors.Wrap(err, arg.Name)
+		}
 		if got == "" || got == "*" {
 			got = got + mkRecTypName(arg.Name)
 		}
@@ -410,8 +413,17 @@ func capitalize(text string) string {
 	return strings.ToUpper(text[:1]) + strings.ToLower(text[1:])
 }
 
+var UnknownSimpleType = errors.New("unknown simple type")
+
 // returns a go type for the argument's type
 func (arg *Argument) goType(isTable bool) (typName string) {
+	var err error
+	if typName, err = arg.GoType(isTable); err != nil {
+		panic(err)
+	}
+	return typName
+}
+func (arg *Argument) GoType(isTable bool) (typName string, err error) {
 	defer func() {
 		if strings.HasPrefix(typName, "**") {
 			typName = typName[1:]
@@ -425,9 +437,9 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 	// cached?
 	if arg.goTypeName != "" {
 		if strings.Index(arg.goTypeName, "__") > 0 {
-			return "*" + arg.goTypeName
+			return "*" + arg.goTypeName, nil
 		}
-		return arg.goTypeName
+		return arg.goTypeName, nil
 	}
 	defer func() {
 		// cache it
@@ -437,41 +449,40 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2", "ROWID":
 			if !isTable && arg.IsOutput() {
-				//return "*string"
-				return "string"
+				//return "*string", nil
+				return "string", nil
 			}
-			return "string" // NULL is the same as the empty string for Oracle
+			return "string", nil // NULL is the same as the empty string for Oracle
 		case "RAW":
-			return "string"
+			return "string", nil
 		case "NUMBER":
-			return "goracle.Number"
+			return "goracle.Number", nil
 		case "INTEGER":
 			if !isTable && arg.IsOutput() {
-				return "*int64"
+				return "*int64", nil
 			}
-			return "int64"
+			return "int64", nil
 		case "PLS_INTEGER", "BINARY_INTEGER":
 			if !isTable && arg.IsOutput() {
-				//return "*int32"
-				return "int32"
+				//return "*int32", nil
+				return "int32", nil
 			}
-			return "int32"
+			return "int32", nil
 		case "BOOLEAN", "PL/SQL BOOLEAN":
 			if !isTable && arg.IsOutput() {
-				return "*bool"
+				return "*bool", nil
 			}
-			return "bool"
+			return "bool", nil
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
-			return "custom.Date"
+			return "custom.Date", nil
 		case "REF CURSOR":
-			return "*sql.Rows"
+			return "*sql.Rows", nil
 		case "CLOB", "BLOB":
-			return "goracle.Lob"
+			return "goracle.Lob", nil
 		case "BFILE":
-			return "ora.Bfile"
+			return "ora.Bfile", nil
 		default:
-			Log("error", fmt.Sprintf("%+v", errors.New("unknown simple type")), "type", arg.Type, "arg", fmt.Sprintf("%#v", arg))
-			os.Exit(1)
+			return "", errors.Wrap(UnknownSimpleType, arg.Type)
 		}
 	}
 	typName = arg.TypeName
@@ -493,15 +504,15 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		tn := "[]" + targ.goType(true)
 		if arg.Type != "REF CURSOR" {
 			if arg.IsOutput() && arg.TableOf.Flavor == FLAVOR_SIMPLE {
-				return "*" + tn
+				return "*" + tn, nil
 			}
-			return tn
+			return tn, nil
 		}
 		cn := tn[2:]
 		if cn[0] == '*' {
 			cn = cn[1:]
 		}
-		return cn
+		return cn, nil
 	}
 
 	// FLAVOR_RECORD
@@ -509,7 +520,7 @@ func (arg *Argument) goType(isTable bool) (typName string) {
 		Log("msg", "arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
-	return "*" + typName
+	return "*" + typName, nil
 }
 
 func replHidden(text string) string {
