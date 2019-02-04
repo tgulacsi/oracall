@@ -16,10 +16,11 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
 	github.com/tgulacsi/go v0.2.3
+	golang.org/x/net v0.0.0-20181114220301-adae6a3d119a // indirect
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/text v0.3.0 // indirect
 	google.golang.org/genproto v0.0.0-20180722052100-02b4e9547331 // indirect
 	google.golang.org/grpc v1.13.0
-	gopkg.in/goracle.v2 v2.10.2
+	gopkg.in/goracle.v2 v2.12.1
 	gopkg.in/stack.v1 v1.7.0
 )
