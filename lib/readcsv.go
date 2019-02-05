@@ -205,104 +205,107 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 }
 
 func ParseArguments(userArgs <-chan UserArgument, filter func(string) bool) (functions []Function, err error) {
-	var (
-		prev, level uint8
-		fun         Function
-		args        = make([]Argument, 0, 16)
-		lastArgs    = make([]*Argument, 0, 3)
-		row         int
-	)
-	functions = make([]Function, 0, 32)
+	// Split args by functions
+	funArgs := make([][]UserArgument, 0, 16)
+	usrArgs := make([]UserArgument, 0, 16)
 	seen := make(map[string]uint8, 64)
+	var prevFunName string
 	for ua := range userArgs {
-		row++
-		funName := ua.ObjectName
-		if funName[len(funName)-1] == '#' { //hidden
+		if ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
+			filter != nil && !filter(ua.ObjectName) {
 			continue
 		}
-		if filter != nil && !filter(funName) {
-			continue
-		}
-		nameFun := Function{Package: ua.PackageName, name: ua.ObjectName}
-		funName = nameFun.Name()
+		usrArgs = append(usrArgs, ua)
+		funName := Function{Package: ua.PackageName, name: ua.ObjectName}.Name()
 		if seen[funName] > 1 {
 			Log("msg", "function "+funName+" already seen! skipping...")
-			//continue
+			continue
 		}
-		if fun.Name() == "" || funName != fun.Name() { //new (differs from prev record
+		//Log("funName", funName, "prevFunName", prevFunName, "usrArgs", len(usrArgs))
+		if prevFunName == "" || funName != prevFunName { //new (differs from prev record
 			seen[funName]++
-			//Log("msg", "ParseArguments", "old", fun.Name(), "new", funName, "seen", seen[funName])
-			//Log("msg", "New function "+funName)
-			if fun.name != "" {
-				x := fun // copy
-				x.Args = append(make([]Argument, 0, len(args)), args...)
-				functions = append(functions, x)
+			prevFunName = funName
+			if funName != prevFunName {
+				funArgs = append(funArgs, usrArgs)
+				usrArgs = make([]UserArgument, 0, 16)
 			}
-			if seen[funName] > 1 {
-				continue
-			}
-			fun = Function{Package: ua.PackageName, name: ua.ObjectName}
-			args = args[:0]
-			lastArgs = lastArgs[:0]
 		}
-		level = ua.DataLevel
-		arg := NewArgument(ua.ArgumentName,
-			ua.DataType,
-			ua.PlsType,
-			ua.TypeOwner+"."+ua.TypeName+"."+ua.TypeSubname+"@"+ua.TypeLink,
-			ua.InOut,
-			0,
-			ua.CharacterSetName,
-			ua.DataPrecision,
-			ua.DataScale,
-			ua.CharLength,
-		)
-		// Possibilities:
-		// 1. SIMPLE
-		// 2. RECORD at level 0
-		// 3. TABLE OF simple
-		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-		//Log("msg", "ParseArguments", "level", level, "arg", arg)
-		if level == 0 {
-			if len(args) == 0 && arg.Name == "" {
-				arg.Name = "ret"
-				fun.Returns = &arg
-			} else {
-				args = append(args, arg)
+	}
+	if len(usrArgs) != 0 {
+		funArgs = append(funArgs, usrArgs)
+	}
+
+	functions = make([]Function, 0, len(funArgs))
+	var row int
+	for _, usrArgs = range funArgs {
+		var fun Function
+		args := make([]Argument, 0, len(usrArgs))
+		lastArgs := make([]*Argument, 0, 3)
+		var prev, level uint8
+		Log("usrArgs", usrArgs)
+		for i, ua := range usrArgs {
+			row++
+			if i == 0 {
+				fun = Function{Package: ua.PackageName, name: ua.ObjectName}
 			}
-		} else {
-			lastArgs = lastArgs[:level]
-			lastArg := lastArgs[level-1]
-			if lastArg == nil {
-				Log("msg", "lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
-				return functions, errors.Wrapf(errors.New("lastArg is nil"), "level=%d fun.Args=%v ua=%v", level, fun.Args, ua)
-			}
-			Log("lastArg", lastArg, "arg", arg, "flavor", lastArg.Flavor == FLAVOR_TABLE, "prev", prev, "level", level)
-			if prev >= level {
-				lastArg.RecordOf = nil
-			}
-			if prev < level {
-				if lastArg.Flavor == FLAVOR_TABLE {
-					lastArg.TableOf = &arg
+
+			level = ua.DataLevel
+			arg := NewArgument(ua.ArgumentName,
+				ua.DataType,
+				ua.PlsType,
+				ua.TypeOwner+"."+ua.TypeName+"."+ua.TypeSubname+"@"+ua.TypeLink,
+				ua.InOut,
+				0,
+				ua.CharacterSetName,
+				ua.DataPrecision,
+				ua.DataScale,
+				ua.CharLength,
+			)
+			// Possibilities:
+			// 1. SIMPLE
+			// 2. RECORD at level 0
+			// 3. TABLE OF simple
+			// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
+			Log("msg", "ParseArguments", "level", level, "arg", arg)
+			if level == 0 {
+				if len(args) == 0 && arg.Name == "" {
+					arg.Name = "ret"
+					fun.Returns = &arg
 				} else {
-					lastArg.RecordOf = append(lastArg.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
+					args = append(args, arg)
+				}
+			} else {
+				lastArgs = lastArgs[:level]
+				lastArg := lastArgs[level-1]
+				if lastArg == nil {
+					Log("msg", "lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
+					return functions, errors.Wrapf(errors.New("lastArg is nil"), "level=%d fun.Args=%v ua=%v", level, fun.Args, ua)
+				}
+				Log("lastArg", lastArg, "arg", arg, "flavor", lastArg.Flavor == FLAVOR_TABLE, "prev", prev, "level", level)
+				if prev >= level {
+					lastArg.RecordOf = nil
+				}
+				if prev < level {
+					if lastArg.Flavor == FLAVOR_TABLE {
+						lastArg.TableOf = &arg
+					} else {
+						lastArg.RecordOf = append(lastArg.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
+					}
+				}
+				// copy back to root
+				if len(args) > 0 {
+					args[len(args)-1] = *lastArgs[0]
 				}
 			}
-			// copy back to root
-			if len(args) > 0 {
-				args[len(args)-1] = *lastArgs[0]
+			if arg.Flavor != FLAVOR_SIMPLE {
+				lastArgs = append(lastArgs[:level], &arg)
 			}
+			prev = level
 		}
-		if arg.Flavor != FLAVOR_SIMPLE {
-			lastArgs = append(lastArgs[:level], &arg)
-		}
-		prev = level
-	}
-	if fun.name != "" {
 		fun.Args = args
 		functions = append(functions, fun)
 	}
-	Log("msg", fmt.Sprintf("found %d functions (from %d args).", len(functions), row))
+	Log("msg", fmt.Sprintf("found %d functions.", len(functions)))
 	return
 }
 

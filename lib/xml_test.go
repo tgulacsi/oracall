@@ -17,6 +17,7 @@ limitations under the License.
 package oracall
 
 import (
+	"encoding/xml"
 	"fmt"
 	"strings"
 	"testing"
@@ -47,7 +48,11 @@ func TestQuery078(t *testing.T) {
 	if len(functions) != 1 {
 		t.Errorf("parsed %d functions, wanted %d!", len(functions), 1)
 	}
-	t.Logf("functions: %s", functions[0])
+	b, err := xml.Marshal(functions[0])
+	if err != nil {
+		t.Fatal(functions[0], err)
+	}
+	t.Logf("functions: %s", b)
 	var buf strings.Builder
 	if err = SaveProtobuf(&buf, functions, "spl3"); err != nil {
 		t.Fatal(err)
