@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -219,7 +220,7 @@ func ParseArguments(userArgs <-chan UserArgument, filter func(string) bool) (fun
 		if funName[len(funName)-1] == '#' { //hidden
 			continue
 		}
-		if !filter(funName) {
+		if filter != nil && !filter(funName) {
 			continue
 		}
 		nameFun := Function{Package: ua.PackageName, name: ua.ObjectName}
@@ -274,15 +275,18 @@ func ParseArguments(userArgs <-chan UserArgument, filter func(string) bool) (fun
 			lastArg := lastArgs[level-1]
 			if lastArg == nil {
 				Log("msg", "lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
-				os.Exit(1)
+				return functions, errors.Wrapf(errors.New("lastArg is nil"), "level=%d fun.Args=%v ua=%v", level, fun.Args, ua)
 			}
-			if prev != level {
+			Log("lastArg", lastArg, "arg", arg, "flavor", lastArg.Flavor == FLAVOR_TABLE, "prev", prev, "level", level)
+			if prev >= level {
 				lastArg.RecordOf = nil
 			}
-			if lastArg.Flavor == FLAVOR_TABLE {
-				lastArg.TableOf = &arg
-			} else {
-				lastArg.RecordOf = append(lastArg.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
+			if prev < level {
+				if lastArg.Flavor == FLAVOR_TABLE {
+					lastArg.TableOf = &arg
+				} else {
+					lastArg.RecordOf = append(lastArg.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
+				}
 			}
 			// copy back to root
 			if len(args) > 0 {

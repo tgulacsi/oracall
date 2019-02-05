@@ -17,11 +17,28 @@ limitations under the License.
 package oracall
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestQuery078(t *testing.T) {
+	Log = func(keyvals ...interface{}) error {
+		var buf strings.Builder
+		var tmp strings.Builder
+		for i := 0; i < len(keyvals); i += 2 {
+			tmp.Reset()
+			fmt.Fprintf(&tmp, "%+v", keyvals[i+1])
+			v := strings.ReplaceAll(tmp.String(), "\"", "\\\"")
+			if strings.Contains(v, " ") {
+				fmt.Fprintf(&buf, "%s=\"%s\" ", keyvals[i], v)
+			} else {
+				fmt.Fprintf(&buf, "%s=%s ", keyvals[i], v)
+			}
+		}
+		t.Log(buf.String())
+		return nil
+	}
 	functions, err := ParseCsv(strings.NewReader(query078Csv), nil)
 	if err != nil {
 		t.Errorf("error parsing csv: %v", err)
@@ -30,6 +47,12 @@ func TestQuery078(t *testing.T) {
 	if len(functions) != 1 {
 		t.Errorf("parsed %d functions, wanted %d!", len(functions), 1)
 	}
+	t.Logf("functions: %s", functions[0])
+	var buf strings.Builder
+	if err = SaveProtobuf(&buf, functions, "spl3"); err != nil {
+		t.Fatal(err)
+	}
+	t.Log(buf.String())
 }
 
 const query078Csv = `OBJECT_ID,SUBPROGRAM_ID,SEQUENCE,PACKAGE_NAME,OBJECT_NAME,DATA_LEVEL,POSITION,ARGUMENT_NAME,IN_OUT,DATA_TYPE,DATA_PRECISION,DATA_SCALE,CHARACTER_SET_NAME,PLS_TYPE,CHAR_LENGTH,TYPE_OWNER,TYPE_NAME,TYPE_SUBNAME,TYPE_LINK
