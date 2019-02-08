@@ -80,17 +80,17 @@ func ParseCsvFile(filename string, filter func(string) bool) (functions []Functi
 
 // ParseCsv parses the csv
 func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err error) {
-	userArgs := make(chan UserArgument, 16)
+	userArgs := make(chan []UserArgument, 16)
 	var grp errgroup.Group
 	grp.Go(func() error { return ReadCsv(userArgs, r) })
 	filteredArgs := userArgs
 	if filter != nil {
-		filteredArgs = make(chan UserArgument, 16)
+		filteredArgs = make(chan []UserArgument, 16)
 		grp.Go(func() error {
 			defer close(filteredArgs)
-			for ua := range userArgs {
-				if filter(ua.PackageName + "." + ua.ObjectName) {
-					filteredArgs <- ua
+			for uas := range userArgs {
+				if len(uas) != 0 && filter(uas[0].PackageName+"."+uas[0].ObjectName) {
+					filteredArgs <- uas
 				}
 			}
 			return nil
@@ -125,8 +125,9 @@ func MustOpenCsv(filename string) *os.File {
 	return fh
 }
 
-// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel
-func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
+// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel,
+// grouping the args by function (object_id/subprogram_id/package_name/subprogram_name).
+func ReadCsv(userArgs chan<- []UserArgument, r io.Reader) error {
 	defer close(userArgs)
 
 	var err error
@@ -166,6 +167,11 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	}
 	Log("msg", "field order", "fields", csvFields)
 
+	var args []UserArgument
+	var lastProg struct {
+		ObjectID, SubprogramID  uint
+		PackageName, ObjectName string
+	}
 	for {
 		rec, err = csvr.Read()
 		Log("rec", rec, "err", err)
@@ -175,7 +181,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			}
 			break
 		}
-		userArgs <- UserArgument{
+		arg := UserArgument{
 			ObjectID:     mustBeUint(rec[csvFields["OBJECT_ID"]]),
 			SubprogramID: mustBeUint(rec[csvFields["SUBPROGRAM_ID"]]),
 
@@ -200,50 +206,40 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			TypeName:    rec[csvFields["TYPE_NAME"]],
 			TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
 		}
+
+		if lastProg.ObjectID == 0 && lastProg.SubprogramID == 0 && lastProg.PackageName == "" && lastProg.ObjectName == "" ||
+			!(lastProg.ObjectID == arg.ObjectID && lastProg.SubprogramID == arg.SubprogramID &&
+				lastProg.PackageName == arg.PackageName && lastProg.ObjectName == arg.ObjectName) {
+			if len(args) != 0 {
+				userArgs <- args
+				args = make([]UserArgument, 0, cap(args))
+			}
+			lastProg.ObjectID, lastProg.SubprogramID, lastProg.PackageName, lastProg.ObjectName =
+				arg.ObjectID, arg.SubprogramID, arg.PackageName, arg.ObjectName
+		}
+		args = append(args, arg)
+	}
+	if len(args) != 0 {
+		userArgs <- args
 	}
 	return err
 }
 
-func ParseArguments(userArgs <-chan UserArgument, filter func(string) bool) (functions []Function, err error) {
+func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (functions []Function, err error) {
 	// Split args by functions
-	funArgs := make([][]UserArgument, 0, 16)
-	usrArgs := make([]UserArgument, 0, 16)
-	seen := make(map[string]uint8, 64)
-	var prevFunName string
-	for ua := range userArgs {
-		if ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
+	var row int
+	for uas := range userArgs {
+		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
 			filter != nil && !filter(ua.ObjectName) {
 			continue
 		}
-		usrArgs = append(usrArgs, ua)
-		funName := Function{Package: ua.PackageName, name: ua.ObjectName}.Name()
-		if seen[funName] > 1 {
-			Log("msg", "function "+funName+" already seen! skipping...")
-			continue
-		}
-		//Log("funName", funName, "prevFunName", prevFunName, "usrArgs", len(usrArgs))
-		if prevFunName == "" || funName != prevFunName { //new (differs from prev record
-			seen[funName]++
-			prevFunName = funName
-			if funName != prevFunName {
-				funArgs = append(funArgs, usrArgs)
-				usrArgs = make([]UserArgument, 0, 16)
-			}
-		}
-	}
-	if len(usrArgs) != 0 {
-		funArgs = append(funArgs, usrArgs)
-	}
 
-	functions = make([]Function, 0, len(funArgs))
-	var row int
-	for _, usrArgs = range funArgs {
 		var fun Function
-		args := make([]Argument, 0, len(usrArgs))
+		args := make([]Argument, 0, len(uas))
 		lastArgs := make([]*Argument, 0, 3)
 		var prev, level uint8
-		Log("usrArgs", usrArgs)
-		for i, ua := range usrArgs {
+		Log("usrArgs", uas)
+		for i, ua := range uas {
 			row++
 			if i == 0 {
 				fun = Function{Package: ua.PackageName, name: ua.ObjectName}
