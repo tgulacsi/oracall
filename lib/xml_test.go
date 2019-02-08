@@ -48,12 +48,14 @@ func TestQuery078(t *testing.T) {
 	if len(functions) != 1 {
 		t.Errorf("parsed %d functions, wanted %d!", len(functions), 1)
 	}
-	b, err := xml.Marshal(functions[0])
-	if err != nil {
+	var buf strings.Builder
+	enc := xml.NewEncoder(&buf)
+	enc.Indent("", "  ")
+	if err := enc.Encode(functions[0]); err != nil {
 		t.Fatal(functions[0], err)
 	}
-	t.Logf("functions: %s", b)
-	var buf strings.Builder
+	t.Logf("functions: %s", buf.String())
+	buf.Reset()
 	if err = SaveProtobuf(&buf, functions, "spl3"); err != nil {
 		t.Fatal(err)
 	}

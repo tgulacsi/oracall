@@ -266,7 +266,7 @@ func ParseArguments(userArgs <-chan UserArgument, filter func(string) bool) (fun
 			// 2. RECORD at level 0
 			// 3. TABLE OF simple
 			// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-			Log("msg", "ParseArguments", "level", level, "arg", arg)
+			Log("msg", "ParseArguments", "level", level, "prev", prev, "arg", arg)
 			if level == 0 {
 				if len(args) == 0 && arg.Name == "" {
 					arg.Name = "ret"
@@ -281,17 +281,14 @@ func ParseArguments(userArgs <-chan UserArgument, filter func(string) bool) (fun
 					Log("msg", "lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
 					return functions, errors.Wrapf(errors.New("lastArg is nil"), "level=%d fun.Args=%v ua=%v", level, fun.Args, ua)
 				}
-				Log("lastArg", lastArg, "arg", arg, "flavor", lastArg.Flavor == FLAVOR_TABLE, "prev", prev, "level", level)
-				if prev >= level {
-					lastArg.RecordOf = nil
-				}
-				if prev < level {
+				if prev <= level {
 					if lastArg.Flavor == FLAVOR_TABLE {
 						lastArg.TableOf = &arg
 					} else {
 						lastArg.RecordOf = append(lastArg.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
 					}
 				}
+				Log("lastArg", lastArg)
 				// copy back to root
 				if len(args) > 0 {
 					args[len(args)-1] = *lastArgs[0]
