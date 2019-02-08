@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -225,6 +224,12 @@ func ReadCsv(userArgs chan<- []UserArgument, r io.Reader) error {
 	return err
 }
 
+func reverseArguments(args []Argument) {
+	for i, j := 0, len(args)-1; i < j; i, j = i+1, j-1 {
+		args[i], args[j] = args[j], args[i]
+	}
+}
+
 func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (functions []Function, err error) {
 	// Split args by functions
 	var row int
@@ -236,9 +241,13 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 
 		var fun Function
 		args := make([]Argument, 0, len(uas))
-		lastArgs := make([]*Argument, 0, 3)
+		scratch := make([]Argument, 0, len(uas))
 		var prev, level uint8
-		Log("usrArgs", uas)
+		//Log("usrArgs", uas)
+		// Reverse arguments
+		for i, j := 0, len(uas)-1; i < j; i, j = i+1, j-1 {
+			uas[i], uas[j] = uas[j], uas[i]
+		}
 		for i, ua := range uas {
 			row++
 			if i == 0 {
@@ -262,39 +271,38 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 			// 2. RECORD at level 0
 			// 3. TABLE OF simple
 			// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-			Log("msg", "ParseArguments", "level", level, "prev", prev, "arg", arg)
-			if level == 0 {
-				if len(args) == 0 && arg.Name == "" {
-					arg.Name = "ret"
-					fun.Returns = &arg
+			//Log("msg", "ParseArguments", "level", level, "prev", prev, "arg", arg)
+			if level == 0 && len(args) == 0 && arg.Name == "" {
+				arg.Name = "ret"
+				fun.Returns = &arg
+			}
+			if level != prev {
+				reverseArguments(scratch)
+				//Log("scratch", scratch, "arg", arg, "isTable?", arg.Flavor == FLAVOR_TABLE)
+				if arg.Flavor == FLAVOR_TABLE {
+					arg.TableOf = &scratch[0]
 				} else {
-					args = append(args, arg)
-				}
-			} else {
-				lastArgs = lastArgs[:level]
-				lastArg := lastArgs[level-1]
-				if lastArg == nil {
-					Log("msg", "lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
-					return functions, errors.Wrapf(errors.New("lastArg is nil"), "level=%d fun.Args=%v ua=%v", level, fun.Args, ua)
-				}
-				if prev <= level {
-					if lastArg.Flavor == FLAVOR_TABLE {
-						lastArg.TableOf = &arg
-					} else {
-						lastArg.RecordOf = append(lastArg.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
+					arg.RecordOf = make([]NamedArgument, len(scratch))
+					for i, a := range scratch {
+						arg.RecordOf[i] = NamedArgument{Name: a.Name, Argument: a}
 					}
 				}
-				Log("lastArg", lastArg)
-				// copy back to root
-				if len(args) > 0 {
-					args[len(args)-1] = *lastArgs[0]
+				scratch = make([]Argument, 0, cap(scratch))
+				if level == 0 {
+					args = append(args, arg)
+				} else {
+					scratch = append(scratch, arg)
 				}
-			}
-			if arg.Flavor != FLAVOR_SIMPLE {
-				lastArgs = append(lastArgs[:level], &arg)
+			} else {
+				if level == 0 {
+					args = append(args, arg)
+				} else {
+					scratch = append(scratch, arg)
+				}
 			}
 			prev = level
 		}
+		reverseArguments(args)
 		fun.Args = args
 		functions = append(functions, fun)
 	}
