@@ -54,7 +54,10 @@ func TestQuery078(t *testing.T) {
 	if err := enc.Encode(functions[0]); err != nil {
 		t.Fatal(functions[0], err)
 	}
-	t.Logf("functions: %s", buf.String())
+	if x := buf.String(); x != query078WantXML {
+		t.Errorf("got %s\n\twanted %s", x, query078WantXML)
+	}
+
 	buf.Reset()
 	if err = SaveProtobuf(&buf, functions, "spl3"); err != nil {
 		t.Fatal(err)
@@ -83,3 +86,248 @@ const query078Csv = `OBJECT_ID,SUBPROGRAM_ID,SEQUENCE,PACKAGE_NAME,OBJECT_NAME,D
 35325,81,18,DB_SPOOLSYS3,QUERY_078,4,3,F_ISIN,OUT,VARCHAR2,,,CHAR_CS,VARCHAR2,12,,,,
 35325,81,19,DB_SPOOLSYS3,QUERY_078,4,4,UNIT_DB,OUT,NUMBER,24,12,,NUMBER,0,,,,
 35325,81,20,DB_SPOOLSYS3,QUERY_078,4,5,UNIT_ARF,OUT,NUMBER,24,12,,NUMBER,0,,,,`
+
+const query078WantXML = `<Function>
+  <Package>DB_SPOOLSYS3</Package>
+  <Args>
+    <Name>p_szerz_azon</Name>
+    <Type>NUMBER</Type>
+    <TypeName></TypeName>
+    <AbsType>NUMBER(9)</AbsType>
+    <Charset></Charset>
+    <Charlength>0</Charlength>
+    <Flavor>0</Flavor>
+    <Direction>1</Direction>
+    <Precision>9</Precision>
+    <Scale>0</Scale>
+  </Args>
+  <Args>
+    <Name>p_output</Name>
+    <Type>PL/SQL TABLE</Type>
+    <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTLIST_078</TypeName>
+    <AbsType>PL/SQL TABLE</AbsType>
+    <Charset></Charset>
+    <Charlength>0</Charlength>
+    <TableOf>
+      <RecordOf>
+        <Name>tranz_kezdete</Name>
+        <Type>DATE</Type>
+        <TypeName></TypeName>
+        <AbsType>DATE</AbsType>
+        <Charset></Charset>
+        <Charlength>0</Charlength>
+        <Flavor>0</Flavor>
+        <Direction>2</Direction>
+        <Precision>0</Precision>
+        <Scale>0</Scale>
+      </RecordOf>
+      <RecordOf>
+        <Name>tranz_vege</Name>
+        <Type>DATE</Type>
+        <TypeName></TypeName>
+        <AbsType>DATE</AbsType>
+        <Charset></Charset>
+        <Charlength>0</Charlength>
+        <Flavor>0</Flavor>
+        <Direction>2</Direction>
+        <Precision>0</Precision>
+        <Scale>0</Scale>
+      </RecordOf>
+      <RecordOf>
+        <Name>koltseg</Name>
+        <Type>NUMBER</Type>
+        <TypeName></TypeName>
+        <AbsType>NUMBER(12, 5)</AbsType>
+        <Charset></Charset>
+        <Charlength>0</Charlength>
+        <Flavor>0</Flavor>
+        <Direction>2</Direction>
+        <Precision>12</Precision>
+        <Scale>5</Scale>
+      </RecordOf>
+      <RecordOf>
+        <Name>ertekesitett_alapok</Name>
+        <Type>PL/SQL TABLE</Type>
+        <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTLIST_UNIT</TypeName>
+        <AbsType>PL/SQL TABLE</AbsType>
+        <Charset></Charset>
+        <Charlength>0</Charlength>
+        <TableOf>
+          <RecordOf>
+            <Name>f_unit_rnev</Name>
+            <Type>VARCHAR2</Type>
+            <TypeName></TypeName>
+            <AbsType>VARCHAR2(6)</AbsType>
+            <Charset>CHAR_CS</Charset>
+            <Charlength>6</Charlength>
+            <Flavor>0</Flavor>
+            <Direction>2</Direction>
+            <Precision>0</Precision>
+            <Scale>0</Scale>
+          </RecordOf>
+          <RecordOf>
+            <Name>f_unit_nev</Name>
+            <Type>VARCHAR2</Type>
+            <TypeName></TypeName>
+            <AbsType>VARCHAR2(40)</AbsType>
+            <Charset>CHAR_CS</Charset>
+            <Charlength>40</Charlength>
+            <Flavor>0</Flavor>
+            <Direction>2</Direction>
+            <Precision>0</Precision>
+            <Scale>0</Scale>
+          </RecordOf>
+          <RecordOf>
+            <Name>f_isin</Name>
+            <Type>VARCHAR2</Type>
+            <TypeName></TypeName>
+            <AbsType>VARCHAR2(12)</AbsType>
+            <Charset>CHAR_CS</Charset>
+            <Charlength>12</Charlength>
+            <Flavor>0</Flavor>
+            <Direction>2</Direction>
+            <Precision>0</Precision>
+            <Scale>0</Scale>
+          </RecordOf>
+          <RecordOf>
+            <Name>unit_db</Name>
+            <Type>NUMBER</Type>
+            <TypeName></TypeName>
+            <AbsType>NUMBER(24, 12)</AbsType>
+            <Charset></Charset>
+            <Charlength>0</Charlength>
+            <Flavor>0</Flavor>
+            <Direction>2</Direction>
+            <Precision>24</Precision>
+            <Scale>12</Scale>
+          </RecordOf>
+          <RecordOf>
+            <Name>unit_arf</Name>
+            <RecordOf>
+              <Name>vasarolt_alapok</Name>
+              <Type>PL/SQL TABLE</Type>
+              <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTLIST_UNIT</TypeName>
+              <AbsType>PL/SQL TABLE</AbsType>
+              <Charset></Charset>
+              <Charlength>0</Charlength>
+              <TableOf>
+                <RecordOf>
+                  <Name>f_unit_rnev</Name>
+                  <Type>VARCHAR2</Type>
+                  <TypeName></TypeName>
+                  <AbsType>VARCHAR2(6)</AbsType>
+                  <Charset>CHAR_CS</Charset>
+                  <Charlength>6</Charlength>
+                  <Flavor>0</Flavor>
+                  <Direction>2</Direction>
+                  <Precision>0</Precision>
+                  <Scale>0</Scale>
+                </RecordOf>
+                <RecordOf>
+                  <Name>f_unit_nev</Name>
+                  <Type>VARCHAR2</Type>
+                  <TypeName></TypeName>
+                  <AbsType>VARCHAR2(40)</AbsType>
+                  <Charset>CHAR_CS</Charset>
+                  <Charlength>40</Charlength>
+                  <Flavor>0</Flavor>
+                  <Direction>2</Direction>
+                  <Precision>0</Precision>
+                  <Scale>0</Scale>
+                </RecordOf>
+                <RecordOf>
+                  <Name>f_isin</Name>
+                  <Type>VARCHAR2</Type>
+                  <TypeName></TypeName>
+                  <AbsType>VARCHAR2(12)</AbsType>
+                  <Charset>CHAR_CS</Charset>
+                  <Charlength>12</Charlength>
+                  <Flavor>0</Flavor>
+                  <Direction>2</Direction>
+                  <Precision>0</Precision>
+                  <Scale>0</Scale>
+                </RecordOf>
+                <RecordOf>
+                  <Name>unit_db</Name>
+                  <Type>NUMBER</Type>
+                  <TypeName></TypeName>
+                  <AbsType>NUMBER(24, 12)</AbsType>
+                  <Charset></Charset>
+                  <Charlength>0</Charlength>
+                  <Flavor>0</Flavor>
+                  <Direction>2</Direction>
+                  <Precision>24</Precision>
+                  <Scale>12</Scale>
+                </RecordOf>
+                <RecordOf>
+                  <Name>unit_arf</Name>
+                  <Type>NUMBER</Type>
+                  <TypeName></TypeName>
+                  <AbsType>NUMBER(24, 12)</AbsType>
+                  <Charset></Charset>
+                  <Charlength>0</Charlength>
+                  <Flavor>0</Flavor>
+                  <Direction>2</Direction>
+                  <Precision>24</Precision>
+                  <Scale>12</Scale>
+                </RecordOf>
+                <Name></Name>
+                <Type>PL/SQL RECORD</Type>
+                <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTPUT_UNIT</TypeName>
+                <AbsType>PL/SQL RECORD</AbsType>
+                <Charset></Charset>
+                <Charlength>0</Charlength>
+                <Flavor>1</Flavor>
+                <Direction>2</Direction>
+                <Precision>0</Precision>
+                <Scale>0</Scale>
+              </TableOf>
+              <Flavor>2</Flavor>
+              <Direction>2</Direction>
+              <Precision>0</Precision>
+              <Scale>0</Scale>
+            </RecordOf>
+            <Type>NUMBER</Type>
+            <TypeName></TypeName>
+            <AbsType>NUMBER(24, 12)</AbsType>
+            <Charset></Charset>
+            <Charlength>0</Charlength>
+            <Flavor>0</Flavor>
+            <Direction>2</Direction>
+            <Precision>24</Precision>
+            <Scale>12</Scale>
+          </RecordOf>
+          <Name></Name>
+          <Type>PL/SQL RECORD</Type>
+          <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTPUT_UNIT</TypeName>
+          <AbsType>PL/SQL RECORD</AbsType>
+          <Charset></Charset>
+          <Charlength>0</Charlength>
+          <Flavor>1</Flavor>
+          <Direction>2</Direction>
+          <Precision>0</Precision>
+          <Scale>0</Scale>
+        </TableOf>
+        <Flavor>2</Flavor>
+        <Direction>2</Direction>
+        <Precision>0</Precision>
+        <Scale>0</Scale>
+      </RecordOf>
+      <Name></Name>
+      <Type>PL/SQL RECORD</Type>
+      <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_078</TypeName>
+      <AbsType>PL/SQL RECORD</AbsType>
+      <Charset></Charset>
+      <Charlength>0</Charlength>
+      <Flavor>1</Flavor>
+      <Direction>2</Direction>
+      <Precision>0</Precision>
+      <Scale>0</Scale>
+    </TableOf>
+    <Flavor>2</Flavor>
+    <Direction>2</Direction>
+    <Precision>0</Precision>
+    <Scale>0</Scale>
+  </Args>
+  <Documentation></Documentation>
+</Function>`

@@ -278,11 +278,24 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 			}
 			if level != prev {
 				reverseArguments(scratch)
-				//Log("scratch", scratch, "arg", arg, "isTable?", arg.Flavor == FLAVOR_TABLE)
+				if arg.Name == "ertekesitett_alapok" || arg.Name == "vasarolt_alapok" {
+					Log("scratch", scratch, "arg", arg, "isTable?", arg.Flavor == FLAVOR_TABLE)
+					Log("recordOf", scratch[0])
+				}
 				if arg.Flavor == FLAVOR_TABLE {
 					arg.TableOf = &scratch[0]
+					if len(scratch) > 1 {
+						panic(fmt.Sprintf("table with more than one children: %+v", scratch))
+					}
 				} else {
-					arg.RecordOf = make([]NamedArgument, len(scratch))
+					for i := 0; i < len(arg.RecordOf); i++ {
+						if a := arg.RecordOf[i]; a.Name == "" && a.Type == "" && a.TypeName == "" && a.AbsType == "" {
+							arg.RecordOf[i] = arg.RecordOf[0]
+							arg.RecordOf = arg.RecordOf[1:]
+							i--
+						}
+					}
+					arg.RecordOf = append(make([]NamedArgument, len(scratch)), arg.RecordOf...)
 					for i, a := range scratch {
 						arg.RecordOf[i] = NamedArgument{Name: a.Name, Argument: a}
 					}
