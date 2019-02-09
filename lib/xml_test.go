@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestQuery078(t *testing.T) {
@@ -54,9 +56,8 @@ func TestQuery078(t *testing.T) {
 	if err := enc.Encode(functions[0]); err != nil {
 		t.Fatal(functions[0], err)
 	}
-	if x := buf.String(); x != query078WantXML {
-		t.Errorf("got %s", x)
-		//t.Errorf("got %s\n\twanted %s", x, query078WantXML)
+	if d := cmp.Diff(strings.Split(buf.String(), "\n"), strings.Split(query078WantXML, "\n")); d != "" {
+		t.Error(d)
 	}
 
 	buf.Reset()
@@ -97,8 +98,8 @@ const query078WantXML = `<Function>
     <AbsType>NUMBER(9)</AbsType>
     <Charset></Charset>
     <Charlength>0</Charlength>
-    <Flavor>0</Flavor>
-    <Direction>1</Direction>
+    <Flavor>SIMPLE</Flavor>
+    <Direction>IN</Direction>
     <Precision>9</Precision>
     <Scale>0</Scale>
   </Args>
@@ -117,8 +118,8 @@ const query078WantXML = `<Function>
         <AbsType>DATE</AbsType>
         <Charset></Charset>
         <Charlength>0</Charlength>
-        <Flavor>0</Flavor>
-        <Direction>2</Direction>
+        <Flavor>SIMPLE</Flavor>
+        <Direction>OUT</Direction>
         <Precision>0</Precision>
         <Scale>0</Scale>
       </RecordOf>
@@ -129,8 +130,8 @@ const query078WantXML = `<Function>
         <AbsType>DATE</AbsType>
         <Charset></Charset>
         <Charlength>0</Charlength>
-        <Flavor>0</Flavor>
-        <Direction>2</Direction>
+        <Flavor>SIMPLE</Flavor>
+        <Direction>OUT</Direction>
         <Precision>0</Precision>
         <Scale>0</Scale>
       </RecordOf>
@@ -141,8 +142,8 @@ const query078WantXML = `<Function>
         <AbsType>NUMBER(12, 5)</AbsType>
         <Charset></Charset>
         <Charlength>0</Charlength>
-        <Flavor>0</Flavor>
-        <Direction>2</Direction>
+        <Flavor>SIMPLE</Flavor>
+        <Direction>OUT</Direction>
         <Precision>12</Precision>
         <Scale>5</Scale>
       </RecordOf>
@@ -161,8 +162,8 @@ const query078WantXML = `<Function>
             <AbsType>VARCHAR2(6)</AbsType>
             <Charset>CHAR_CS</Charset>
             <Charlength>6</Charlength>
-            <Flavor>0</Flavor>
-            <Direction>2</Direction>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
             <Precision>0</Precision>
             <Scale>0</Scale>
           </RecordOf>
@@ -173,8 +174,8 @@ const query078WantXML = `<Function>
             <AbsType>VARCHAR2(40)</AbsType>
             <Charset>CHAR_CS</Charset>
             <Charlength>40</Charlength>
-            <Flavor>0</Flavor>
-            <Direction>2</Direction>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
             <Precision>0</Precision>
             <Scale>0</Scale>
           </RecordOf>
@@ -185,8 +186,8 @@ const query078WantXML = `<Function>
             <AbsType>VARCHAR2(12)</AbsType>
             <Charset>CHAR_CS</Charset>
             <Charlength>12</Charlength>
-            <Flavor>0</Flavor>
-            <Direction>2</Direction>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
             <Precision>0</Precision>
             <Scale>0</Scale>
           </RecordOf>
@@ -197,104 +198,20 @@ const query078WantXML = `<Function>
             <AbsType>NUMBER(24, 12)</AbsType>
             <Charset></Charset>
             <Charlength>0</Charlength>
-            <Flavor>0</Flavor>
-            <Direction>2</Direction>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
             <Precision>24</Precision>
             <Scale>12</Scale>
           </RecordOf>
           <RecordOf>
             <Name>unit_arf</Name>
-            <RecordOf>
-              <Name>vasarolt_alapok</Name>
-              <Type>PL/SQL TABLE</Type>
-              <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTLIST_UNIT</TypeName>
-              <AbsType>PL/SQL TABLE</AbsType>
-              <Charset></Charset>
-              <Charlength>0</Charlength>
-              <TableOf>
-                <RecordOf>
-                  <Name>f_unit_rnev</Name>
-                  <Type>VARCHAR2</Type>
-                  <TypeName></TypeName>
-                  <AbsType>VARCHAR2(6)</AbsType>
-                  <Charset>CHAR_CS</Charset>
-                  <Charlength>6</Charlength>
-                  <Flavor>0</Flavor>
-                  <Direction>2</Direction>
-                  <Precision>0</Precision>
-                  <Scale>0</Scale>
-                </RecordOf>
-                <RecordOf>
-                  <Name>f_unit_nev</Name>
-                  <Type>VARCHAR2</Type>
-                  <TypeName></TypeName>
-                  <AbsType>VARCHAR2(40)</AbsType>
-                  <Charset>CHAR_CS</Charset>
-                  <Charlength>40</Charlength>
-                  <Flavor>0</Flavor>
-                  <Direction>2</Direction>
-                  <Precision>0</Precision>
-                  <Scale>0</Scale>
-                </RecordOf>
-                <RecordOf>
-                  <Name>f_isin</Name>
-                  <Type>VARCHAR2</Type>
-                  <TypeName></TypeName>
-                  <AbsType>VARCHAR2(12)</AbsType>
-                  <Charset>CHAR_CS</Charset>
-                  <Charlength>12</Charlength>
-                  <Flavor>0</Flavor>
-                  <Direction>2</Direction>
-                  <Precision>0</Precision>
-                  <Scale>0</Scale>
-                </RecordOf>
-                <RecordOf>
-                  <Name>unit_db</Name>
-                  <Type>NUMBER</Type>
-                  <TypeName></TypeName>
-                  <AbsType>NUMBER(24, 12)</AbsType>
-                  <Charset></Charset>
-                  <Charlength>0</Charlength>
-                  <Flavor>0</Flavor>
-                  <Direction>2</Direction>
-                  <Precision>24</Precision>
-                  <Scale>12</Scale>
-                </RecordOf>
-                <RecordOf>
-                  <Name>unit_arf</Name>
-                  <Type>NUMBER</Type>
-                  <TypeName></TypeName>
-                  <AbsType>NUMBER(24, 12)</AbsType>
-                  <Charset></Charset>
-                  <Charlength>0</Charlength>
-                  <Flavor>0</Flavor>
-                  <Direction>2</Direction>
-                  <Precision>24</Precision>
-                  <Scale>12</Scale>
-                </RecordOf>
-                <Name></Name>
-                <Type>PL/SQL RECORD</Type>
-                <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTPUT_UNIT</TypeName>
-                <AbsType>PL/SQL RECORD</AbsType>
-                <Charset></Charset>
-                <Charlength>0</Charlength>
-                <Flavor>1</Flavor>
-                <Direction>2</Direction>
-                <Precision>0</Precision>
-                <Scale>0</Scale>
-              </TableOf>
-              <Flavor>2</Flavor>
-              <Direction>2</Direction>
-              <Precision>0</Precision>
-              <Scale>0</Scale>
-            </RecordOf>
             <Type>NUMBER</Type>
             <TypeName></TypeName>
             <AbsType>NUMBER(24, 12)</AbsType>
             <Charset></Charset>
             <Charlength>0</Charlength>
-            <Flavor>0</Flavor>
-            <Direction>2</Direction>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
             <Precision>24</Precision>
             <Scale>12</Scale>
           </RecordOf>
@@ -304,13 +221,97 @@ const query078WantXML = `<Function>
           <AbsType>PL/SQL RECORD</AbsType>
           <Charset></Charset>
           <Charlength>0</Charlength>
-          <Flavor>1</Flavor>
-          <Direction>2</Direction>
+          <Flavor>RECORD</Flavor>
+          <Direction>OUT</Direction>
           <Precision>0</Precision>
           <Scale>0</Scale>
         </TableOf>
-        <Flavor>2</Flavor>
-        <Direction>2</Direction>
+        <Flavor>TABLE</Flavor>
+        <Direction>OUT</Direction>
+        <Precision>0</Precision>
+        <Scale>0</Scale>
+      </RecordOf>
+      <RecordOf>
+        <Name>vasarolt_alapok</Name>
+        <Type>PL/SQL TABLE</Type>
+        <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTLIST_UNIT</TypeName>
+        <AbsType>PL/SQL TABLE</AbsType>
+        <Charset></Charset>
+        <Charlength>0</Charlength>
+        <TableOf>
+          <RecordOf>
+            <Name>f_unit_rnev</Name>
+            <Type>VARCHAR2</Type>
+            <TypeName></TypeName>
+            <AbsType>VARCHAR2(6)</AbsType>
+            <Charset>CHAR_CS</Charset>
+            <Charlength>6</Charlength>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
+            <Precision>0</Precision>
+            <Scale>0</Scale>
+          </RecordOf>
+          <RecordOf>
+            <Name>f_unit_nev</Name>
+            <Type>VARCHAR2</Type>
+            <TypeName></TypeName>
+            <AbsType>VARCHAR2(40)</AbsType>
+            <Charset>CHAR_CS</Charset>
+            <Charlength>40</Charlength>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
+            <Precision>0</Precision>
+            <Scale>0</Scale>
+          </RecordOf>
+          <RecordOf>
+            <Name>f_isin</Name>
+            <Type>VARCHAR2</Type>
+            <TypeName></TypeName>
+            <AbsType>VARCHAR2(12)</AbsType>
+            <Charset>CHAR_CS</Charset>
+            <Charlength>12</Charlength>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
+            <Precision>0</Precision>
+            <Scale>0</Scale>
+          </RecordOf>
+          <RecordOf>
+            <Name>unit_db</Name>
+            <Type>NUMBER</Type>
+            <TypeName></TypeName>
+            <AbsType>NUMBER(24, 12)</AbsType>
+            <Charset></Charset>
+            <Charlength>0</Charlength>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
+            <Precision>24</Precision>
+            <Scale>12</Scale>
+          </RecordOf>
+          <RecordOf>
+            <Name>unit_arf</Name>
+            <Type>NUMBER</Type>
+            <TypeName></TypeName>
+            <AbsType>NUMBER(24, 12)</AbsType>
+            <Charset></Charset>
+            <Charlength>0</Charlength>
+            <Flavor>SIMPLE</Flavor>
+            <Direction>OUT</Direction>
+            <Precision>24</Precision>
+            <Scale>12</Scale>
+          </RecordOf>
+          <Name></Name>
+          <Type>PL/SQL RECORD</Type>
+          <TypeName>BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTPUT_UNIT</TypeName>
+          <AbsType>PL/SQL RECORD</AbsType>
+          <Charset></Charset>
+          <Charlength>0</Charlength>
+          <Flavor>RECORD</Flavor>
+          <Direction>OUT</Direction>
+          <Precision>0</Precision>
+          <Scale>0</Scale>
+        </TableOf>
+        <Flavor>TABLE</Flavor>
+        <Direction>OUT</Direction>
         <Precision>0</Precision>
         <Scale>0</Scale>
       </RecordOf>
@@ -320,13 +321,13 @@ const query078WantXML = `<Function>
       <AbsType>PL/SQL RECORD</AbsType>
       <Charset></Charset>
       <Charlength>0</Charlength>
-      <Flavor>1</Flavor>
-      <Direction>2</Direction>
+      <Flavor>RECORD</Flavor>
+      <Direction>OUT</Direction>
       <Precision>0</Precision>
       <Scale>0</Scale>
     </TableOf>
-    <Flavor>2</Flavor>
-    <Direction>2</Direction>
+    <Flavor>TABLE</Flavor>
+    <Direction>OUT</Direction>
     <Precision>0</Precision>
     <Scale>0</Scale>
   </Args>

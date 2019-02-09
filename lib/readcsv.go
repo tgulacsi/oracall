@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2019 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -174,7 +174,7 @@ func ReadCsv(userArgs chan<- []UserArgument, r io.Reader) error {
 	}
 	for {
 		rec, err = csvr.Read()
-		Log("rec", rec, "err", err)
+		//Log("rec", rec, "err", err)
 		if err != nil {
 			if err == io.EOF {
 				err = nil
@@ -237,6 +237,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 		}
 		return dumpBuf.String()
 	}
+	_ = dumpXML
 	var row int
 	for uas := range userArgs {
 		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
@@ -247,8 +248,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 		var fun Function
 		lastArgs := make(map[int8]*Argument, 8)
 		lastArgs[-1] = &Argument{Flavor: FLAVOR_RECORD}
-		var prev, level int8
-		//Log("usrArgs", uas)
+		var level int8
 		for i, ua := range uas {
 			row++
 			if i == 0 {
@@ -275,32 +275,24 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 			if level == 0 && fun.Returns == nil && arg.Name == "" {
 				arg.Name = "ret"
 				fun.Returns = &arg
-				prev = level
 				continue
 			}
 			parent := lastArgs[level-1]
-			lastArgs[level] = &arg
-			_ = prev
+			if arg.Flavor != FLAVOR_SIMPLE {
+				lastArgs[level] = &arg
+			}
 			if parent == nil {
 				Log("level", level, "lastArgs", lastArgs)
 			}
 			if parent.Flavor == FLAVOR_TABLE {
 				parent.TableOf = &arg
 			} else {
-				parent.RecordOf = append(parent.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
+				parent.RecordOf = append(parent.RecordOf, NamedArgument{Name: arg.Name, Argument: &arg})
 			}
-			Log("arg", arg.Name, "level", level, "parent", parent)
-			if level > 0 {
-				Log("gp", lastArgs[level-2])
-			}
-
-			Log("xml", dumpXML(lastArgs[-1]))
-			prev = level
 		}
-		Log("-1", lastArgs[0].RecordOf)
 		fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
 		for i, na := range lastArgs[-1].RecordOf {
-			fun.Args[i] = na.Argument
+			fun.Args[i] = *na.Argument
 		}
 		functions = append(functions, fun)
 	}

@@ -6,6 +6,7 @@ require (
 	github.com/fatih/structs v1.0.0
 	github.com/go-kit/kit v0.8.0
 	github.com/gogo/protobuf v1.2.0
+	github.com/google/go-cmp v0.2.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.0
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
 	github.com/oklog/ulid v1.0.0

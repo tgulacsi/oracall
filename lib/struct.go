@@ -90,6 +90,9 @@ func (dir direction) String() string {
 	}
 	return fmt.Sprintf("%d", dir)
 }
+func (dir direction) MarshalText() ([]byte, error) {
+	return []byte(dir.String()), nil
+}
 
 const (
 	DIR_IN    = direction(1)
@@ -109,6 +112,9 @@ func (f flavor) String() string {
 		return "TABLE"
 	}
 	return fmt.Sprintf("%d", f)
+}
+func (f flavor) MarshalText() ([]byte, error) {
+	return []byte(f.String()), nil
 }
 
 const (
@@ -137,7 +143,7 @@ type Argument struct {
 }
 type NamedArgument struct {
 	Name string
-	Argument
+	*Argument
 }
 
 func (a Argument) String() string {
@@ -148,16 +154,7 @@ func (a Argument) String() string {
 	case FLAVOR_TABLE:
 		typ = fmt.Sprintf("%s[%v]", a.PlsType, a.TableOf)
 	}
-	var dir string
-	switch a.Direction {
-	case DIR_IN:
-		dir = "IN"
-	case DIR_OUT:
-		dir = "OUT"
-	default:
-		dir = "INOUT"
-	}
-	return a.Name + " " + dir + " " + typ
+	return a.Name + " " + a.Direction.String() + " " + typ
 }
 
 func (a Argument) IsInput() bool {
@@ -201,7 +198,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 	switch arg.Type {
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
-		arg.RecordOf = make([]NamedArgument, 1)
+		arg.RecordOf = make([]NamedArgument, 0, 1)
 	case "TABLE", "PL/SQL TABLE", "REF CURSOR":
 		arg.Flavor = FLAVOR_TABLE
 	}

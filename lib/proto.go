@@ -155,7 +155,6 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		aName := arg.Name
 		got, err := arg.GoType(false)
-		fmt.Fprintf(w, "// %s: got=%s\n", aName, got)
 		if err != nil {
 			return err
 		}
@@ -184,18 +183,17 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			subArgs := make([]Argument, 0, 16)
 			if arg.TableOf == nil {
 				for _, v := range arg.RecordOf {
-					subArgs = append(subArgs, v.Argument)
+					subArgs = append(subArgs, *v.Argument)
 				}
 			} else {
 				if arg.TableOf.RecordOf == nil {
 					subArgs = append(subArgs, *arg.TableOf)
 				} else {
 					for _, v := range arg.TableOf.RecordOf {
-						subArgs = append(subArgs, v.Argument)
+						subArgs = append(subArgs, *v.Argument)
 					}
 				}
 			}
-			fmt.Fprintf(w, "// subArgs or %s: %v\n", arg.Name, subArgs)
 			if err = protoWriteMessageTyp(buf, typ, seen, subArgs...); err != nil {
 				Log("msg", "protoWriteMessageTyp", "error", err)
 				return err
