@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/csv"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
@@ -224,14 +225,18 @@ func ReadCsv(userArgs chan<- []UserArgument, r io.Reader) error {
 	return err
 }
 
-func reverseArguments(args []Argument) {
-	for i, j := 0, len(args)-1; i < j; i, j = i+1, j-1 {
-		args[i], args[j] = args[j], args[i]
-	}
-}
-
 func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (functions []Function, err error) {
 	// Split args by functions
+	var dumpBuf strings.Builder
+	dumpEnc := xml.NewEncoder(&dumpBuf)
+	dumpEnc.Indent("", "  ")
+	dumpXML := func(v interface{}) string {
+		dumpBuf.Reset()
+		if err := dumpEnc.Encode(v); err != nil {
+			panic(err)
+		}
+		return dumpBuf.String()
+	}
 	var row int
 	for uas := range userArgs {
 		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
@@ -240,21 +245,17 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 		}
 
 		var fun Function
-		args := make([]Argument, 0, len(uas))
-		scratch := make([]Argument, 0, len(uas))
-		var prev, level uint8
+		lastArgs := make(map[int8]*Argument, 8)
+		lastArgs[-1] = &Argument{Flavor: FLAVOR_RECORD}
+		var prev, level int8
 		//Log("usrArgs", uas)
-		// Reverse arguments
-		for i, j := 0, len(uas)-1; i < j; i, j = i+1, j-1 {
-			uas[i], uas[j] = uas[j], uas[i]
-		}
 		for i, ua := range uas {
 			row++
 			if i == 0 {
 				fun = Function{Package: ua.PackageName, name: ua.ObjectName}
 			}
 
-			level = ua.DataLevel
+			level = int8(ua.DataLevel)
 			arg := NewArgument(ua.ArgumentName,
 				ua.DataType,
 				ua.PlsType,
@@ -271,52 +272,36 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 			// 2. RECORD at level 0
 			// 3. TABLE OF simple
 			// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-			//Log("msg", "ParseArguments", "level", level, "prev", prev, "arg", arg)
-			if level == 0 && len(args) == 0 && arg.Name == "" {
+			if level == 0 && fun.Returns == nil && arg.Name == "" {
 				arg.Name = "ret"
 				fun.Returns = &arg
+				prev = level
+				continue
 			}
-			if level != prev {
-				reverseArguments(scratch)
-				if arg.Name == "ertekesitett_alapok" || arg.Name == "vasarolt_alapok" {
-					Log("scratch", scratch, "arg", arg, "isTable?", arg.Flavor == FLAVOR_TABLE)
-					Log("recordOf", scratch[0])
-				}
-				if arg.Flavor == FLAVOR_TABLE {
-					arg.TableOf = &scratch[0]
-					if len(scratch) > 1 {
-						panic(fmt.Sprintf("table with more than one children: %+v", scratch))
-					}
-				} else {
-					for i := 0; i < len(arg.RecordOf); i++ {
-						if a := arg.RecordOf[i]; a.Name == "" && a.Type == "" && a.TypeName == "" && a.AbsType == "" {
-							arg.RecordOf[i] = arg.RecordOf[0]
-							arg.RecordOf = arg.RecordOf[1:]
-							i--
-						}
-					}
-					arg.RecordOf = append(make([]NamedArgument, len(scratch)), arg.RecordOf...)
-					for i, a := range scratch {
-						arg.RecordOf[i] = NamedArgument{Name: a.Name, Argument: a}
-					}
-				}
-				scratch = make([]Argument, 0, cap(scratch))
-				if level == 0 {
-					args = append(args, arg)
-				} else {
-					scratch = append(scratch, arg)
-				}
+			parent := lastArgs[level-1]
+			lastArgs[level] = &arg
+			_ = prev
+			if parent == nil {
+				Log("level", level, "lastArgs", lastArgs)
+			}
+			if parent.Flavor == FLAVOR_TABLE {
+				parent.TableOf = &arg
 			} else {
-				if level == 0 {
-					args = append(args, arg)
-				} else {
-					scratch = append(scratch, arg)
-				}
+				parent.RecordOf = append(parent.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
 			}
+			Log("arg", arg.Name, "level", level, "parent", parent)
+			if level > 0 {
+				Log("gp", lastArgs[level-2])
+			}
+
+			Log("xml", dumpXML(lastArgs[-1]))
 			prev = level
 		}
-		reverseArguments(args)
-		fun.Args = args
+		Log("-1", lastArgs[0].RecordOf)
+		fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
+		for i, na := range lastArgs[-1].RecordOf {
+			fun.Args[i] = na.Argument
+		}
 		functions = append(functions, fun)
 	}
 	Log("msg", fmt.Sprintf("found %d functions.", len(functions)))

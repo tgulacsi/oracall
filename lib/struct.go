@@ -79,15 +79,42 @@ type direction uint8
 
 func (dir direction) IsInput() bool  { return dir&DIR_IN > 0 }
 func (dir direction) IsOutput() bool { return dir&DIR_OUT > 0 }
+func (dir direction) String() string {
+	switch dir {
+	case DIR_IN:
+		return "IN"
+	case DIR_OUT:
+		return "OUT"
+	case DIR_INOUT:
+		return "INOUT"
+	}
+	return fmt.Sprintf("%d", dir)
+}
 
 const (
 	DIR_IN    = direction(1)
 	DIR_OUT   = direction(2)
 	DIR_INOUT = direction(3)
+)
 
-	FLAVOR_SIMPLE = 0
-	FLAVOR_RECORD = 1
-	FLAVOR_TABLE  = 2
+type flavor uint8
+
+func (f flavor) String() string {
+	switch f {
+	case FLAVOR_SIMPLE:
+		return "SIMPLE"
+	case FLAVOR_RECORD:
+		return "RECORD"
+	case FLAVOR_TABLE:
+		return "TABLE"
+	}
+	return fmt.Sprintf("%d", f)
+}
+
+const (
+	FLAVOR_SIMPLE = flavor(0)
+	FLAVOR_RECORD = flavor(1)
+	FLAVOR_TABLE  = flavor(2)
 )
 
 type Argument struct {
@@ -102,7 +129,7 @@ type Argument struct {
 	TableOf        *Argument // this argument is a table (array) of this type
 	goTypeName     string
 	PlsType
-	Flavor    uint8
+	Flavor    flavor
 	Direction direction
 	Precision uint8
 	Scale     uint8

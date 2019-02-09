@@ -55,7 +55,8 @@ func TestQuery078(t *testing.T) {
 		t.Fatal(functions[0], err)
 	}
 	if x := buf.String(); x != query078WantXML {
-		t.Errorf("got %s\n\twanted %s", x, query078WantXML)
+		t.Errorf("got %s", x)
+		//t.Errorf("got %s\n\twanted %s", x, query078WantXML)
 	}
 
 	buf.Reset()
