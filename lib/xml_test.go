@@ -72,6 +72,9 @@ func TestQuery078(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	if strings.Contains(buf.String(), "PL/SQLTABLE_tab_typ;") {
+		t.Error("PL/SQLTABLE_tab_typ is nonsense!")
+	}
 }
 
 const query078Csv = `OBJECT_ID,SUBPROGRAM_ID,SEQUENCE,PACKAGE_NAME,OBJECT_NAME,DATA_LEVEL,POSITION,ARGUMENT_NAME,IN_OUT,DATA_TYPE,DATA_PRECISION,DATA_SCALE,CHARACTER_SET_NAME,PLS_TYPE,CHAR_LENGTH,TYPE_OWNER,TYPE_NAME,TYPE_SUBNAME,TYPE_LINK

@@ -26,6 +26,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/pkg/errors"
 	"gopkg.in/goracle.v2"
 )
 
@@ -449,7 +450,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			if arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
 					Log("msg", "cannot use IN cursor variables", "arg", arg)
-					os.Exit(1)
+					panic(fmt.Sprintf("cannot use IN cursor variables (%v)", arg))
 				}
 				name := (CamelCase(arg.Name))
 				//name := capitalize(replHidden(arg.Name))
@@ -459,6 +460,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
 					typ = getTableType(arg.TableOf.AbsType)
+					if strings.IndexByte(typ, '/') >= 0 {
+						err = errors.Errorf("nonsense table type of %s", arg)
+						return
+					}
+
 					setvar := ""
 					if arg.IsInput() {
 						setvar = " := :" + arg.Name
@@ -520,6 +526,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						a := a
 						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
+						if strings.IndexByte(typ, '/') >= 0 {
+							err = errors.Errorf("nonsense table type of %s", arg)
+							return
+						}
 						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D="+arg.Name)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
