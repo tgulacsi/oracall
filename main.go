@@ -426,7 +426,9 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 		}
 		return nil
 	})
-	functions, err = oracall.ParseArguments(userArgs, filter)
+	filteredArgs := make(chan []oracall.UserArgument, 16)
+	grp.Go(func() error { oracall.FilterAndGroup(filteredArgs, userArgs, filter); return nil })
+	functions, err = oracall.ParseArguments(filteredArgs, filter)
 	if grpErr := grp.Wait(); grpErr != nil {
 		if err == nil {
 			err = grpErr

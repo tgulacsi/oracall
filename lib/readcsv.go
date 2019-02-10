@@ -80,27 +80,45 @@ func ParseCsvFile(filename string, filter func(string) bool) (functions []Functi
 
 // ParseCsv parses the csv
 func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err error) {
-	userArgs := make(chan []UserArgument, 16)
+	userArgs := make(chan UserArgument, 16)
 	var grp errgroup.Group
 	grp.Go(func() error { return ReadCsv(userArgs, r) })
-	filteredArgs := userArgs
-	if filter != nil {
-		filteredArgs = make(chan []UserArgument, 16)
-		grp.Go(func() error {
-			defer close(filteredArgs)
-			for uas := range userArgs {
-				if len(uas) != 0 && filter(uas[0].PackageName+"."+uas[0].ObjectName) {
-					filteredArgs <- uas
-				}
-			}
-			return nil
-		})
-	}
+	filteredArgs := make(chan []UserArgument, 16)
+	grp.Go(func() error { FilterAndGroup(filteredArgs, userArgs, filter); return nil })
 	functions, err = ParseArguments(filteredArgs, filter)
 	if err == nil {
 		err = grp.Wait()
 	}
 	return functions, err
+}
+
+func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgument, filter func(string) bool) {
+	defer close(filteredArgs)
+	type program struct {
+		ObjectID, SubprogramID  uint
+		PackageName, ObjectName string
+	}
+	var lastProg, zeroProg program
+	args := make([]UserArgument, 0, 4)
+	for ua := range userArgs {
+		if filter != nil && !filter(ua.PackageName+"."+ua.ObjectName) {
+			continue
+		}
+		actProg := program{
+			ObjectID: ua.ObjectID, SubprogramID: ua.SubprogramID,
+			PackageName: ua.PackageName, ObjectName: ua.ObjectName}
+		if lastProg != zeroProg && lastProg != actProg {
+			if len(args) != 0 {
+				filteredArgs <- args
+				args = make([]UserArgument, 0, cap(args))
+			}
+		}
+		args = append(args, ua)
+		lastProg = actProg
+	}
+	if len(args) != 0 {
+		filteredArgs <- args
+	}
 }
 
 // OpenCsv opens the filename
@@ -125,9 +143,8 @@ func MustOpenCsv(filename string) *os.File {
 	return fh
 }
 
-// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel,
-// grouping the args by function (object_id/subprogram_id/package_name/subprogram_name).
-func ReadCsv(userArgs chan<- []UserArgument, r io.Reader) error {
+// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel.
+func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	defer close(userArgs)
 
 	var err error
@@ -167,11 +184,6 @@ func ReadCsv(userArgs chan<- []UserArgument, r io.Reader) error {
 	}
 	Log("msg", "field order", "fields", csvFields)
 
-	var args []UserArgument
-	var lastProg struct {
-		ObjectID, SubprogramID  uint
-		PackageName, ObjectName string
-	}
 	for {
 		rec, err = csvr.Read()
 		//Log("rec", rec, "err", err)
@@ -207,20 +219,7 @@ func ReadCsv(userArgs chan<- []UserArgument, r io.Reader) error {
 			TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
 		}
 
-		if lastProg.ObjectID == 0 && lastProg.SubprogramID == 0 && lastProg.PackageName == "" && lastProg.ObjectName == "" ||
-			!(lastProg.ObjectID == arg.ObjectID && lastProg.SubprogramID == arg.SubprogramID &&
-				lastProg.PackageName == arg.PackageName && lastProg.ObjectName == arg.ObjectName) {
-			if len(args) != 0 {
-				userArgs <- args
-				args = make([]UserArgument, 0, cap(args))
-			}
-			lastProg.ObjectID, lastProg.SubprogramID, lastProg.PackageName, lastProg.ObjectName =
-				arg.ObjectID, arg.SubprogramID, arg.PackageName, arg.ObjectName
-		}
-		args = append(args, arg)
-	}
-	if len(args) != 0 {
-		userArgs <- args
+		userArgs <- arg
 	}
 	return err
 }
