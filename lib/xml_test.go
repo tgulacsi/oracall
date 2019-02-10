@@ -65,6 +65,13 @@ func TestQuery078(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(buf.String())
+
+	buf.Reset()
+	err = SaveFunctions(&buf, functions, "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true)
+	t.Log(buf.String())
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 const query078Csv = `OBJECT_ID,SUBPROGRAM_ID,SEQUENCE,PACKAGE_NAME,OBJECT_NAME,DATA_LEVEL,POSITION,ARGUMENT_NAME,IN_OUT,DATA_TYPE,DATA_PRECISION,DATA_SCALE,CHARACTER_SET_NAME,PLS_TYPE,CHAR_LENGTH,TYPE_OWNER,TYPE_NAME,TYPE_SUBNAME,TYPE_LINK
