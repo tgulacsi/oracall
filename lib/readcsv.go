@@ -326,3 +326,29 @@ func mustBeUint8(text string) uint8 {
 	}
 	return uint8(u)
 }
+
+func ReplaceFunctions(functions []Function, m map[string]string) []Function {
+	if len(m) == 0 {
+		return functions
+	}
+	for k, v := range m {
+		v = strings.ToLower(v)
+		m[strings.ToLower(k)] = v
+		m[v] = ""
+	}
+	for i := 0; i < len(functions); i++ {
+		f := functions[i]
+		if v, ok := m[strings.ToLower(f.Name())]; ok && v == "" { // just a replacement
+			functions[i] = functions[0]
+			functions = functions[1:]
+			i--
+		}
+	}
+	for i, f := range functions {
+		if v := m[strings.ToLower(f.Name())]; v != "" {
+			f.Replacement = v
+			functions[i] = f
+		}
+	}
+	return functions
+}
