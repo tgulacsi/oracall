@@ -282,7 +282,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 				lastArgs[level] = &arg
 			}
 			if parent == nil {
-				Log("level", level, "lastArgs", lastArgs)
+				Log("level", level, "lastArgs", lastArgs, "fun", fun)
 			}
 			if parent.Flavor == FLAVOR_TABLE {
 				parent.TableOf = &arg

@@ -154,9 +154,9 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			rule = "repeated "
 		}
 		aName := arg.Name
-		got, err := arg.GoType(false)
+		got, err := arg.goType(false)
 		if err != nil {
-			return err
+			return errors.WithMessage(err, msgName)
 		}
 		got = strings.TrimPrefix(got, "*")
 		if strings.HasPrefix(got, "[]") {

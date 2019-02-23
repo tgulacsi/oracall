@@ -223,7 +223,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		}
 		//aName = capitalize(goName(arg.Name))
 		aName = capitalize(replHidden(arg.Name))
-		if got, err = arg.GoType(arg.Flavor == FLAVOR_TABLE); err != nil {
+		if got, err = arg.goType(arg.Flavor == FLAVOR_TABLE); err != nil {
 			return errors.Wrap(err, arg.Name)
 		}
 		if got == "" || got == "*" {
@@ -300,7 +300,10 @@ func %s(s *pb.%s) error {
 func genChecks(checks []string, arg Argument, base string, parentIsTable bool) []string {
 	aName := (CamelCase(arg.Name))
 	//aName := capitalize(replHidden(arg.Name))
-	got := arg.goType(parentIsTable || arg.Flavor == FLAVOR_TABLE)
+	got, err := arg.goType(parentIsTable || arg.Flavor == FLAVOR_TABLE)
+	if err != nil {
+		panic(err)
+	}
 	var name string
 	if aName == "" {
 		name = base
@@ -415,15 +418,7 @@ func capitalize(text string) string {
 
 var UnknownSimpleType = errors.New("unknown simple type")
 
-// returns a go type for the argument's type
-func (arg *Argument) goType(isTable bool) (typName string) {
-	var err error
-	if typName, err = arg.GoType(isTable); err != nil {
-		panic(err)
-	}
-	return typName
-}
-func (arg *Argument) GoType(isTable bool) (typName string, err error) {
+func (arg *Argument) goType(isTable bool) (typName string, err error) {
 	defer func() {
 		if strings.HasPrefix(typName, "**") {
 			typName = typName[1:]
@@ -501,7 +496,11 @@ func (arg *Argument) GoType(isTable bool) (typName string, err error) {
 		//Log("msg", "TABLE", "arg", arg, "tableOf", arg.TableOf)
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
-		tn := "[]" + targ.goType(true)
+		tn, err := targ.goType(true)
+		if err != nil {
+			return tn, err
+		}
+		tn = "[]" + tn
 		if arg.Type != "REF CURSOR" {
 			if arg.IsOutput() && arg.TableOf.Flavor == FLAVOR_SIMPLE {
 				return "*" + tn, nil

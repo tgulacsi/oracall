@@ -443,19 +443,27 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			aname := (CamelCase(arg.Name))
 			//aname := capitalize(replHidden(arg.Name))
 			if arg.IsOutput() {
+				var got string
+				if got, err = arg.goType(false); err != nil {
+					return
+				}
 				if arg.IsInput() {
 					convIn = append(convIn, fmt.Sprintf(`
 					output.%s = new(%s)  // sr1
 					if input.%s != nil { *output.%s = *input.%s }
-					`, aname, withPb(CamelCase(arg.goType(false)[1:])),
+					`, aname, withPb(CamelCase(got[1:])),
 						aname, aname, aname))
 				} else {
+					var got string
+					if got, err = arg.goType(false); err != nil {
+						return
+					}
 					// yes, convIn - getConvRec uses this!
 					convIn = append(convIn, fmt.Sprintf(`
                     if output.%s == nil {
                         output.%s = new(%s)  // sr2
                     }`, aname,
-						aname, withPb(CamelCase(arg.goType(false)[1:]))))
+						aname, withPb(CamelCase(got[1:]))))
 				}
 			}
 			for _, a := range arg.RecordOf {
@@ -535,14 +543,18 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					aname := (CamelCase(arg.Name))
 					//aname := capitalize(replHidden(arg.Name))
 					if arg.IsOutput() {
-						st := withPb(CamelCase(arg.TableOf.goType(true)))
+						var tgot string
+						if tgot, err = arg.TableOf.goType(true); err != nil {
+							return
+						}
+						st := withPb(CamelCase(tgot))
 						convOut = append(convOut, fmt.Sprintf(`
 					if m := %d - cap(output.%s); m > 0 { // %s
 						output.%s = append(output.%s[:cap(output.%s)], make([]%s, m)...) // fr1
                     }
 					output.%s = output.%s[:%d]
 					`,
-							MaxTableSize, aname, arg.TableOf.goType(true),
+							MaxTableSize, aname, tgot,
 							aname, aname, aname, st,
 							aname, aname, MaxTableSize))
 					}
@@ -663,7 +675,10 @@ func (arg Argument) getConvSimple(
 	name, paramName string,
 ) ([]string, []string) {
 	if arg.IsOutput() {
-		got := arg.goType(false)
+		got, err := arg.goType(false)
+		if err != nil {
+			panic(err)
+		}
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s) // %s  // gcs1", name, got[1:], got))
 			if arg.IsInput() {
@@ -693,7 +708,10 @@ func (arg Argument) getConvSimpleTable(
 	tableSize int,
 ) ([]string, []string) {
 	if arg.IsOutput() {
-		got := arg.goType(true)
+		got, err := arg.goType(true)
+		if err != nil {
+			panic(err)
+		}
 		if arg.Type == "REF CURSOR" {
 			return arg.getConvRefCursor(convIn, convOut, name, paramName, tableSize)
 		}
@@ -758,7 +776,7 @@ func (arg Argument) getConvSimpleTable(
 			arg.Direction)
 		convIn = append(convIn,
 			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
-		if arg.goType(true) == "[]goracle.Number" {
+		if got, _ := arg.goType(true); got == "[]goracle.Number" {
 			convIn = append(convIn,
 				fmt.Sprintf(`if len(input.%s) == 0 { %s = []goracle.Number{} } else {
 			%s = *custom.NumbersFromStrings(&input.%s) // gcst2
@@ -777,7 +795,10 @@ func (arg Argument) getConvRefCursor(
 	name, paramName string,
 	tableSize int,
 ) ([]string, []string) {
-	got := arg.goType(true)
+	got, err := arg.goType(true)
+	if err != nil {
+		panic(err)
+	}
 	GoT := withPb(CamelCase(got))
 	convIn = append(convIn, fmt.Sprintf(`output.%s = make([]%s, 0, %d)  // gcrf1
 		%s = sql.Out{Dest:new(driver.Rows)} // gcrf1 %q`,
@@ -820,14 +841,21 @@ func (arg Argument) getFromRset(rsetRow string) string {
 	buf := Buffers.Get()
 	defer Buffers.Put(buf)
 
-	GoT := CamelCase(arg.goType(true))
+	got, err := arg.goType(true)
+	if err != nil {
+		panic(err)
+	}
+	GoT := CamelCase(got)
 	if GoT[0] == '*' {
 		GoT = "&" + GoT[1:]
 	}
 	fmt.Fprintf(buf, "%s{\n", withPb(GoT))
 	for i, a := range arg.TableOf.RecordOf {
 		a := a
-		got := a.Argument.goType(true)
+		got, err = a.Argument.goType(true)
+		if err != nil {
+			panic(err)
+		}
 		if strings.Contains(got, ".") {
 			fmt.Fprintf(buf, "\t%s: %s, // %s\n", CamelCase(a.Name),
 				a.GetOra(fmt.Sprintf("%s[%d]", rsetRow, i), ""),
@@ -921,7 +949,10 @@ func (arg Argument) getConvTableRec(
 	parent Argument,
 ) ([]string, []string) {
 	absName := "x__" + name[0] + "__" + name[1]
-	typ := arg.goType(true)
+	typ, err := arg.goType(true)
+	if err != nil {
+		panic(err)
+	}
 	oraTyp := typ
 	switch oraTyp {
 	case "custom.Date":
@@ -959,7 +990,10 @@ func (arg Argument) getConvTableRec(
 					absName, oraTyp, tableSize,
 					paramName, absName))
 		}
-		got := parent.goType(true)
+		got, err := parent.goType(true)
+		if err != nil {
+			panic(err)
+		}
 		convOut = append(convOut,
 			fmt.Sprintf(`if m := len(%s)-cap(output.%s); m > 0 { // gctr3
 			output.%s = append(output.%s, make([]%s, m)...)
