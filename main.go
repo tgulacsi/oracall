@@ -249,17 +249,27 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 
 	qry := `` + //nolint:gas
 		`SELECT A.*
-	  FROM
-	(SELECT DISTINCT object_id object_id, subprogram_id, sequence,
-	       package_name, object_name,
-           data_level, position, argument_name, in_out,
+      FROM
+    (SELECT DISTINCT object_id object_id, subprogram_id, sequence*100,
+           package_name, object_name,
+           data_level, position*100, argument_name, in_out,
            data_type, data_precision, data_scale, character_set_name,
            pls_type, char_length, type_owner, type_name, type_subname, type_link
       FROM ` + tbl + `
-	  WHERE package_name||'.'||object_name LIKE UPPER(:1)
+      WHERE data_type <> 'OBJECT' AND package_name||'.'||object_name LIKE UPPER(:1)
+     UNION ALL
+     SELECT DISTINCT object_id object_id, subprogram_id, A.sequence*100 + B.attr_no,
+            package_name, object_name,
+            A.data_level, A.position*100 + B.attr_no, B.attr_name, A.in_out,
+            B.ATTR_TYPE_NAME, B.PRECISION, B.scale, B.character_set_name,
+            B.ATTR_TYPE_OWNER||'.'||B.attr_type_name, B.length, NULL, NULL, NULL, NULL
+       FROM all_type_attrs B, ` + tbl + ` A
+       WHERE B.owner = A.type_owner AND B.type_name = A.type_name AND
+             A.data_type = 'OBJECT' AND
+             A.package_name||'.'||A.object_name LIKE UPPER(:2)
      ) A
       ORDER BY 1, 2, 3`
-	rows, err := cx.QueryContext(ctx, qry, pattern)
+	rows, err := cx.QueryContext(ctx, qry, pattern, pattern)
 	if err != nil {
 		logger.Log("qry", qry, "error", err)
 		return functions, replacements, errors.Wrap(err, qry)
