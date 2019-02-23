@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"flag"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -57,10 +58,13 @@ var flagConnect = flag.String("connect", "", "connect to DB for retrieving funct
 
 func main() {
 	oracall.Log = log.With(logger, "lib", "oracall").Log
-	os.Exit(Main(os.Args))
+	if err := Main(os.Args); err != nil {
+		logger.Log("error", fmt.Sprintf("%+v", err))
+		os.Exit(1)
+	}
 }
 
-func Main(args []string) int {
+func Main(args []string) error {
 	os.Args = args
 
 	gopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
@@ -75,12 +79,12 @@ func Main(args []string) int {
 	flag.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
 	flagExcept := flag.String("except", "", "except these functions")
+	flagReplace := flag.String("replace", "", "funcA=>funcB")
 
 	flag.Parse()
 	if *flagPbOut == "" {
 		if *flagDbOut == "" {
-			logger.Log("-pb-out or -db-out is required!")
-			os.Exit(1)
+			return errors.New("-pb-out or -db-out is required!")
 		}
 		*flagPbOut = *flagDbOut
 	} else if *flagDbOut == "" {
@@ -131,23 +135,24 @@ func Main(args []string) int {
 	} else {
 		var cx *sql.DB
 		if cx, err = sql.Open("goracle", *flagConnect); err != nil {
-			Log("msg", "connecting to", "dsn", *flagConnect, "error", err)
-			return 1
+			return errors.Wrap(err, "connect to "+*flagConnect)
 		}
 		defer cx.Close()
 		if *flagVerbose {
 			goracle.Log = log.With(logger, "lib", "goracle").Log
 		}
 		if err = cx.Ping(); err != nil {
-			Log("msg", "pinging", "dsn", *flagConnect, "error", err)
-			return 1
+			return errors.Wrap(err, "Ping "+*flagConnect)
 		}
 
-		functions, err = parseDB(cx, pattern, *flagDump, filter)
+		var replacements []string
+		functions, replacements, err = parseDB(cx, pattern, *flagDump, filter)
+		if len(replacements) != 0 {
+			*flagReplace += " " + strings.Join(replacements, " ")
+		}
 	}
 	if err != nil {
-		Log("msg", "read", "file", flag.Arg(0), "error", err)
-		return 3
+		return errors.Wrap(err, "read "+flag.Arg(0))
 	}
 
 	defer os.Stdout.Sync()
@@ -161,14 +166,18 @@ func Main(args []string) int {
 		Log("msg", "Writing generated functions", "file", fn)
 		os.MkdirAll(filepath.Dir(fn), 0775)
 		if out, err = os.Create(fn); err != nil {
-			Log("msg", "create", "file", fn, "error", err)
-			return 1
+			return errors.Wrap(err, "create "+fn)
 		}
 		defer func() {
 			if err := out.Close(); err != nil {
 				Log("msg", "close", "file", out.Name(), "error", err)
 			}
 		}()
+	}
+
+	*flagReplace = strings.TrimSpace(*flagReplace)
+	if *flagReplace != "" {
+		functions = oracall.ReplaceFunctions(functions, mkReplacementMap(*flagReplace))
 	}
 
 	var grp errgroup.Group
@@ -222,13 +231,12 @@ func Main(args []string) int {
 	})
 
 	if err := grp.Wait(); err != nil {
-		Log("error", err)
-		return 1
+		return err
 	}
-	return 0
+	return nil
 }
 
-func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, err error) {
+func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, replacements []string, err error) {
 	tbl := "user_arguments"
 	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
 		tbl = "all_arguments"
@@ -253,7 +261,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 	rows, err := cx.QueryContext(ctx, qry, pattern)
 	if err != nil {
 		logger.Log("qry", qry, "error", err)
-		return functions, errors.Wrap(err, qry)
+		return functions, replacements, errors.Wrap(err, qry)
 	}
 	defer rows.Close()
 
@@ -296,7 +304,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
 			logger.Log("msg", "create", "dump", dumpFn, "error", err)
-			return functions, errors.Wrap(err, dumpFn)
+			return functions, replacements, errors.Wrap(err, dumpFn)
 		}
 		defer func() {
 			cw.Flush()
@@ -310,12 +318,13 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 		cw = csv.NewWriter(fh)
 		if err = cw.Write(colNames); err != nil {
 			logger.Log("msg", "write header to csv", "error", err)
-			return functions, errors.Wrap(err, "write header")
+			return functions, replacements, errors.Wrap(err, "write header")
 		}
 	}
 
 	var prevPackage string
 	var docsMu sync.Mutex
+	var replMu sync.Mutex
 	docs := make(map[string]string)
 	userArgs := make(chan oracall.UserArgument, 16)
 	grp.Go(func() error {
@@ -357,6 +366,19 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 							Log("msg", "getSource", "error", srcErr)
 							return errors.WithMessage(srcErr, ua.PackageName)
 						}
+						replMu.Lock()
+						for _, b := range rReplacement.FindAll(buf.Bytes(), -1) {
+							b = bytes.TrimSpace(bytes.TrimPrefix(b, []byte("--replace ")))
+							if i := bytes.LastIndexByte(b, ' '); i < 0 {
+								replacements = append(replacements, string(b))
+							} else {
+								replacements = append(replacements, fmt.Sprintf("%s.%s%s.%s", ua.PackageName, b[:i+1], ua.PackageName, b[i+1:]))
+							}
+						}
+						if len(replacements) != 0 {
+							Log("replacements", replacements)
+						}
+						replMu.Unlock()
 						subCtx, subCancel := context.WithTimeout(ctx, 1*time.Second)
 						funDocs, docsErr := parseDocs(subCtx, buf.String())
 						subCancel()
@@ -426,7 +448,9 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 		}
 		return nil
 	})
-	functions, err = oracall.ParseArguments(userArgs, filter)
+	filteredArgs := make(chan []oracall.UserArgument, 16)
+	grp.Go(func() error { oracall.FilterAndGroup(filteredArgs, userArgs, filter); return nil })
+	functions, err = oracall.ParseArguments(filteredArgs, filter)
 	if grpErr := grp.Wait(); grpErr != nil {
 		if err == nil {
 			err = grpErr
@@ -452,7 +476,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 	if any {
 		logger.Log("has", docNames)
 	}
-	return functions, nil
+	return functions, replacements, nil
 }
 
 var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 1024)) }}
@@ -492,6 +516,26 @@ func parsePkgFlag(s string) (string, string) {
 		pkg = "main"
 	}
 	return s, pkg
+}
+
+var rReplace = regexp.MustCompile("\\s*=>\\s*")
+var rReplacement = regexp.MustCompile("--replace\\s+[a-zA-Z0-9_#]+\\s*=>\\s*[a-zA-Z0-9_#]+")
+
+func mkReplacementMap(s string) map[string]string {
+	fields := strings.Fields(rReplace.ReplaceAllLiteralString(s, "=>"))
+	if len(fields) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(fields))
+	for _, f := range fields {
+		i := strings.Index(f, "=>")
+		if i < 0 {
+			continue
+		}
+		m[f[:i]] = f[i+2:]
+		m[f[i+2:]] = ""
+	}
+	return m
 }
 
 // vim: set fileencoding=utf-8 noet:

@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2019 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,12 +20,14 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/csv"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -82,24 +84,42 @@ func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err 
 	userArgs := make(chan UserArgument, 16)
 	var grp errgroup.Group
 	grp.Go(func() error { return ReadCsv(userArgs, r) })
-	filteredArgs := userArgs
-	if filter != nil {
-		filteredArgs = make(chan UserArgument, 16)
-		grp.Go(func() error {
-			defer close(filteredArgs)
-			for ua := range userArgs {
-				if filter(ua.PackageName + "." + ua.ObjectName) {
-					filteredArgs <- ua
-				}
-			}
-			return nil
-		})
-	}
+	filteredArgs := make(chan []UserArgument, 16)
+	grp.Go(func() error { FilterAndGroup(filteredArgs, userArgs, filter); return nil })
 	functions, err = ParseArguments(filteredArgs, filter)
 	if err == nil {
 		err = grp.Wait()
 	}
 	return functions, err
+}
+
+func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgument, filter func(string) bool) {
+	defer close(filteredArgs)
+	type program struct {
+		ObjectID, SubprogramID  uint
+		PackageName, ObjectName string
+	}
+	var lastProg, zeroProg program
+	args := make([]UserArgument, 0, 4)
+	for ua := range userArgs {
+		if filter != nil && !filter(ua.PackageName+"."+ua.ObjectName) {
+			continue
+		}
+		actProg := program{
+			ObjectID: ua.ObjectID, SubprogramID: ua.SubprogramID,
+			PackageName: ua.PackageName, ObjectName: ua.ObjectName}
+		if lastProg != zeroProg && lastProg != actProg {
+			if len(args) != 0 {
+				filteredArgs <- args
+				args = make([]UserArgument, 0, cap(args))
+			}
+		}
+		args = append(args, ua)
+		lastProg = actProg
+	}
+	if len(args) != 0 {
+		filteredArgs <- args
+	}
 }
 
 // OpenCsv opens the filename
@@ -119,12 +139,12 @@ func MustOpenCsv(filename string) *os.File {
 	fh, err := OpenCsv(filename)
 	if err != nil {
 		Log("msg", "MustOpenCsv", "file", filename, "error", err)
-		os.Exit(1)
+		panic(errors.Wrap(err, filename))
 	}
 	return fh
 }
 
-// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel
+// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel.
 func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	defer close(userArgs)
 
@@ -167,14 +187,14 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 
 	for {
 		rec, err = csvr.Read()
-		Log("rec", rec, "err", err)
+		//Log("rec", rec, "err", err)
 		if err != nil {
 			if err == io.EOF {
 				err = nil
 			}
 			break
 		}
-		userArgs <- UserArgument{
+		arg := UserArgument{
 			ObjectID:     mustBeUint(rec[csvFields["OBJECT_ID"]]),
 			SubprogramID: mustBeUint(rec[csvFields["SUBPROGRAM_ID"]]),
 
@@ -199,106 +219,84 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			TypeName:    rec[csvFields["TYPE_NAME"]],
 			TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
 		}
+
+		userArgs <- arg
 	}
 	return err
 }
 
-func ParseArguments(userArgs <-chan UserArgument, filter func(string) bool) (functions []Function, err error) {
-	var (
-		prev, level uint8
-		fun         Function
-		args        = make([]Argument, 0, 16)
-		lastArgs    = make([]*Argument, 0, 3)
-		row         int
-	)
-	functions = make([]Function, 0, 32)
-	seen := make(map[string]uint8, 64)
-	for ua := range userArgs {
-		row++
-		funName := ua.ObjectName
-		if funName[len(funName)-1] == '#' { //hidden
+func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (functions []Function, err error) {
+	// Split args by functions
+	var dumpBuf strings.Builder
+	dumpEnc := xml.NewEncoder(&dumpBuf)
+	dumpEnc.Indent("", "  ")
+	dumpXML := func(v interface{}) string {
+		dumpBuf.Reset()
+		if err := dumpEnc.Encode(v); err != nil {
+			panic(err)
+		}
+		return dumpBuf.String()
+	}
+	_ = dumpXML
+	var row int
+	for uas := range userArgs {
+		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
+			filter != nil && !filter(ua.ObjectName) {
 			continue
 		}
-		if !filter(funName) {
-			continue
-		}
-		nameFun := Function{Package: ua.PackageName, name: ua.ObjectName}
-		funName = nameFun.Name()
-		if seen[funName] > 1 {
-			Log("msg", "function "+funName+" already seen! skipping...")
-			//continue
-		}
-		if fun.Name() == "" || funName != fun.Name() { //new (differs from prev record
-			seen[funName]++
-			//Log("msg", "ParseArguments", "old", fun.Name(), "new", funName, "seen", seen[funName])
-			//Log("msg", "New function "+funName)
-			if fun.name != "" {
-				x := fun // copy
-				x.Args = append(make([]Argument, 0, len(args)), args...)
-				functions = append(functions, x)
+
+		var fun Function
+		lastArgs := make(map[int8]*Argument, 8)
+		lastArgs[-1] = &Argument{Flavor: FLAVOR_RECORD}
+		var level int8
+		for i, ua := range uas {
+			row++
+			if i == 0 {
+				fun = Function{Package: ua.PackageName, name: ua.ObjectName}
 			}
-			if seen[funName] > 1 {
-				continue
-			}
-			fun = Function{Package: ua.PackageName, name: ua.ObjectName}
-			args = args[:0]
-			lastArgs = lastArgs[:0]
-		}
-		level = ua.DataLevel
-		arg := NewArgument(ua.ArgumentName,
-			ua.DataType,
-			ua.PlsType,
-			ua.TypeOwner+"."+ua.TypeName+"."+ua.TypeSubname+"@"+ua.TypeLink,
-			ua.InOut,
-			0,
-			ua.CharacterSetName,
-			ua.DataPrecision,
-			ua.DataScale,
-			ua.CharLength,
-		)
-		// Possibilities:
-		// 1. SIMPLE
-		// 2. RECORD at level 0
-		// 3. TABLE OF simple
-		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-		//Log("msg", "ParseArguments", "level", level, "arg", arg)
-		if level == 0 {
-			if len(args) == 0 && arg.Name == "" {
+
+			level = int8(ua.DataLevel)
+			arg := NewArgument(ua.ArgumentName,
+				ua.DataType,
+				ua.PlsType,
+				ua.TypeOwner+"."+ua.TypeName+"."+ua.TypeSubname+"@"+ua.TypeLink,
+				ua.InOut,
+				0,
+				ua.CharacterSetName,
+				ua.DataPrecision,
+				ua.DataScale,
+				ua.CharLength,
+			)
+			// Possibilities:
+			// 1. SIMPLE
+			// 2. RECORD at level 0
+			// 3. TABLE OF simple
+			// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
+			if level == 0 && fun.Returns == nil && arg.Name == "" {
 				arg.Name = "ret"
 				fun.Returns = &arg
+				continue
+			}
+			parent := lastArgs[level-1]
+			if arg.Flavor != FLAVOR_SIMPLE {
+				lastArgs[level] = &arg
+			}
+			if parent == nil {
+				Log("level", level, "lastArgs", lastArgs)
+			}
+			if parent.Flavor == FLAVOR_TABLE {
+				parent.TableOf = &arg
 			} else {
-				args = append(args, arg)
-			}
-		} else {
-			lastArgs = lastArgs[:level]
-			lastArg := lastArgs[level-1]
-			if lastArg == nil {
-				Log("msg", "lastArg is nil!", "row", row, "level", level, "fun.Args", fun.Args, "ua", ua)
-				os.Exit(1)
-			}
-			if prev != level {
-				lastArg.RecordOf = nil
-			}
-			if lastArg.Flavor == FLAVOR_TABLE {
-				lastArg.TableOf = &arg
-			} else {
-				lastArg.RecordOf = append(lastArg.RecordOf, NamedArgument{Name: arg.Name, Argument: arg})
-			}
-			// copy back to root
-			if len(args) > 0 {
-				args[len(args)-1] = *lastArgs[0]
+				parent.RecordOf = append(parent.RecordOf, NamedArgument{Name: arg.Name, Argument: &arg})
 			}
 		}
-		if arg.Flavor != FLAVOR_SIMPLE {
-			lastArgs = append(lastArgs[:level], &arg)
+		fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
+		for i, na := range lastArgs[-1].RecordOf {
+			fun.Args[i] = *na.Argument
 		}
-		prev = level
-	}
-	if fun.name != "" {
-		fun.Args = args
 		functions = append(functions, fun)
 	}
-	Log("msg", fmt.Sprintf("found %d functions (from %d args).", len(functions), row))
+	Log("msg", fmt.Sprintf("found %d functions.", len(functions)))
 	return
 }
 
@@ -328,4 +326,36 @@ func mustBeUint8(text string) uint8 {
 		panic(fmt.Sprintf("%d out of range (not uint8)", u))
 	}
 	return uint8(u)
+}
+
+func ReplaceFunctions(functions []Function, m map[string]string) []Function {
+	if len(m) == 0 {
+		return functions
+	}
+	for k, v := range m {
+		v = strings.ToLower(v)
+		m[strings.ToLower(k)] = v
+		m[v] = ""
+	}
+	names := make(map[string]*Function, len(functions))
+	for i := 0; i < len(functions); i++ {
+		f := functions[i]
+		// delete if this is a replacement
+		nm := strings.ToLower(f.Name())
+		if v, ok := m[nm]; ok && v == "" {
+			functions[i] = functions[0]
+			functions = functions[1:]
+			i--
+			continue
+		}
+		names[nm] = &functions[i]
+	}
+	for i, f := range functions {
+		nm := strings.ToLower(f.Name())
+		if v := m[nm]; v != "" {
+			f.Replacement = names[nm]
+			functions[i] = f
+		}
+	}
+	return functions
 }

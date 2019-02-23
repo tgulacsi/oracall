@@ -41,6 +41,7 @@ type Function struct {
 	Returns       *Argument
 	Args          []Argument
 	Documentation string
+	Replacement   *Function
 }
 
 func (f Function) Name() string {
@@ -79,15 +80,48 @@ type direction uint8
 
 func (dir direction) IsInput() bool  { return dir&DIR_IN > 0 }
 func (dir direction) IsOutput() bool { return dir&DIR_OUT > 0 }
+func (dir direction) String() string {
+	switch dir {
+	case DIR_IN:
+		return "IN"
+	case DIR_OUT:
+		return "OUT"
+	case DIR_INOUT:
+		return "INOUT"
+	}
+	return fmt.Sprintf("%d", dir)
+}
+func (dir direction) MarshalText() ([]byte, error) {
+	return []byte(dir.String()), nil
+}
 
 const (
 	DIR_IN    = direction(1)
 	DIR_OUT   = direction(2)
 	DIR_INOUT = direction(3)
+)
 
-	FLAVOR_SIMPLE = 0
-	FLAVOR_RECORD = 1
-	FLAVOR_TABLE  = 2
+type flavor uint8
+
+func (f flavor) String() string {
+	switch f {
+	case FLAVOR_SIMPLE:
+		return "SIMPLE"
+	case FLAVOR_RECORD:
+		return "RECORD"
+	case FLAVOR_TABLE:
+		return "TABLE"
+	}
+	return fmt.Sprintf("%d", f)
+}
+func (f flavor) MarshalText() ([]byte, error) {
+	return []byte(f.String()), nil
+}
+
+const (
+	FLAVOR_SIMPLE = flavor(0)
+	FLAVOR_RECORD = flavor(1)
+	FLAVOR_TABLE  = flavor(2)
 )
 
 type Argument struct {
@@ -102,7 +136,7 @@ type Argument struct {
 	TableOf        *Argument // this argument is a table (array) of this type
 	goTypeName     string
 	PlsType
-	Flavor    uint8
+	Flavor    flavor
 	Direction direction
 	Precision uint8
 	Scale     uint8
@@ -110,7 +144,7 @@ type Argument struct {
 }
 type NamedArgument struct {
 	Name string
-	Argument
+	*Argument
 }
 
 func (a Argument) String() string {
@@ -121,16 +155,7 @@ func (a Argument) String() string {
 	case FLAVOR_TABLE:
 		typ = fmt.Sprintf("%s[%v]", a.PlsType, a.TableOf)
 	}
-	var dir string
-	switch a.Direction {
-	case DIR_IN:
-		dir = "IN"
-	case DIR_OUT:
-		dir = "OUT"
-	default:
-		dir = "INOUT"
-	}
-	return a.Name + " " + dir + " " + typ
+	return a.Name + " " + a.Direction.String() + " " + typ
 }
 
 func (a Argument) IsInput() bool {
@@ -174,7 +199,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 	switch arg.Type {
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
-		arg.RecordOf = make([]NamedArgument, 1)
+		arg.RecordOf = make([]NamedArgument, 0, 1)
 	case "TABLE", "PL/SQL TABLE", "REF CURSOR":
 		arg.Flavor = FLAVOR_TABLE
 	}

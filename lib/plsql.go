@@ -26,6 +26,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/pkg/errors"
 	"gopkg.in/goracle.v2"
 )
 
@@ -38,12 +39,12 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
 		Log("msg", "error preparing", "function", fun, "error", err)
-		os.Exit(1)
+		panic(errors.Wrap(err, fun.Name()))
 	}
 	fn := strings.Replace(fun.name, ".", "__", -1)
 
-	plsBuf := buffers.Get()
-	defer buffers.Put(plsBuf)
+	plsBuf := Buffers.Get()
+	defer Buffers.Put(plsBuf)
 	plsBuf.Reset()
 	if len(decls) > 0 {
 		io.WriteString(plsBuf, "DECLARE\n")
@@ -71,8 +72,8 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	`, checkName)
 	}
 
-	callBuf := buffers.Get()
-	defer buffers.Put(callBuf)
+	callBuf := Buffers.Get()
+	defer Buffers.Put(callBuf)
 	callBuf.Reset()
 
 	hasCursorOut := fun.HasCursorOut()
@@ -236,8 +237,8 @@ func demap(plsql, callFun string) (string, string) {
 	opts := repl{
 		ParamsArrLen: len(paramsArr),
 	}
-	callBuf := buffers.Get()
-	defer buffers.Put(callBuf)
+	callBuf := Buffers.Get()
+	defer Buffers.Put(callBuf)
 	var lastIdx int
 	tpl, err := template.New("callFun").
 		Funcs(
@@ -298,8 +299,8 @@ func demap(plsql, callFun string) (string, string) {
 	}
 
 	sort.Sort(byNewRemap(plusIdxs))
-	plus := buffers.Get()
-	defer buffers.Put(plus)
+	plus := Buffers.Get()
+	defer Buffers.Put(plus)
 
 	b = callBuf.Bytes()
 	i = bytes.LastIndex(b, []byte(fmt.Sprintf("params[%d] =", lastIdx)))
@@ -331,9 +332,38 @@ func demap(plsql, callFun string) (string, string) {
 }
 
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
-	tableTypes := make(map[string]string, 4)
 	callArgs := make(map[string]string, 16)
+	if fun.Replacement != nil {
+		// DECLARE v_in XMLType; v_out XMLType; BEGIN v_out := replacement(v_in); END;
+		decls = append(decls, "v_in XMLType;", "v_out XMLType;")
+		pre = append(pre, "v_in := createXML(:1);")
+		convIn = append(convIn,
+			"inXML := oracall.Buffers.Get(); defer oracall.Buffers.Put(inXML)",
+			"if err = xml.NewEncoder(inXML).Encode(input); err != nil { return }",
+			"var outXML string",
+			"params := []interface{}{inXML.String(), sql.Out{Dest:&outXML}}",
+		)
+		convOut = append(convOut,
+			"if err = xml.NewDecoder(strings.NewReader(outXML)).Decode(&output); err != nil { err = errors.Wrap(err, outXML); return; }",
+		)
+		if fun.Replacement.Returns != nil {
+			call = fmt.Sprintf("v_out := %s(%s=>v_in)", fun.Replacement.Name(), fun.Replacement.Args[0].Name)
+		} else {
+			var argIn, argOut *Argument
+			for i, a := range fun.Replacement.Args {
+				if a.Direction.IsOutput() {
+					argOut = &fun.Replacement.Args[i]
+				} else if a.Direction.IsInput() {
+					argIn = &fun.Replacement.Args[i]
+				}
+			}
+			call = fmt.Sprintf("%s(%s=>v_in, %s=>v_out)", fun.Replacement.Name(), argIn.Name, argOut.Name)
+		}
+		post = append(post, ":2 := v_out.getClobVal();")
+		return decls, pre, call, post, convIn, convOut, nil
+	}
 
+	tableTypes := make(map[string]string, 4)
 	getTableType := func(absType string) string {
 		if strings.HasPrefix(absType, "CHAR") {
 			absType = "VARCHAR2" + absType[4:]
@@ -449,7 +479,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			if arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
 					Log("msg", "cannot use IN cursor variables", "arg", arg)
-					os.Exit(1)
+					panic(fmt.Sprintf("cannot use IN cursor variables (%v)", arg))
 				}
 				name := (CamelCase(arg.Name))
 				//name := capitalize(replHidden(arg.Name))
@@ -459,6 +489,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
 					typ = getTableType(arg.TableOf.AbsType)
+					if strings.IndexByte(typ, '/') >= 0 {
+						err = errors.Errorf("nonsense table type of %s", arg)
+						return
+					}
+
 					setvar := ""
 					if arg.IsInput() {
 						setvar = " := :" + arg.Name
@@ -520,6 +555,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						a := a
 						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
+						if strings.IndexByte(typ, '/') >= 0 {
+							err = errors.Errorf("nonsense table type of %s", arg)
+							return
+						}
 						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D="+arg.Name)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
@@ -589,17 +628,17 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					}
 				default:
 					Log("msg", "Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
-					os.Exit(1)
+					panic(errors.Errorf("Only table of simple or record types are allowed (no table of table!) - %s(%v)", fun.Name(), arg.Name))
 				}
 			}
 		default:
 			Log("msg", "unkown flavor", "flavor", arg.Flavor)
-			os.Exit(1)
+			panic(errors.Errorf("unknown flavor %s(%v)", fun.Name(), arg.Name))
 		}
 	}
 
-	callb := buffers.Get()
-	defer buffers.Put(callb)
+	callb := Buffers.Get()
+	defer Buffers.Put(callb)
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
 	}
@@ -778,8 +817,8 @@ func (arg Argument) getConvRefCursor(
 }
 
 func (arg Argument) getFromRset(rsetRow string) string {
-	buf := buffers.Get()
-	defer buffers.Put(buf)
+	buf := Buffers.Get()
+	defer Buffers.Put(buf)
 
 	GoT := CamelCase(arg.goType(true))
 	if GoT[0] == '*' {

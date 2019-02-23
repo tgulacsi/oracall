@@ -140,8 +140,8 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 	w := errWriter{Writer: dst, err: &err}
 	fmt.Fprintf(w, "\nmessage %s {\n", msgName)
 
-	buf := buffers.Get()
-	defer buffers.Put(buf)
+	buf := Buffers.Get()
+	defer Buffers.Put(buf)
 	for i, arg := range args {
 		var rule string
 		if strings.HasSuffix(arg.Name, "#") {
@@ -178,26 +178,26 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		typ = CamelCase(typ)
 		if _, ok := seen[typ]; !ok {
+			seen[typ] = struct{}{}
 			//lName := strings.ToLower(arg.Name)
 			subArgs := make([]Argument, 0, 16)
-			if arg.TableOf != nil {
+			if arg.TableOf == nil {
+				for _, v := range arg.RecordOf {
+					subArgs = append(subArgs, *v.Argument)
+				}
+			} else {
 				if arg.TableOf.RecordOf == nil {
 					subArgs = append(subArgs, *arg.TableOf)
 				} else {
 					for _, v := range arg.TableOf.RecordOf {
-						subArgs = append(subArgs, v.Argument)
+						subArgs = append(subArgs, *v.Argument)
 					}
-				}
-			} else {
-				for _, v := range arg.RecordOf {
-					subArgs = append(subArgs, v.Argument)
 				}
 			}
 			if err = protoWriteMessageTyp(buf, typ, seen, subArgs...); err != nil {
 				Log("msg", "protoWriteMessageTyp", "error", err)
 				return err
 			}
-			seen[typ] = struct{}{}
 		}
 		fmt.Fprintf(w, "\t%s%s %s = %d%s;\n", rule, typ, aName, i+1, optS)
 	}
