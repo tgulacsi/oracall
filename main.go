@@ -368,7 +368,15 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 						}
 						replMu.Lock()
 						for _, b := range rReplacement.FindAll(buf.Bytes(), -1) {
-							replacements = append(replacements, string(bytes.TrimSpace(bytes.TrimPrefix(b, []byte("--replace ")))))
+							b = bytes.TrimSpace(bytes.TrimPrefix(b, []byte("--replace ")))
+							if i := bytes.LastIndexByte(b, ' '); i < 0 {
+								replacements = append(replacements, string(b))
+							} else {
+								replacements = append(replacements, fmt.Sprintf("%s.%s%s.%s", ua.PackageName, b[:i+1], ua.PackageName, b[i+1:]))
+							}
+						}
+						if len(replacements) != 0 {
+							Log("replacements", replacements)
 						}
 						replMu.Unlock()
 						subCtx, subCancel := context.WithTimeout(ctx, 1*time.Second)

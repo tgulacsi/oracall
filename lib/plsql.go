@@ -344,7 +344,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			"params := []interface{}{inXML.String(), sql.Out{Dest:&outXML}}",
 		)
 		convOut = append(convOut,
-			"if err = xml.NewDecoder(strings.NewReader(outXML).Decode(&output)); err != nil { err = errors.Wrap(err, outXML); return; }",
+			"if err = xml.NewDecoder(strings.NewReader(outXML)).Decode(&output); err != nil { err = errors.Wrap(err, outXML); return; }",
 		)
 		if fun.Replacement.Returns != nil {
 			call = fmt.Sprintf("v_out := %s(%s=>v_in)", fun.Replacement.Name(), fun.Replacement.Args[0].Name)

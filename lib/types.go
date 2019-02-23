@@ -40,7 +40,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	if Gogo {
 		if varName != "" {
 			switch arg.ora {
-			case "DATE":
+			case "DATE", "TIMESTAMP":
 				return fmt.Sprintf("%s = string(custom.NewDate(%s))", dst, varName)
 			}
 		}
@@ -56,7 +56,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 			return fmt.Sprintf("{var b []byte; b, err = ioutil.ReadAll(%s); %s = string(b)}", varName, dst)
 		}
 		return fmt.Sprintf("%s = goracle.Lob{IsClob:true, Reader:strings.NewReader(%s)}", dst, src)
-	case "DATE":
+	case "DATE", "TIMESTAMP":
 		return fmt.Sprintf("%s = string(%s)", dst, src)
 	case "PLS_INTEGER":
 		return fmt.Sprintf("%s = int32(%s)", dst, src)
