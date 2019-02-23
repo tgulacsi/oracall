@@ -680,7 +680,7 @@ func (arg Argument) getConvSimple(
 			panic(err)
 		}
 		if got[0] == '*' {
-			convIn = append(convIn, fmt.Sprintf("output.%s = new(%s) // %s  // gcs1", name, got[1:], got))
+			//convIn = append(convIn, fmt.Sprintf("output.%s = new(%s) // %s  // gcs1", name, got[1:], got))
 			if arg.IsInput() {
 				convIn = append(convIn, fmt.Sprintf(`if input.%s != nil { *output.%s = *input.%s }  // gcs2`, name, name, name))
 			}

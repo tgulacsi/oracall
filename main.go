@@ -113,7 +113,8 @@ func Main(args []string) error {
 		return true
 	}
 	if *flagExcept != "" {
-		except := strings.Fields(*flagExcept)
+		except := strings.FieldsFunc(*flagExcept, func(r rune) bool { return r == ',' || unicode.IsSpace(r) })
+		Log("except", except)
 		filters = append(filters, func(s string) bool {
 			for _, e := range except {
 				if strings.EqualFold(e, s) {
