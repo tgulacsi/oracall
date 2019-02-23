@@ -333,10 +333,9 @@ func demap(plsql, callFun string) (string, string) {
 
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
 	callArgs := make(map[string]string, 16)
-	if fun.Replacement != nil {
+	if repl := fun.Replacement; repl != nil {
 		// DECLARE v_in XMLType; v_out XMLType; BEGIN v_out := replacement(v_in); END;
-		decls = append(decls, "v_in XMLType;", "v_out XMLType;")
-		pre = append(pre, "v_in := createXML(:1);")
+		decls = append(decls, "v_in CLOB := :1;")
 		convIn = append(convIn,
 			"inXML := oracall.Buffers.Get(); defer oracall.Buffers.Put(inXML)",
 			"if err = xml.NewEncoder(inXML).Encode(input); err != nil { return }",
@@ -346,20 +345,19 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		convOut = append(convOut,
 			"if err = xml.NewDecoder(strings.NewReader(outXML)).Decode(&output); err != nil { err = errors.Wrap(err, outXML); return; }",
 		)
-		if fun.Replacement.Returns != nil {
-			call = fmt.Sprintf("v_out := %s(%s=>v_in)", fun.Replacement.Name(), fun.Replacement.Args[0].Name)
+		if repl.Returns != nil {
+			call = fmt.Sprintf(":2 := %s(%s=>v_in)", repl.Name(), repl.Args[0].Name)
 		} else {
 			var argIn, argOut *Argument
-			for i, a := range fun.Replacement.Args {
+			for i, a := range repl.Args {
 				if a.Direction.IsOutput() {
-					argOut = &fun.Replacement.Args[i]
+					argOut = &repl.Args[i]
 				} else if a.Direction.IsInput() {
-					argIn = &fun.Replacement.Args[i]
+					argIn = &repl.Args[i]
 				}
 			}
-			call = fmt.Sprintf("%s(%s=>v_in, %s=>v_out)", fun.Replacement.Name(), argIn.Name, argOut.Name)
+			call = fmt.Sprintf("%s(%s=>v_in, %s=>:2)", repl.Name(), argIn.Name, argOut.Name)
 		}
-		post = append(post, ":2 := v_out.getClobVal();")
 		return decls, pre, call, post, convIn, convOut, nil
 	}
 

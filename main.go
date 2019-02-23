@@ -533,8 +533,8 @@ func mkReplacementMap(s string) map[string]string {
 		if i < 0 {
 			continue
 		}
-		m[f[:i]] = f[i+2:]
-		m[f[i+2:]] = ""
+		m[f[:i]] = f[i+2:] // for replacing
+		m[f[i+2:]] = ""    // for deletion
 	}
 	return m
 }

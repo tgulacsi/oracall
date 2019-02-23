@@ -328,34 +328,33 @@ func mustBeUint8(text string) uint8 {
 	return uint8(u)
 }
 
-func ReplaceFunctions(functions []Function, m map[string]string) []Function {
-	if len(m) == 0 {
+func ReplaceFunctions(functions []Function, tbr map[string]string) []Function {
+	if len(tbr) == 0 {
 		return functions
 	}
-	for k, v := range m {
-		v = strings.ToLower(v)
-		m[strings.ToLower(k)] = v
-		m[v] = ""
-	}
-	names := make(map[string]*Function, len(functions))
-	for i := 0; i < len(functions); i++ {
+	funcs := make(map[string]*Function, len(functions))
+	for i := range functions {
 		f := functions[i]
-		// delete if this is a replacement
-		nm := strings.ToLower(f.Name())
-		if v, ok := m[nm]; ok && v == "" {
-			functions[i] = functions[0]
-			functions = functions[1:]
-			i--
+		funcs[strings.ToLower(f.Name())] = &f
+	}
+	for k, v := range tbr {
+		if v == "" {
 			continue
 		}
-		names[nm] = &functions[i]
+		funcs[strings.ToLower(k)].Replacement = funcs[strings.ToLower(v)]
 	}
-	for i, f := range functions {
-		nm := strings.ToLower(f.Name())
-		if v := m[nm]; v != "" {
-			f.Replacement = names[nm]
-			functions[i] = f
+	// delete replacements
+	for k, v := range tbr {
+		if v == "" {
+			delete(funcs, k)
 		}
+	}
+	functions = functions[:0]
+	for _, f := range funcs {
+		if f.Replacement != nil {
+			Log("replacee", f.Name(), "replacement", f.Replacement.Name())
+		}
+		functions = append(functions, *f)
 	}
 	return functions
 }
