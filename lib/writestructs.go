@@ -181,7 +181,7 @@ func (f Function) getStructName(out, withPackage bool) string {
 	return capitalize(f.Package + "__" + f.name + "__" + dirname)
 }
 
-var buffers = newBufPool(1 << 16)
+var Buffers = newBufPool(1 << 16)
 
 func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	dirmap, dirname := DIR_IN, "input"
@@ -205,8 +205,8 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 
 	structName = CamelCase(f.getStructName(out, true))
 	//structName = f.getStructName(out)
-	buf := buffers.Get()
-	defer buffers.Put(buf)
+	buf := Buffers.Get()
+	defer Buffers.Put(buf)
 	w := errWriter{Writer: buf, err: &err}
 
 	fmt.Fprintf(w, `
@@ -273,8 +273,8 @@ func (f Function) GenChecks(w io.Writer) (string, error) {
 		return "", nil
 	}
 	structName := CamelCase(strings.SplitN(f.getStructName(false, true), "__", 2)[1])
-	buf := buffers.Get()
-	defer buffers.Put(buf)
+	buf := Buffers.Get()
+	defer Buffers.Put(buf)
 	nm := "Check" + structName
 	fmt.Fprintf(buf, `
 // %s checks input bounds for pb.%s

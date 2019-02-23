@@ -41,7 +41,7 @@ type Function struct {
 	Returns       *Argument
 	Args          []Argument
 	Documentation string
-	Replacement   string
+	Replacement   *Function
 }
 
 func (f Function) Name() string {

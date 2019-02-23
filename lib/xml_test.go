@@ -47,9 +47,10 @@ func TestQuery078(t *testing.T) {
 		t.Errorf("error parsing csv: %v", err)
 		t.FailNow()
 	}
-	if len(functions) != 1 {
+	if len(functions) != 2 {
 		t.Errorf("parsed %d functions, wanted %d!", len(functions), 1)
 	}
+	functions[0].Replacement = &functions[1]
 	var buf strings.Builder
 	enc := xml.NewEncoder(&buf)
 	enc.Indent("", "  ")
@@ -67,7 +68,7 @@ func TestQuery078(t *testing.T) {
 	t.Log(buf.String())
 
 	buf.Reset()
-	err = SaveFunctions(&buf, functions, "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true)
+	err = SaveFunctions(&buf, functions[:1], "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true)
 	t.Log(buf.String())
 	if err != nil {
 		t.Error(err)
@@ -97,7 +98,10 @@ const query078Csv = `OBJECT_ID,SUBPROGRAM_ID,SEQUENCE,PACKAGE_NAME,OBJECT_NAME,D
 35325,81,17,DB_SPOOLSYS3,QUERY_078,4,2,F_UNIT_NEV,OUT,VARCHAR2,,,CHAR_CS,VARCHAR2,40,,,,
 35325,81,18,DB_SPOOLSYS3,QUERY_078,4,3,F_ISIN,OUT,VARCHAR2,,,CHAR_CS,VARCHAR2,12,,,,
 35325,81,19,DB_SPOOLSYS3,QUERY_078,4,4,UNIT_DB,OUT,NUMBER,24,12,,NUMBER,0,,,,
-35325,81,20,DB_SPOOLSYS3,QUERY_078,4,5,UNIT_ARF,OUT,NUMBER,24,12,,NUMBER,0,,,,`
+35325,81,20,DB_SPOOLSYS3,QUERY_078,4,5,UNIT_ARF,OUT,NUMBER,24,12,,NUMBER,0,,,,
+35325,82,1,DB_SPOOLSYS3,QUERY_078_XML,0,1,P_OUT,OUT,,,,,XMLTYPE,0,,,,
+35325,82,1,DB_SPOOLSYS3,QUERY_078_XML,0,2,P_IN,IN,,,,,XMLTYPE,0,,,,
+`
 
 const query078WantXML = `<Function>
   <Package>DB_SPOOLSYS3</Package>

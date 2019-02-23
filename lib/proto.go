@@ -140,8 +140,8 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 	w := errWriter{Writer: dst, err: &err}
 	fmt.Fprintf(w, "\nmessage %s {\n", msgName)
 
-	buf := buffers.Get()
-	defer buffers.Put(buf)
+	buf := Buffers.Get()
+	defer Buffers.Put(buf)
 	for i, arg := range args {
 		var rule string
 		if strings.HasSuffix(arg.Name, "#") {

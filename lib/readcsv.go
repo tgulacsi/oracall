@@ -337,17 +337,23 @@ func ReplaceFunctions(functions []Function, m map[string]string) []Function {
 		m[strings.ToLower(k)] = v
 		m[v] = ""
 	}
+	names := make(map[string]*Function, len(functions))
 	for i := 0; i < len(functions); i++ {
 		f := functions[i]
-		if v, ok := m[strings.ToLower(f.Name())]; ok && v == "" { // just a replacement
+		// delete if this is a replacement
+		nm := strings.ToLower(f.Name())
+		if v, ok := m[nm]; ok && v == "" {
 			functions[i] = functions[0]
 			functions = functions[1:]
 			i--
+			continue
 		}
+		names[nm] = &functions[i]
 	}
 	for i, f := range functions {
-		if v := m[strings.ToLower(f.Name())]; v != "" {
-			f.Replacement = v
+		nm := strings.ToLower(f.Name())
+		if v := m[nm]; v != "" {
+			f.Replacement = names[nm]
 			functions[i] = f
 		}
 	}
