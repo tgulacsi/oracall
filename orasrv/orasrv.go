@@ -43,6 +43,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 		if _, ok := ctx.Deadline(); !ok && Timeout > 0 {
 			ctx, toCancel = context.WithTimeout(ctx, Timeout) //nolint:govet
 		}
+		var cancel context.CancelFunc
 		ctx, cancel = joincontext.Join(ctx, globalCtx)
 		if toCancel != nil {
 			origCancel := cancel
