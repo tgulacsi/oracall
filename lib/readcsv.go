@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -138,7 +139,7 @@ func MustOpenCsv(filename string) *os.File {
 	fh, err := OpenCsv(filename)
 	if err != nil {
 		Log("msg", "MustOpenCsv", "file", filename, "error", err)
-		os.Exit(1)
+		panic(errors.Wrap(err, filename))
 	}
 	return fh
 }

@@ -401,7 +401,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 		}
 	default:
 		Log("msg", "unknown flavor", "flavor", arg.Flavor)
-		os.Exit(1)
+		panic(errors.Errorf("unknown flavor %v", arg.Flavor))
 	}
 	return checks
 }

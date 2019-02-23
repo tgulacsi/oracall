@@ -39,7 +39,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
 		Log("msg", "error preparing", "function", fun, "error", err)
-		os.Exit(1)
+		panic(errors.Wrap(err, fun.Name()))
 	}
 	fn := strings.Replace(fun.name, ".", "__", -1)
 
@@ -599,12 +599,12 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					}
 				default:
 					Log("msg", "Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
-					os.Exit(1)
+					panic(errors.Errorf("Only table of simple or record types are allowed (no table of table!) - %s(%v)", fun.Name(), arg.Name))
 				}
 			}
 		default:
 			Log("msg", "unkown flavor", "flavor", arg.Flavor)
-			os.Exit(1)
+			panic(errors.Errorf("unknown flavor %s(%v)", fun.Name(), arg.Name))
 		}
 	}
 
