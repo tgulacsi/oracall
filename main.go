@@ -125,6 +125,7 @@ func Main(args []string) error {
 		})
 	}
 
+	var annotations []oracall.Annotation
 	if *flagConnect == "" {
 		if pattern != "%" {
 			rPattern := regexp.MustCompile("(?i)" + strings.Replace(strings.Replace(pattern, ".", "[.]", -1), "%", ".*", -1))
@@ -146,11 +147,7 @@ func Main(args []string) error {
 			return errors.Wrap(err, "Ping "+*flagConnect)
 		}
 
-		var replacements []string
-		functions, replacements, err = parseDB(cx, pattern, *flagDump, filter)
-		if len(replacements) != 0 {
-			*flagReplace += " " + strings.Join(replacements, " ")
-		}
+		functions, annotations, err = parseDB(cx, pattern, *flagDump, filter)
 	}
 	if err != nil {
 		return errors.Wrap(err, "read "+flag.Arg(0))
@@ -177,8 +174,22 @@ func Main(args []string) error {
 	}
 
 	*flagReplace = strings.TrimSpace(*flagReplace)
+	for _, elt := range strings.FieldsFunc(
+		rReplace.ReplaceAllLiteralString(*flagReplace, "=>"),
+		func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
+		i := strings.Index(elt, "=>")
+		if i < 0 {
+			continue
+		}
+		a := oracall.Annotation{Type: "replace", Name: elt[:i], Other: elt[i+2:]}
+		if i = strings.IndexByte(a.Name, '.'); i >= 0 {
+			a.Package, a.Name = a.Name[:i], a.Name[i+1:]
+			a.Other = strings.TrimPrefix(a.Other, a.Package)
+		}
+		annotations = append(annotations, a)
+	}
 	if *flagReplace != "" {
-		functions = oracall.ReplaceFunctions(functions, mkReplacementMap(*flagReplace))
+		functions = oracall.ApplyAnnotations(functions, annotations)
 	}
 
 	var grp errgroup.Group
@@ -237,7 +248,7 @@ func Main(args []string) error {
 	return nil
 }
 
-func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, replacements []string, err error) {
+func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, annotations []oracall.Annotation, err error) {
 	tbl := "user_arguments"
 	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
 		tbl = "all_arguments"
@@ -272,7 +283,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 	rows, err := cx.QueryContext(ctx, qry, pattern, pattern)
 	if err != nil {
 		logger.Log("qry", qry, "error", err)
-		return functions, replacements, errors.Wrap(err, qry)
+		return functions, annotations, errors.Wrap(err, qry)
 	}
 	defer rows.Close()
 
@@ -315,7 +326,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
 			logger.Log("msg", "create", "dump", dumpFn, "error", err)
-			return functions, replacements, errors.Wrap(err, dumpFn)
+			return functions, annotations, errors.Wrap(err, dumpFn)
 		}
 		defer func() {
 			cw.Flush()
@@ -329,7 +340,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 		cw = csv.NewWriter(fh)
 		if err = cw.Write(colNames); err != nil {
 			logger.Log("msg", "write header to csv", "error", err)
-			return functions, replacements, errors.Wrap(err, "write header")
+			return functions, annotations, errors.Wrap(err, "write header")
 		}
 	}
 
@@ -378,16 +389,23 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 							return errors.WithMessage(srcErr, ua.PackageName)
 						}
 						replMu.Lock()
-						for _, b := range rReplacement.FindAll(buf.Bytes(), -1) {
-							b = bytes.TrimSpace(bytes.TrimPrefix(b, []byte("--replace ")))
-							if i := bytes.LastIndexByte(b, ' '); i < 0 {
-								replacements = append(replacements, string(b))
+						for _, b := range rAnnotation.FindAll(buf.Bytes(), -1) {
+							b = bytes.TrimSpace(bytes.TrimPrefix(b, []byte("--oracall:")))
+							a := oracall.Annotation{Package: ua.PackageName}
+							if i := bytes.IndexByte(b, ' '); i < 0 {
+								continue
 							} else {
-								replacements = append(replacements, fmt.Sprintf("%s.%s%s.%s", ua.PackageName, b[:i+1], ua.PackageName, b[i+1:]))
+								a.Type, b = string(b[:i]), b[i+1:]
 							}
+							if i := bytes.Index(b, []byte("=>")); i < 0 {
+								a.Name = string(bytes.TrimSpace(b))
+							} else {
+								a.Name, a.Other = string(bytes.TrimSpace(b[:i])), string(bytes.TrimSpace(b[i+2:]))
+							}
+							annotations = append(annotations, a)
 						}
-						if len(replacements) != 0 {
-							Log("replacements", replacements)
+						if len(annotations) != 0 {
+							Log("annotations", annotations)
 						}
 						replMu.Unlock()
 						subCtx, subCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -487,7 +505,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 	if any {
 		logger.Log("has", docNames)
 	}
-	return functions, replacements, nil
+	return functions, annotations, nil
 }
 
 var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 1024)) }}
@@ -530,23 +548,6 @@ func parsePkgFlag(s string) (string, string) {
 }
 
 var rReplace = regexp.MustCompile("\\s*=>\\s*")
-var rReplacement = regexp.MustCompile("--replace\\s+[a-zA-Z0-9_#]+\\s*=>\\s*[a-zA-Z0-9_#]+")
-
-func mkReplacementMap(s string) map[string]string {
-	fields := strings.Fields(rReplace.ReplaceAllLiteralString(s, "=>"))
-	if len(fields) == 0 {
-		return nil
-	}
-	m := make(map[string]string, len(fields))
-	for _, f := range fields {
-		i := strings.Index(f, "=>")
-		if i < 0 {
-			continue
-		}
-		m[f[:i]] = f[i+2:] // for replacing
-		m[f[i+2:]] = ""    // for deletion
-	}
-	return m
-}
+var rAnnotation = regexp.MustCompile("--oracall:((replace|rename)\\s+[a-zA-Z0-9_#]+\\s*=>\\s*[a-zA-Z0-9_#]+)|private\\s+[a-zA-Z0-9_#]+")
 
 // vim: set fileencoding=utf-8 noet:

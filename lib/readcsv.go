@@ -328,25 +328,65 @@ func mustBeUint8(text string) uint8 {
 	return uint8(u)
 }
 
-func ReplaceFunctions(functions []Function, tbr map[string]string) []Function {
-	if len(tbr) == 0 {
+type Annotation struct {
+	Package, Type, Name, Other string
+}
+
+func (a Annotation) FullName() string {
+	if a.Package == "" || a.Name == "" {
+		return a.Name
+	}
+	return a.Package + "." + a.Name
+}
+func (a Annotation) FullOther() string {
+	if a.Package == "" || a.Other == "" {
+		return a.Other
+	}
+	return a.Package + "." + a.Other
+}
+func (a Annotation) String() string {
+	if a.Type == "" || a.Name == "" {
+		return ""
+	}
+	if a.Type == "private" {
+		return a.Type + " " + a.FullName()
+	}
+	return a.Type + " " + a.FullName() + "=>" + a.FullOther()
+}
+
+func ApplyAnnotations(functions []Function, annotations []Annotation) []Function {
+	if len(annotations) == 0 {
 		return functions
 	}
+	L := strings.ToLower
 	funcs := make(map[string]*Function, len(functions))
 	for i := range functions {
 		f := functions[i]
-		funcs[strings.ToLower(f.Name())] = &f
+		funcs[L(f.Name())] = &f
 	}
-	for k, v := range tbr {
-		if v == "" {
+	for _, a := range annotations {
+		if a.Name == "" {
 			continue
 		}
-		funcs[strings.ToLower(k)].Replacement = funcs[strings.ToLower(v)]
+		switch a.Type {
+		case "rename":
+			if a.Other != "" {
+				if f := funcs[L(a.FullName())]; f != nil {
+					funcs[L(a.FullOther())] = f
+					delete(funcs, L(f.Name()))
+					f.name = a.Other
+				}
+			}
+		case "replace":
+			if a.Other != "" {
+				funcs[L(a.FullName())].Replacement = funcs[L(a.FullOther())]
+			}
+		}
 	}
 	// delete replacements
-	for k, v := range tbr {
-		if v == "" {
-			delete(funcs, k)
+	for _, a := range annotations {
+		if a.Type == "replace" && a.Other != "" {
+			delete(funcs, L(a.FullOther()))
 		}
 	}
 	functions = functions[:0]
