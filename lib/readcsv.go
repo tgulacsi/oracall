@@ -374,11 +374,13 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 				if f := funcs[L(a.FullName())]; f != nil {
 					funcs[L(a.FullOther())] = f
 					delete(funcs, L(f.Name()))
+					Log("rename", f.name, "to", a.Other)
 					f.name = a.Other
 				}
 			}
 		case "replace":
 			if a.Other != "" {
+				Log("replace", a.FullName(), "with", a.FullOther())
 				funcs[L(a.FullName())].Replacement = funcs[L(a.FullOther())]
 			}
 		}

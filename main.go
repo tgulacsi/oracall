@@ -188,9 +188,7 @@ func Main(args []string) error {
 		}
 		annotations = append(annotations, a)
 	}
-	if *flagReplace != "" {
-		functions = oracall.ApplyAnnotations(functions, annotations)
-	}
+	functions = oracall.ApplyAnnotations(functions, annotations)
 
 	var grp errgroup.Group
 	grp.Go(func() error {
