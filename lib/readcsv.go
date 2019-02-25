@@ -362,43 +362,39 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 	funcs := make(map[string]*Function, len(functions))
 	for i := range functions {
 		f := functions[i]
-		funcs[L(f.Name())] = &f
+		funcs[L(f.RealName())] = &f
 	}
 	for _, a := range annotations {
-		if a.Name == "" {
+		if a.Name == "" || a.Type == "" ||
+			a.Type != "private" && a.Other == "" {
 			continue
 		}
 		switch a.Type {
 		case "private":
-			Log("private", a.FullName())
-			delete(funcs, L(a.FullName()))
+			nm := L(a.FullName())
+			Log("private", nm)
+			delete(funcs, nm)
 		case "rename":
-			if a.Other != "" {
-				if f := funcs[L(a.FullName())]; f != nil {
-					funcs[L(a.FullOther())] = f
-					delete(funcs, L(f.Name()))
-					Log("rename", f.name, "to", a.Other)
-					f.alias = a.Other
-				}
+			nm := L(a.FullName())
+			if f := funcs[nm]; f != nil {
+				delete(funcs, nm)
+				funcs[L(a.FullOther())] = f
+				Log("rename", nm, "to", a.Other)
+				f.alias = a.Other
 			}
 		case "replace":
-			if a.Other != "" {
-				Log("replace", a.FullName(), "with", a.FullOther())
-				funcs[L(a.FullName())].Replacement = funcs[L(a.FullOther())]
+			k, v := L(a.FullName()), L(a.FullOther())
+			if f := funcs[k]; f != nil {
+				Log("replace", k, "with", v)
+				f.Replacement = funcs[v]
+				delete(funcs, v)
+				Log("delete", v, "add", f.Name())
+				funcs[L(f.Name())] = f
 			}
-		}
-	}
-	// delete replacements
-	for _, a := range annotations {
-		if a.Type == "replace" && a.Other != "" {
-			delete(funcs, L(a.FullOther()))
 		}
 	}
 	functions = functions[:0]
 	for _, f := range funcs {
-		if f.Replacement != nil {
-			Log("replacee", f.Name(), "replacement", f.Replacement.Name())
-		}
 		functions = append(functions, *f)
 	}
 	return functions

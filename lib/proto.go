@@ -57,7 +57,11 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 
 FunLoop:
 	for _, fun := range functions {
-		fName := strings.ToLower(fun.name)
+		fName := fun.name
+		if fun.alias != "" {
+			fName = fun.alias
+		}
+		fName = strings.ToLower(fName)
 		if err := fun.SaveProtobuf(w, seen); err != nil {
 			if SkipMissingTableOf && (errors.Cause(err) == ErrMissingTableOf ||
 				errors.Cause(err) == UnknownSimpleType) {

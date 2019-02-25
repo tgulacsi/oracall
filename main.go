@@ -403,12 +403,14 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 							}
 							annotations = append(annotations, a)
 						}
+						bb := buf.Bytes()
 						if len(annotations) != 0 {
 							Log("annotations", annotations)
+							bb = rAnnotation.ReplaceAll(bb, nil)
 						}
 						replMu.Unlock()
 						subCtx, subCancel := context.WithTimeout(ctx, 1*time.Second)
-						funDocs, docsErr := parseDocs(subCtx, buf.String())
+						funDocs, docsErr := parseDocs(subCtx, string(bb))
 						subCancel()
 						Log("msg", "parseDocs", "docs", len(funDocs), "error", docsErr)
 						docsMu.Lock()
