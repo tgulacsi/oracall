@@ -369,13 +369,16 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 			continue
 		}
 		switch a.Type {
+		case "private":
+			Log("private", a.FullName())
+			delete(funcs, L(a.FullName()))
 		case "rename":
 			if a.Other != "" {
 				if f := funcs[L(a.FullName())]; f != nil {
 					funcs[L(a.FullOther())] = f
 					delete(funcs, L(f.Name()))
 					Log("rename", f.name, "to", a.Other)
-					f.name = a.Other
+					f.alias = a.Other
 				}
 			}
 		case "replace":

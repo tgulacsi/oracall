@@ -356,7 +356,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					argIn = &repl.Args[i]
 				}
 			}
-			call = fmt.Sprintf("%s(%s=>v_in, %s=>:2)", repl.Name(), argIn.Name, argOut.Name)
+			call = fmt.Sprintf("%s(%s=>v_in, %s=>:2)", repl.RealName(), argIn.Name, argOut.Name)
 		}
 		return decls, pre, call, post, convIn, convOut, nil
 	}
@@ -653,7 +653,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		callb.WriteString(":ret := ")
 	}
 	//Log("msg","prepareCall", "callArgs", callArgs)
-	callb.WriteString(fun.Name() + "(")
+	callb.WriteString(fun.RealName() + "(")
 	for i, arg := range fun.Args {
 		if i > 0 {
 			callb.WriteString(",\n\t\t")

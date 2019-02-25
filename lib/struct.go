@@ -37,18 +37,29 @@ const (
 )
 
 type Function struct {
-	Package, name string
-	Returns       *Argument
-	Args          []Argument
-	Documentation string
-	Replacement   *Function
+	Package, name, alias string
+	Returns              *Argument
+	Args                 []Argument
+	Documentation        string
+	Replacement          *Function
 }
 
 func (f Function) Name() string {
-	if f.Package == "" {
-		return strings.ToLower(f.name)
+	nm := strings.ToLower(f.name)
+	if f.alias != "" {
+		nm = strings.ToLower(f.name)
 	}
-	return UnoCap(f.Package) + "." + strings.ToLower(f.name)
+	if f.Package == "" {
+		return nm
+	}
+	return UnoCap(f.Package) + "." + nm
+}
+func (f Function) RealName() string {
+	nm := strings.ToLower(f.name)
+	if f.Package == "" {
+		return nm
+	}
+	return UnoCap(f.Package) + "." + nm
 }
 
 func (f Function) String() string {
