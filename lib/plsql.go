@@ -122,7 +122,10 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 			})
 	}
 
-	i := strings.Index(call, fun.Name())
+	i := strings.Index(call, fun.RealName())
+	if i < 0 {
+		Log("msg", "not found", "name", fun.RealName(), "in", call)
+	}
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `

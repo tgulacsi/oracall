@@ -53,18 +53,18 @@ type UserArgument struct {
 	SubprogramID uint `sql:"SUBPROGRAM_ID"`
 
 	CharLength uint `sql:"CHAR_LENGTH"`
+	Position   uint `sql:"POSITION"`
 
 	DataPrecision uint8 `sql:"DATA_PRECISION"`
 	DataScale     uint8 `sql:"DATA_SCALE"`
 	DataLevel     uint8 `sql:"DATA_LEVEL"`
-	Position      uint8 `sql:"POSITION"`
 }
 
 // ParseCsv reads the given csv file as user_arguments
 // The csv should be an export of
 /*
-   SELECT object_id, subprogram_id, package_name, object_name,
-          data_level, position, argument_name, in_out,
+   SELECT object_id, subprogram_id, package_name, sequence, object_name,
+          data_level, argument_name, in_out,
           data_type, data_precision, data_scale, character_set_name,
           pls_type, char_length, type_owner, type_name, type_subname, type_link
      FROM user_arguments
@@ -166,7 +166,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 		csvFields = make(map[string]int, 20)
 	)
 	for _, h := range []string{"OBJECT_ID", "SUBPROGRAM_ID", "PACKAGE_NAME",
-		"OBJECT_NAME", "DATA_LEVEL", "POSITION", "ARGUMENT_NAME", "IN_OUT",
+		"OBJECT_NAME", "DATA_LEVEL", "SEQUENCE", "ARGUMENT_NAME", "IN_OUT",
 		"DATA_TYPE", "DATA_PRECISION", "DATA_SCALE", "CHARACTER_SET_NAME",
 		"PLS_TYPE", "CHAR_LENGTH",
 		"TYPE_LINK", "TYPE_OWNER", "TYPE_NAME", "TYPE_SUBNAME"} {
@@ -202,7 +202,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			ObjectName:  rec[csvFields["OBJECT_NAME"]],
 
 			DataLevel:    mustBeUint8(rec[csvFields["DATA_LEVEL"]]),
-			Position:     mustBeUint8(rec[csvFields["POSITION"]]),
+			Position:     mustBeUint(rec[csvFields["SEQUENCE"]]),
 			ArgumentName: rec[csvFields["ARGUMENT_NAME"]],
 			InOut:        rec[csvFields["IN_OUT"]],
 

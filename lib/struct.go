@@ -55,6 +55,9 @@ func (f Function) Name() string {
 	return UnoCap(f.Package) + "." + nm
 }
 func (f Function) RealName() string {
+	if f.Replacement != nil {
+		return f.Replacement.RealName()
+	}
 	nm := strings.ToLower(f.name)
 	if f.Package == "" {
 		return nm
@@ -136,10 +139,8 @@ const (
 )
 
 type Argument struct {
-	RecordOf []NamedArgument //this argument is a record (map) of this type
-	Name     string
-	//Level                   uint8
-	//Position                uint8
+	RecordOf       []NamedArgument //this argument is a record (map) of this type
+	Name           string
 	Type, TypeName string
 	AbsType        string
 	Charset        string

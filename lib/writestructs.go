@@ -167,7 +167,11 @@ FunLoop:
 }
 
 func (f Function) getPlsqlConstName() string {
-	return capitalize(f.Package + "__" + f.name + "__plsql")
+	nm := f.name
+	if f.alias != "" {
+		nm = f.alias
+	}
+	return capitalize(f.Package + "__" + nm + "__plsql")
 }
 
 func (f Function) getStructName(out, withPackage bool) string {
@@ -175,10 +179,14 @@ func (f Function) getStructName(out, withPackage bool) string {
 	if out {
 		dirname = "output"
 	}
-	if !withPackage {
-		return f.name + "__" + dirname
+	nm := f.name
+	if f.alias != "" {
+		nm = f.alias
 	}
-	return capitalize(f.Package + "__" + f.name + "__" + dirname)
+	if !withPackage {
+		return nm + "__" + dirname
+	}
+	return capitalize(f.Package + "__" + nm + "__" + dirname)
 }
 
 var Buffers = newBufPool(1 << 16)

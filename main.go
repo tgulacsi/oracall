@@ -261,7 +261,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
       FROM
     (SELECT DISTINCT object_id object_id, subprogram_id, sequence*100,
            package_name, object_name,
-           data_level, position*100, argument_name, in_out,
+           data_level, argument_name, in_out,
            data_type, data_precision, data_scale, character_set_name,
            pls_type, char_length, type_owner, type_name, type_subname, type_link
       FROM ` + tbl + `
@@ -269,9 +269,10 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
      UNION ALL
      SELECT DISTINCT object_id object_id, subprogram_id, A.sequence*100 + B.attr_no,
             package_name, object_name,
-            A.data_level, A.position*100 + B.attr_no, B.attr_name, A.in_out,
+            A.data_level, B.attr_name, A.in_out,
             B.ATTR_TYPE_NAME, B.PRECISION, B.scale, B.character_set_name,
-            B.ATTR_TYPE_OWNER||'.'||B.attr_type_name, B.length, NULL, NULL, NULL, NULL
+            NVL2(B.ATTR_TYPE_OWNER, B.attr_type_owner||'.', '')||B.attr_type_name, B.length,
+			NULL, NULL, NULL, NULL
        FROM all_type_attrs B, ` + tbl + ` A
        WHERE B.owner = A.type_owner AND B.type_name = A.type_name AND
              A.data_type = 'OBJECT' AND
@@ -350,11 +351,11 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 	grp.Go(func() error {
 		defer close(userArgs)
 		var pn, on, an, cs, plsT, tOwner, tName, tSub, tLink sql.NullString
-		var oid, seq, subid, level, pos, prec, scale, length sql.NullInt64
+		var oid, seq, subid, level, prec, scale, length sql.NullInt64
 		for rows.Next() {
 			var ua oracall.UserArgument
 			err = rows.Scan(&oid, &subid, &seq, &pn, &on,
-				&level, &pos, &an, &ua.InOut,
+				&level, &an, &ua.InOut,
 				&ua.DataType, &prec, &scale, &cs,
 				&plsT, &length, &tOwner, &tName, &tSub, &tLink)
 			if err != nil {
@@ -364,7 +365,7 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 				N := i64ToString
 				if err = cw.Write([]string{
 					N(oid), N(subid), N(seq), pn.String, on.String,
-					N(level), N(pos), an.String, ua.InOut,
+					N(level), an.String, ua.InOut,
 					ua.DataType, N(prec), N(scale), cs.String,
 					plsT.String, N(length),
 					tOwner.String, tName.String, tSub.String, tLink.String,
@@ -456,8 +457,8 @@ func parseDB(cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (func
 			if level.Valid {
 				ua.DataLevel = uint8(level.Int64)
 			}
-			if pos.Valid {
-				ua.Position = uint8(pos.Int64)
+			if seq.Valid {
+				ua.Position = uint(seq.Int64)
 			}
 			if prec.Valid {
 				ua.DataPrecision = uint8(prec.Int64)

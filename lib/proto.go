@@ -122,8 +122,12 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 		args = append(args, *f.Returns)
 	}
 
+	nm := f.name
+	if f.alias != "" {
+		nm = f.alias
+	}
 	return protoWriteMessageTyp(dst,
-		CamelCase(dot2D.Replace(strings.ToLower(f.name))+"__"+dirname),
+		CamelCase(dot2D.Replace(strings.ToLower(nm))+"__"+dirname),
 		seen, args...)
 }
 
