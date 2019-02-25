@@ -267,20 +267,21 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 				ua.DataScale,
 				ua.CharLength,
 			)
+			//Log("level", level, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor)
 			// Possibilities:
 			// 1. SIMPLE
 			// 2. RECORD at level 0
 			// 3. TABLE OF simple
 			// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
+			if arg.Flavor != FLAVOR_SIMPLE {
+				lastArgs[level] = &arg
+			}
 			if level == 0 && fun.Returns == nil && arg.Name == "" {
 				arg.Name = "ret"
 				fun.Returns = &arg
 				continue
 			}
 			parent := lastArgs[level-1]
-			if arg.Flavor != FLAVOR_SIMPLE {
-				lastArgs[level] = &arg
-			}
 			if parent == nil {
 				Log("level", level, "lastArgs", lastArgs, "fun", fun)
 			}
@@ -291,9 +292,11 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 			}
 		}
 		fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
+		//Log("args", lastArgs[-1].RecordOf)
 		for i, na := range lastArgs[-1].RecordOf {
 			fun.Args[i] = *na.Argument
 		}
+		//Log("args", fun.Args)
 		functions = append(functions, fun)
 	}
 	Log("msg", fmt.Sprintf("found %d functions.", len(functions)))
