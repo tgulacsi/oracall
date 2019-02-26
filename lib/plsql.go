@@ -41,7 +41,11 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		Log("msg", "error preparing", "function", fun, "error", err)
 		panic(errors.Wrap(err, fun.Name()))
 	}
-	fn := strings.Replace(fun.name, ".", "__", -1)
+	fn := fun.name
+	if fun.alias != "" {
+		fn = fun.alias
+	}
+	fn = strings.Replace(fn, ".", "__", -1)
 
 	plsBuf := Buffers.Get()
 	defer Buffers.Put(plsBuf)
