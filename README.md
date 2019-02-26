@@ -34,7 +34,7 @@ First, it reads the functions, procedures' names and their arguments' types from
 the given database with the following query:
 
     SELECT object_id, subprogram_id, package_name, object_name,
-           data_level, position, argument_name, in_out,
+           data_level, sequence, argument_name, in_out,
            data_type, data_precision, data_scale, character_set_name,
            pls_type, char_length, type_owner, type_name, type_subname, type_link
       FROM user_arguments
@@ -60,6 +60,23 @@ Supported types:
   must be one of the previously supported types (but not arrays!)
   'Cause of OCI restrictions, these arrays must be indexed from 1.
   * cursors.
+
+## Tweaks
+If you have a package with mixed content, you can force oracall to ignore them
+either by
+
+  * specify command-line flag: `-private pkg.func_to_be_ignored,pkg2.other_private`
+  * or add a comment: `--oracall:private func_to_be_ignored` to the package header.
+
+The latter can be used to implement two other hacks:
+
+  1. *rename* a function (if you have a non-oracall-compliant and a replacement, and have to keep both):
+     `--oracall:rename non_compliant => compliant
+  2. *replace* a function's innards with another function getting and receiving xml as CLOB:
+     `--oracall:replace non_compliant_complex => xml_replacement`
+	 and this will create the `non_compliant_complex` function's call type in the protobuf file
+	 (so this will look like the original complex function), but will call the `xml_replacement`
+	 function with the protobuf serialized to XML, and deserialized from the returned XML.
 
 
 ## REF_CURSOR
