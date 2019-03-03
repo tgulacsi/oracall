@@ -385,11 +385,12 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 				Log("rename", nm, "to", a.Other)
 				f.alias = a.Other
 			}
-		case "replace":
+		case "replace", "replace_json":
 			k, v := L(a.FullName()), L(a.FullOther())
 			if f := funcs[k]; f != nil {
 				Log("replace", k, "with", v)
 				f.Replacement = funcs[v]
+				f.ReplacementIsJSON = a.Type == "replace_json"
 				delete(funcs, v)
 				Log("delete", v, "add", f.Name())
 				funcs[L(f.Name())] = f

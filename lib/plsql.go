@@ -341,17 +341,29 @@ func demap(plsql, callFun string) (string, string) {
 func (fun Function) prepareCall() (decls, pre []string, call string, post []string, convIn, convOut []string, err error) {
 	callArgs := make(map[string]string, 16)
 	if repl := fun.Replacement; repl != nil {
-		// DECLARE v_in XMLType; v_out XMLType; BEGIN v_out := replacement(v_in); END;
 		decls = append(decls, "v_in CLOB := :1;")
 		convIn = append(convIn,
-			"inXML := oracall.Buffers.Get(); defer oracall.Buffers.Put(inXML)",
-			"if err = xml.NewEncoder(inXML).Encode(input); err != nil { return }",
-			"var outXML string",
-			"params := []interface{}{inXML.String(), sql.Out{Dest:&outXML}}",
+			"inCLOB := oracall.Buffers.Get(); defer oracall.Buffers.Put(inCLOB)",
+			"var outCLOB string",
 		)
-		convOut = append(convOut,
-			"if err = xml.NewDecoder(strings.NewReader(outXML)).Decode(&output); err != nil { err = errors.Wrap(err, outXML); return; }",
+		if fun.ReplacementIsJSON {
+			convIn = append(convIn, "if err = json.NewEncoder(inCLOB).Encode(input); err != nil { return }")
+		} else {
+			convIn = append(convIn, "if err = xml.NewEncoder(inCLOB).Encode(input); err != nil { return }")
+		}
+		convIn = append(convIn,
+			"params := []interface{}{inCLOB.String(), sql.Out{Dest:&outCLOB}}",
 		)
+		if fun.ReplacementIsJSON {
+			convOut = append(convOut,
+				"if err = json.NewDecoder(strings.NewReader(outCLOB)).Decode(&output); err != nil { err = errors.Wrap(err, outCLOB); return; }",
+			)
+		} else {
+			convOut = append(convOut,
+				"if err = xml.NewDecoder(strings.NewReader(outCLOB)).Decode(&output); err != nil { err = errors.Wrap(err, outCLOB); return; }",
+			)
+		}
+
 		if repl.Returns != nil {
 			call = fmt.Sprintf(":2 := %s(%s=>v_in)", repl.Name(), repl.Args[0].Name)
 		} else {

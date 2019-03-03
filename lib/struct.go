@@ -42,6 +42,7 @@ type Function struct {
 	Args                 []Argument
 	Documentation        string
 	Replacement          *Function
+	ReplacementIsJSON    bool
 }
 
 func (f Function) Name() string {
