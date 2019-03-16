@@ -5,25 +5,26 @@ set -x
 tmpdir="${TMPDIR:-/tmp}/$(basename "$0")-$$"
 mkdir -p "$tmpdir"
 GOPATH="${GOPATH:-$(go env GOPATH)}"
-if ! protoc --version 2>/dev/null | grep -F 'libprotoc 3'; then
-	dst="$tmpdir/protoc-linux_x86_64.zip"
-	if ! [ -e "$dst" ]; then
-		curl -L -sS "$(curl -L -sS https://github.com/google/protobuf/releases/ \
-			| sed -n -e 's/^.* href="\([^"]*linux-x86_64.zip\)".*$/https:\/\/github.com\1/p' \
-			| grep -F -v java \
-			| sort -ur \
-			| head -n 1)" -o "$dst"
-	fi
-	cd "$GOPATH" && unzip -o "$dst"
-	rsync -a include/google/ "$GOPATH/src/google/"
-	rm -rf include/google
-	rmdir include || echo ''
+mkdir -p $GOPATH/src/google/protobuf
+dst="$tmpdir/protoc-linux_x86_64.zip"
+if ! [ -e "$dst" ]; then
+	curl -L -sS "$(curl -L -sS https://github.com/protocolbuffers/protobuf/releases/ \
+		| sed -n -e 's/^.* href="\([^"]*linux-x86_64.zip\)".*$/https:\/\/github.com\1/p' \
+		| grep -F -v java \
+		| sort -ur \
+		| head -n 1)" -o "$dst"
 fi
+cd "$GOPATH" && unzip -o "$dst"
+rsync -a include/google/ "$GOPATH/src/google/"
+rm -rf include/google
+rmdir include || echo ''
 
-if [ ! -e $GOPATH/src/google/api/annotations.proto ]; then
+if [ ! -e $GOPATH/src/google/api/annotations.proto ] || [ ! -e $GOPATH/src/google/api/timestamp.proto ]; then
 	rm -rf $GOPATH/src/google/api
+	set -x
 	go get github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
-	ln -s ../github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis/google/api $GOPATH/src/google/api
+	mkdir -p $GOPATH/src/google
+	ln -s $GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis/google/api $GOPATH/src/google/api
 fi
 
 rm -rf "$tmpdir"

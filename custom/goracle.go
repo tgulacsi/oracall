@@ -13,8 +13,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/golang/protobuf/ptypes"
-	tspb "github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/gogo/protobuf/types"
 
 	"github.com/pkg/errors"
 	"gopkg.in/goracle.v2"
@@ -61,35 +60,47 @@ func NumbersFromStrings(s *[]string) *[]goracle.Number {
 	return (*[]goracle.Number)(unsafe.Pointer(s))
 }
 
-type Date tspb.Timestamp
+type Date types.Timestamp
 
 const timeFormat = time.RFC3339 //"2006-01-02 15:04:05 -0700"
+
+func TimestampProto(t time.Time) *types.Timestamp {
+	ts, err := types.TimestampProto(t)
+	if err != nil {
+		panic(errors.Wrap(err, t.String()))
+	}
+	return ts
+}
 
 func NewDate(t time.Time) Date {
 	var d Date
 	d.Set(t)
 	return d
 }
-func (d *Date) Set(t time.Time) {
-	ts, err := ptypes.TimestampProto(t)
+func (d *Date) Set(t time.Time) error {
+	ts, err := types.TimestampProto(t)
 	if err != nil {
-		panic(errors.Wrap(err, t.String()))
+		return errors.Wrap(err, t.String())
 	}
 	*d = Date(*ts)
+	return nil
 }
-func (d Date) Get() (od time.Time, err error) {
-	return ptypes.Timestamp((*tspb.Timestamp)(&d))
+func (d Date) GetSeconds() int64 { return (*types.Timestamp)(&d).GetSeconds() }
+func (d Date) GetNanos() int32   { return (*types.Timestamp)(&d).GetNanos() }
+func (d Date) Get() time.Time {
+	return time.Unix(d.GetSeconds(), int64(d.GetNanos()))
 }
 
 // Value returns a driver Value.
-func (d Date) Value() (driver.Value, error) {
-	return d.Get()
+func (d *Date) Value() (driver.Value, error) {
+	return d.Get(), nil
 }
 
-func (d Date) String() string { return ptypes.TimestampString((*tspb.Timestamp)(&d)) }
+func (d Date) Proto() *types.Timestamp { return (*types.Timestamp)(&d) }
+func (d Date) String() string          { return types.TimestampString((*types.Timestamp)(&d)) }
 func (d *Date) SetString(s string) error {
 	if s == "" {
-		((*tspb.Timestamp)(d)).Reset()
+		(*types.Timestamp)(d).Reset()
 		return nil
 	}
 	var i int
@@ -347,9 +358,5 @@ func AsTime(v interface{}) time.Time {
 	if t, ok := v.(time.Time); ok {
 		return t
 	}
-	t, err := AsDate(v).Get()
-	if err != nil {
-		log.Printf("ERROR parsing %q as Date: %v", v, err)
-	}
-	return t
+	return AsDate(v).Get()
 }

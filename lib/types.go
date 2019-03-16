@@ -41,7 +41,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		if varName != "" {
 			switch arg.ora {
 			case "DATE", "TIMESTAMP":
-				return fmt.Sprintf("%s = string(custom.NewDate(%s))", dst, varName)
+				return fmt.Sprintf("%s = custom.TimestampProto(%s)", dst, varName)
 			}
 		}
 	}
@@ -57,7 +57,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		}
 		return fmt.Sprintf("%s = goracle.Lob{IsClob:true, Reader:strings.NewReader(%s)}", dst, src)
 	case "DATE", "TIMESTAMP":
-		return fmt.Sprintf("%s = string(%s)", dst, src)
+		return fmt.Sprintf("%s = (%s)", dst, src)
 	case "PLS_INTEGER":
 		return fmt.Sprintf("%s = int32(%s)", dst, src)
 	case "NUMBER":
@@ -71,9 +71,9 @@ func (arg PlsType) GetOra(src, varName string) string {
 		switch arg.ora {
 		case "DATE":
 			if varName != "" {
-				return fmt.Sprintf("string(custom.NewDate(%s))", varName)
+				return fmt.Sprintf("custom.NewDate(%s).String()", varName)
 			}
-			return fmt.Sprintf("string(custom.AsDate(%s))", src)
+			return fmt.Sprintf("custom.AsDate(%s).Proto()", src)
 		}
 	}
 	switch arg.ora {
@@ -98,44 +98,26 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 	if Gogo {
 		switch arg.ora {
 		case "DATE": // custom.Date
-			var pointer string
-			if src[0] == '&' {
-				pointer = "&"
-			}
+			//var pointer string
+			//if src[0] == '&' {
+			//pointer = "&"
+			//}
 			if dir.IsOutput() {
 				if !strings.HasPrefix(dst, "params[") {
-					return fmt.Sprintf(`%s, convErr := custom.Date(%s).Get()
-			if convErr != nil { // toOra D
-				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
-				return
-			}
-			%s = %s //a`,
-							dstVar, strings.TrimPrefix(src, "&"),
-							dst, dstVar,
+					return fmt.Sprintf(`%s = (*custom.Date)(%s).Get()`,
+							dst, strings.TrimPrefix(src, "&"),
 						),
-						dstVar
+						""
 				}
-				return fmt.Sprintf(`%s, convErr := custom.Date(%s).Get()
-			if convErr != nil { // toOra D
-				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
-				return
-			}
-			%s = sql.Out{Dest:&%s%s} //b`,
-						dstVar, strings.TrimPrefix(src, "&"),
-						dst, dstVar, inTrue,
+				return fmt.Sprintf(`%s = (*custom.Date)(%s).Get()`,
+						dst, strings.TrimPrefix(src, "&"),
 					),
-					dstVar
+					""
 			}
-			return fmt.Sprintf(`%s, convErr := custom.Date(%s).Get() // toOra D
-			if convErr != nil {
-				err = errors.Wrap(oracall.ErrInvalidArgument, convErr.Error())
-				return
-			}
-			%s = %s%s //c`,
-					dstVar, strings.TrimPrefix(src, "&"),
-					dst, pointer, dstVar,
+			return fmt.Sprintf(`%s = (*custom.Date)(%s).Get() // toOra D`,
+					dst, strings.TrimPrefix(src, "&"),
 				),
-				dstVar
+				""
 		}
 	}
 	switch arg.ora {

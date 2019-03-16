@@ -375,12 +375,6 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 						name, cons, cons))
 			}
 
-		case "custom.Date":
-			checks = append(checks,
-				fmt.Sprintf(`if _, err := custom.Date(%s).Get(); err != nil {
-				  return errors.Wrapf(oracall.ErrInvalidArgument, "%s has bad format: " + err.Error())
-			  }`,
-					name, name))
 		default:
 			checks = append(checks, fmt.Sprintf("// No check for %q (%q)", arg.Name, got))
 		}

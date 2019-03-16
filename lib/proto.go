@@ -32,9 +32,9 @@ var Gogo bool
 var NumberAsString bool
 
 //go:generate sh ./download-protoc.sh
-//go:generate go get -u github.com/gogo/protobuf/protoc-gen-gofast
+//go:generate go get -u github.com/gogo/protobuf/protoc-gen-gogofast
 
-// build: protoc --gofast_out=plugins=grpc:. my.proto
+// build: protoc --gogofast_out=plugins=grpc:. my.proto
 // build: protoc --go_out=plugins=grpc:. my.proto
 
 func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
@@ -48,6 +48,7 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	}
 	if Gogo {
 		io.WriteString(w, `
+	import "google/protobuf/timestamp.proto";
 	import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 `)
 	}

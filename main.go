@@ -74,7 +74,7 @@ func Main(args []string) error {
 	flagBaseDir := flag.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
-	flagGenerator := flag.String("protoc-gen", "gofast", "use protoc-gen-<generator>")
+	flagGenerator := flag.String("protoc-gen", "gogofast", "use protoc-gen-<generator>")
 	flag.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
 	flag.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
@@ -229,7 +229,7 @@ func Main(args []string) error {
 		cmd := exec.Command(
 			"protoc",
 			"--proto_path="+*flagBaseDir+":.",
-			"--"+goOut+"=plugins=grpc:"+*flagBaseDir,
+			"--"+goOut+"=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir,
 			fn,
 		)
 		cmd.Stdout = os.Stdout
