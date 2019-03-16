@@ -243,7 +243,7 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 		}
 
 	case "custom.date":
-		return "string", nil
+		return "google.protobuf.Timestamp", nil
 	case "n":
 		return "string", nil
 	case "raw":

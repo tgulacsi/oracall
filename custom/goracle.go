@@ -13,6 +13,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/golang/protobuf/ptypes"
+	tspb "github.com/golang/protobuf/ptypes/timestamp"
+
 	"github.com/pkg/errors"
 	"gopkg.in/goracle.v2"
 )
@@ -58,47 +61,24 @@ func NumbersFromStrings(s *[]string) *[]goracle.Number {
 	return (*[]goracle.Number)(unsafe.Pointer(s))
 }
 
-type Date string
+type Date tspb.Timestamp
 
 const timeFormat = time.RFC3339 //"2006-01-02 15:04:05 -0700"
 
 func NewDate(t time.Time) Date {
-	if t.IsZero() {
-		return Date("")
-	}
-	return Date(t.Format(timeFormat))
+	var d Date
+	d.Set(t)
+	return d
 }
 func (d *Date) Set(t time.Time) {
-	if t.IsZero() {
-		*d = Date("")
+	ts, err := ptypes.TimestampProto(t)
+	if err != nil {
+		panic(errors.Wrap(err, t.String()))
 	}
-	*d = NewDate(t)
+	*d = Date(*ts)
 }
 func (d Date) Get() (od time.Time, err error) {
-	//defer func() {
-	//	fmt.Printf("GET %q: %v (%+v)\n", string(d), od, err)
-	//}()
-	if d == "" {
-		return
-	}
-	var i int
-	if i = strings.IndexByte(string(d), 'T'); i < 0 {
-		if i = strings.IndexByte(string(d), ' '); i < 0 {
-			d = d + "T00:00:00"
-		} else {
-			d = d[:i] + "T" + d[i+1:]
-		}
-	}
-
-	n := len(d)
-	if n > len(timeFormat) {
-		n = len(timeFormat)
-	}
-	t, err := time.Parse(timeFormat[:n], string(d)) // TODO(tgulacsi): more robust parser
-	if err != nil {
-		return t, errors.Wrap(err, string(d))
-	}
-	return t, nil
+	return ptypes.Timestamp((*tspb.Timestamp)(&d))
 }
 
 // Value returns a driver Value.
@@ -106,15 +86,44 @@ func (d Date) Value() (driver.Value, error) {
 	return d.Get()
 }
 
+func (d Date) String() string { return ptypes.TimestampString((*tspb.Timestamp)(&d)) }
+func (d *Date) SetString(s string) error {
+	if s == "" {
+		((*tspb.Timestamp)(d)).Reset()
+		return nil
+	}
+	var i int
+	if i = strings.IndexByte(s, 'T'); i < 0 {
+		if i = strings.IndexByte(s, ' '); i < 0 {
+			s = s + "T00:00:00"
+		} else {
+			s = s[:i] + "T" + s[i+1:]
+		}
+	}
+
+	n := len(s)
+	if n > len(timeFormat) {
+		n = len(timeFormat)
+	}
+	t, err := time.Parse(timeFormat[:n], s) // TODO(tgulacsi): more robust parser
+	if err != nil {
+		return errors.Wrap(err, s)
+	}
+	d.Set(t)
+	return nil
+
+}
+
 // Scan assigns a value from a database driver.
 func (d *Date) Scan(src interface{}) error {
 	switch x := src.(type) {
 	case string:
-		*d = Date(x)
+		return d.SetString(x)
 	case []byte:
-		*d = Date(x)
+		return d.SetString(string(x))
 	case time.Time:
-		*d = Date(x.Format(timeFormat))
+		d.Set(x)
+		return nil
 	default:
 		return errors.Errorf("unknown type %T", src)
 	}
@@ -313,21 +322,22 @@ func AsInt64(v interface{}) int64 {
 	return 0
 }
 func AsDate(v interface{}) Date {
+	var d Date
 	if v == nil {
-		return ""
+		return d
 	}
 	switch x := v.(type) {
 	case Date:
 		return x
 	case time.Time:
-		return Date(x.Format(timeFormat))
+		d.Set(x)
 	case string:
-		return Date(x)
+		d.SetString(x)
 	default:
 		log.Printf("WARN: unknown Date type %T", v)
 	}
 
-	return Date("")
+	return d
 }
 
 func AsTime(v interface{}) time.Time {

@@ -2,19 +2,20 @@
 set -u
 set -e
 set -x
-tmpdir="${TMPDIR:-/tmp}/$(basename $0)-$$"
+tmpdir="${TMPDIR:-/tmp}/$(basename "$0")-$$"
 mkdir -p "$tmpdir"
-if ! protoc --version 2>/dev/null | fgrep 'libprotoc 3'; then
+GOPATH="${GOPATH:-$(go env GOPATH)}"
+if ! protoc --version 2>/dev/null | grep -F 'libprotoc 3'; then
 	dst="$tmpdir/protoc-linux_x86_64.zip"
 	if ! [ -e "$dst" ]; then
-		curl -L -sS $(curl -sS https://github.com/google/protobuf/releases/ \
+		curl -L -sS "$(curl -L -sS https://github.com/google/protobuf/releases/ \
 			| sed -n -e 's/^.* href="\([^"]*linux-x86_64.zip\)".*$/https:\/\/github.com\1/p' \
-			| fgrep -v java \
+			| grep -F -v java \
 			| sort -ur \
-			| head -n 1) -o "$dst"
+			| head -n 1)" -o "$dst"
 	fi
-	cd $GOPATH && unzip -o "$dst"
-	rsync -a include/google/ $GOPATH/src/google/
+	cd "$GOPATH" && unzip -o "$dst"
+	rsync -a include/google/ "$GOPATH/src/google/"
 	rm -rf include/google
 	rmdir include || echo ''
 fi
