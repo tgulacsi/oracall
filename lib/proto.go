@@ -218,8 +218,6 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 
 func protoType(got, aName, absType string) (string, protoOptions) {
 	switch trimmed := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")); trimmed {
-	case "time.time":
-		return "string", nil
 	case "string":
 		return "string", nil
 
@@ -243,8 +241,10 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 			"gogoproto.jsontag": aName + ",omitempty",
 		}
 
-	case "custom.date":
-		return "google.protobuf.Timestamp", nil
+	case "custom.date", "time.time":
+		return "google.protobuf.Timestamp", protoOptions{
+			"gogoproto.stdtime": true,
+		}
 	case "n":
 		return "string", nil
 	case "raw":

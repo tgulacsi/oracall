@@ -41,7 +41,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		if varName != "" {
 			switch arg.ora {
 			case "DATE", "TIMESTAMP":
-				return fmt.Sprintf("%s = custom.TimestampProto(%s)", dst, varName)
+				return fmt.Sprintf("%s = /*custom.TimestampProto*/(&%s)", dst, varName)
 			}
 		}
 	}
@@ -71,9 +71,9 @@ func (arg PlsType) GetOra(src, varName string) string {
 		switch arg.ora {
 		case "DATE":
 			if varName != "" {
-				return fmt.Sprintf("custom.NewDate(%s).String()", varName)
+				return fmt.Sprintf("%s.Format(time.RFC3339)", varName)
 			}
-			return fmt.Sprintf("custom.AsDate(%s).Proto()", src)
+			return fmt.Sprintf("custom.AsDate(%s)", src)
 		}
 	}
 	switch arg.ora {
@@ -104,17 +104,17 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 			//}
 			if dir.IsOutput() {
 				if !strings.HasPrefix(dst, "params[") {
-					return fmt.Sprintf(`%s = (*custom.Date)(%s).Get()`,
+					return fmt.Sprintf(`%s = *custom.AsDate(%s)`,
 							dst, strings.TrimPrefix(src, "&"),
 						),
 						""
 				}
-				return fmt.Sprintf(`%s = (*custom.Date)(%s).Get()`,
+				return fmt.Sprintf(`%s = *custom.AsDate(%s)`,
 						dst, strings.TrimPrefix(src, "&"),
 					),
 					""
 			}
-			return fmt.Sprintf(`%s = (*custom.Date)(%s).Get() // toOra D`,
+			return fmt.Sprintf(`%s = *custom.AsDate(%s) // toOra D`,
 					dst, strings.TrimPrefix(src, "&"),
 				),
 				""

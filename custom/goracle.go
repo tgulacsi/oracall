@@ -13,8 +13,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gogo/protobuf/types"
-
 	"github.com/pkg/errors"
 	"gopkg.in/goracle.v2"
 )
@@ -60,47 +58,11 @@ func NumbersFromStrings(s *[]string) *[]goracle.Number {
 	return (*[]goracle.Number)(unsafe.Pointer(s))
 }
 
-type Date types.Timestamp
+const timeFormat = time.RFC3339
 
-const timeFormat = time.RFC3339 //"2006-01-02 15:04:05 -0700"
-
-func TimestampProto(t time.Time) *types.Timestamp {
-	ts, err := types.TimestampProto(t)
-	if err != nil {
-		panic(errors.Wrap(err, t.String()))
-	}
-	return ts
-}
-
-func NewDate(t time.Time) Date {
-	var d Date
-	d.Set(t)
-	return d
-}
-func (d *Date) Set(t time.Time) error {
-	ts, err := types.TimestampProto(t)
-	if err != nil {
-		return errors.Wrap(err, t.String())
-	}
-	*d = Date(*ts)
-	return nil
-}
-func (d Date) GetSeconds() int64 { return (*types.Timestamp)(&d).GetSeconds() }
-func (d Date) GetNanos() int32   { return (*types.Timestamp)(&d).GetNanos() }
-func (d Date) Get() time.Time {
-	return time.Unix(d.GetSeconds(), int64(d.GetNanos()))
-}
-
-// Value returns a driver Value.
-func (d *Date) Value() (driver.Value, error) {
-	return d.Get(), nil
-}
-
-func (d Date) Proto() *types.Timestamp { return (*types.Timestamp)(&d) }
-func (d Date) String() string          { return types.TimestampString((*types.Timestamp)(&d)) }
-func (d *Date) SetString(s string) error {
+func ParseTime(t *time.Time, s string) error {
 	if s == "" {
-		(*types.Timestamp)(d).Reset()
+		*t = time.Time{}
 		return nil
 	}
 	var i int
@@ -116,29 +78,9 @@ func (d *Date) SetString(s string) error {
 	if n > len(timeFormat) {
 		n = len(timeFormat)
 	}
-	t, err := time.Parse(timeFormat[:n], s) // TODO(tgulacsi): more robust parser
-	if err != nil {
-		return errors.Wrap(err, s)
-	}
-	d.Set(t)
-	return nil
-
-}
-
-// Scan assigns a value from a database driver.
-func (d *Date) Scan(src interface{}) error {
-	switch x := src.(type) {
-	case string:
-		return d.SetString(x)
-	case []byte:
-		return d.SetString(string(x))
-	case time.Time:
-		d.Set(x)
-		return nil
-	default:
-		return errors.Errorf("unknown type %T", src)
-	}
-	return nil
+	var err error
+	*t, err = time.Parse(timeFormat[:n], s) // TODO(tgulacsi): more robust parser
+	return errors.Wrap(err, s)
 }
 
 type Lob struct {
@@ -332,18 +274,16 @@ func AsInt64(v interface{}) int64 {
 	}
 	return 0
 }
-func AsDate(v interface{}) Date {
-	var d Date
+func AsDate(v interface{}) *time.Time {
+	d := new(time.Time)
 	if v == nil {
 		return d
 	}
 	switch x := v.(type) {
-	case Date:
-		return x
 	case time.Time:
-		d.Set(x)
+		*d = x
 	case string:
-		d.SetString(x)
+		_ = ParseTime(d, x)
 	default:
 		log.Printf("WARN: unknown Date type %T", v)
 	}
@@ -358,5 +298,5 @@ func AsTime(v interface{}) time.Time {
 	if t, ok := v.(time.Time); ok {
 		return t
 	}
-	return AsDate(v).Get()
+	return *AsDate(v)
 }

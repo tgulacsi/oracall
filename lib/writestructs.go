@@ -78,7 +78,7 @@ var DebugLevel = uint(0)
 var _ json.Marshaler
 var _ = io.EOF
 var _ context.Context
-var _ custom.Date
+var _ =custom.AsDate
 var _ strconv.NumError
 var _ time.Time
 var _ strings.Reader
@@ -471,7 +471,7 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 			}
 			return "bool", nil
 		case "DATE", "DATETIME", "TIME", "TIMESTAMP":
-			return "custom.Date", nil
+			return "time.Time", nil
 		case "REF CURSOR":
 			return "*sql.Rows", nil
 		case "CLOB", "BLOB":
