@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Tamás Gulácsi
+Copyright 2019 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	fstructs "github.com/fatih/structs"
@@ -55,6 +56,8 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	seen := make(map[string]struct{}, 16)
 
 	services := make([]string, 0, len(functions))
+
+	sort.Slice(functions, func(i, j int) bool { return functions[i].name < functions[j].name })
 
 FunLoop:
 	for _, fun := range functions {
