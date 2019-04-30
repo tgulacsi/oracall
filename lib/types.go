@@ -102,7 +102,7 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 			//if src[0] == '&' {
 			//pointer = "&"
 			//}
-				np := strings.TrimPrefix(src, "&")
+			np := strings.TrimPrefix(src, "&")
 			if dir.IsOutput() {
 				if !strings.HasPrefix(dst, "params[") {
 					return fmt.Sprintf(`%s = *custom.AsDate(%s)`, dst, np), ""

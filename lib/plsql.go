@@ -691,7 +691,10 @@ func (arg Argument) getConvSimple(
 	convIn, convOut []string,
 	name, paramName string,
 ) ([]string, []string) {
-	if arg.IsOutput() {
+	if !arg.IsOutput() {
+		in, _ := arg.ToOra(paramName, "input."+name, arg.Direction)
+		convIn = append(convIn, in+"  // gcs4i")
+	} else {
 		got, err := arg.goType(false)
 		if err != nil {
 			panic(err)
@@ -704,6 +707,9 @@ func (arg Argument) getConvSimple(
 		} else if arg.IsInput() {
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s  // gcs3`, name, name))
 		}
+		if got == "time.Time" {
+			convOut = append(convOut, fmt.Sprintf("if output.%s != nil && output.%s.IsZero() { output.%s = nil }", name, name, name))
+		}
 		src := "output." + name
 		in, varName := arg.ToOra(paramName, "&"+src, arg.Direction)
 		convIn = append(convIn, in)
@@ -712,9 +718,6 @@ func (arg Argument) getConvSimple(
 			convOut = append(convOut,
 				fmt.Sprintf("%s  // gcs4", arg.FromOra(src, paramName, varName)))
 		}
-	} else {
-		in, _ := arg.ToOra(paramName, "input."+name, arg.Direction)
-		convIn = append(convIn, in+"  // gcs4i")
 	}
 	return convIn, convOut
 }
