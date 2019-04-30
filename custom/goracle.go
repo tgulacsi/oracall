@@ -275,10 +275,17 @@ func AsInt64(v interface{}) int64 {
 	return 0
 }
 func AsDate(v interface{}) *time.Time {
-	d := new(time.Time)
+	log.Printf("AsDate(%[1]v %[1]T)", v)
 	if v == nil {
+		return new(time.Time)
+	}
+	if d, ok := v.(*time.Time); ok {
+		if d == nil {
+			return new(time.Time)
+		}
 		return d
 	}
+	d := new(time.Time)
 	switch x := v.(type) {
 	case time.Time:
 		*d = x

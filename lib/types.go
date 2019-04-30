@@ -97,27 +97,24 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 	}
 	if Gogo {
 		switch arg.ora {
-		case "DATE": // custom.Date
+		case "DATE": // custom.Date = *time.Time
 			//var pointer string
 			//if src[0] == '&' {
 			//pointer = "&"
 			//}
+				np := strings.TrimPrefix(src, "&")
 			if dir.IsOutput() {
 				if !strings.HasPrefix(dst, "params[") {
-					return fmt.Sprintf(`%s = *custom.AsDate(%s)`,
-							dst, strings.TrimPrefix(src, "&"),
-						),
-						""
+					return fmt.Sprintf(`%s = *custom.AsDate(%s)`, dst, np), ""
 				}
-				return fmt.Sprintf(`%s = *custom.AsDate(%s)`,
-						dst, strings.TrimPrefix(src, "&"),
+				return fmt.Sprintf(`if %s == nil { %s = new(time.Time) }
+					%s = sql.Out{Dest:%s%s}`,
+						np, np,
+						dst, strings.TrimPrefix(src, "&"), inTrue,
 					),
 					""
 			}
-			return fmt.Sprintf(`%s = *custom.AsDate(%s) // toOra D`,
-					dst, strings.TrimPrefix(src, "&"),
-				),
-				""
+			return fmt.Sprintf(`%s = *custom.AsDate(%s) // toOra D`, dst, np), ""
 		}
 	}
 	switch arg.ora {

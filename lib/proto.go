@@ -68,7 +68,7 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 	sort.Strings(funNames)
 
 FunLoop:
-	for _, fName := range funNames{
+	for _, fName := range funNames {
 		fun := functions[funIdx[fName]]
 		fName = fun.name
 		if fun.alias != "" {
