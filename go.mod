@@ -3,7 +3,8 @@ module github.com/tgulacsi/oracall
 go 1.12
 
 require (
-	github.com/davecgh/go-spew v1.1.1
+	github.com/LK4D4/joincontext v0.0.0-20171026170139-1724345da6d5
+	github.com/antzucaro/matchr v0.0.0-20180616170659-cbc221335f3c
 	github.com/fatih/structs v1.1.0
 	github.com/go-kit/kit v0.8.0
 	github.com/gogo/protobuf v1.2.1
