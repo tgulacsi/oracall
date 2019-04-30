@@ -131,9 +131,6 @@ FunLoop:
 				return err
 			}
 		}
-		if checkName, err = fun.GenChecks(w); err != nil {
-			return err
-		}
 		plsBlock, callFun := fun.PlsqlBlock(checkName)
 		fmt.Fprintf(w, "\nconst %s = `", fun.getPlsqlConstName())
 		io.WriteString(w, plsBlock)

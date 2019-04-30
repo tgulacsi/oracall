@@ -57,11 +57,20 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 
 	services := make([]string, 0, len(functions))
 
-	sort.Slice(functions, func(i, j int) bool { return functions[i].name < functions[j].name })
+	// Sort only the names, as this slice is used concurrently!
+	funNames := make([]string, len(functions))
+	funIdx := make(map[string]int, len(functions))
+	for i, f := range functions {
+		fn := f.Name()
+		funNames[i] = fn
+		funIdx[fn] = i
+	}
+	sort.Strings(funNames)
 
 FunLoop:
-	for _, fun := range functions {
-		fName := fun.name
+	for _, fName := range funNames{
+		fun := functions[funIdx[fName]]
+		fName = fun.name
 		if fun.alias != "" {
 			fName = fun.alias
 		}

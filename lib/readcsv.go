@@ -238,6 +238,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 		return dumpBuf.String()
 	}
 	_ = dumpXML
+	names := make([]string, 0, len(userArgs)/4)
 	var row int
 	for uas := range userArgs {
 		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
@@ -298,8 +299,9 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 		}
 		//Log("args", fun.Args)
 		functions = append(functions, fun)
+		names = append(names, fun.Name())
 	}
-	Log("msg", fmt.Sprintf("found %d functions.", len(functions)))
+	Log("functions", names)
 	return
 }
 
