@@ -67,7 +67,7 @@ import (
 	"github.com/pkg/errors"
 
     goracle "gopkg.in/goracle.v2" // Oracle
-	"github.com/tgulacsi/oracall/custom"	// custom.Date
+	"github.com/tgulacsi/oracall/custom"	// custom.AsDate
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 	`+pbImport+`
 )
@@ -78,7 +78,7 @@ var DebugLevel = uint(0)
 var _ json.Marshaler
 var _ = io.EOF
 var _ context.Context
-var _ =custom.AsDate
+var _ = custom.AsDate
 var _ strconv.NumError
 var _ time.Time
 var _ strings.Reader

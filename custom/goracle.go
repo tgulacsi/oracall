@@ -79,7 +79,7 @@ func ParseTime(t *time.Time, s string) error {
 		n = len(timeFormat)
 	}
 	var err error
-	*t, err = time.Parse(timeFormat[:n], s) // TODO(tgulacsi): more robust parser
+	*t, err = time.ParseInLocation(timeFormat[:n], s, time.Local) // TODO(tgulacsi): more robust parser
 	return errors.Wrap(err, s)
 }
 
@@ -275,15 +275,21 @@ func AsInt64(v interface{}) int64 {
 	return 0
 }
 func AsDate(v interface{}) *time.Time {
-	log.Printf("AsDate(%[1]v %[1]T)", v)
+	//log.Printf("AsDate(%[1]v %[1]T)", v)
 	if v == nil {
 		return new(time.Time)
 	}
-	if d, ok := v.(*time.Time); ok {
+	switch d := v.(type) {
+	case *time.Time:
 		if d == nil {
 			return new(time.Time)
 		}
 		return d
+	case *DateTime:
+		if d == nil {
+			return new(time.Time)
+		}
+		return &d.Time
 	}
 	d := new(time.Time)
 	switch x := v.(type) {

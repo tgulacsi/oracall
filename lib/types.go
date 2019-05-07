@@ -41,7 +41,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		if varName != "" {
 			switch arg.ora {
 			case "DATE", "TIMESTAMP":
-				return fmt.Sprintf("%s = /*custom.TimestampProto*/(&%s)", dst, varName)
+				return fmt.Sprintf("%s = &custom.DateTime{Time:%s}", dst, varName)
 			}
 		}
 	}
@@ -107,8 +107,8 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 				if !strings.HasPrefix(dst, "params[") {
 					return fmt.Sprintf(`%s = *custom.AsDate(%s)`, dst, np), ""
 				}
-				return fmt.Sprintf(`if %s == nil { %s = new(time.Time) }
-					%s = sql.Out{Dest:%s%s}`,
+				return fmt.Sprintf(`if %s == nil { %s = new(custom.DateTime) }
+					%s = sql.Out{Dest:&%s.Time%s}`,
 						np, np,
 						dst, strings.TrimPrefix(src, "&"), inTrue,
 					),

@@ -975,7 +975,7 @@ func (arg Argument) getConvTableRec(
 	}
 	oraTyp := typ
 	switch oraTyp {
-	case "custom.Date":
+	case "custom.Date", "custom.DateTime":
 		oraTyp = "time.Time"
 	case "float64":
 		oraTyp = "float64"
