@@ -360,7 +360,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				return grpCtx.Err()
 			case dbCh <- row:
 			}
-			if row.Data == "PL/SQL TABLE" || row.Data == "PL/SQL RECORD" {
+			if row.Data == "PL/SQL TABLE" || row.Data == "PL/SQL RECORD" || row.Data == "REF CURSOR" {
 				plus, err := resolveTypeShort(grpCtx, row.Data, row.Owner, row.Name, row.Subname)
 				if err != nil {
 					return err
@@ -681,7 +681,7 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 			plus = append(plus, t)
 		}
 
-	case "PL/SQL RECORD":
+	case "PL/SQL RECORD", "REF CURSOR":
 		/*SELECT attr_name, attr_type_owner, attr_type_name, attr_type_package,
 		                      length, precision, scale, character_set_name, attr_no
 					     FROM all_plsql_type_attrs
@@ -759,7 +759,7 @@ func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx co
 			p.Data = "PL/SQL TABLE"
 		}
 		//logger.Log("i", i, "arg", p.Argument, "data", p.Data, "owner", p.Owner, "name", p.Name, "sub", p.Subname)
-		if p.Data == "PL/SQL TABLE" || p.Data == "PL/SQL RECORD" {
+		if p.Data == "PL/SQL TABLE" || p.Data == "PL/SQL RECORD" || p.Data == "REF CURSOR" {
 			q, err := resolveTypeShort(ctx, p.Data, p.Owner, p.Name, p.Subname)
 			if err != nil {
 				return plus, errors.Wrapf(err, "%+v", p)
@@ -769,7 +769,7 @@ func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx co
 				if x.Data == "PL/SQL INDEX TABLE" {
 					x.Data = "PL/SQL TABLE"
 				}
-				x.Level++
+				x.Level += p.Level
 				q[i] = x
 			}
 			plus = append(plus[:i+1], append(q, plus[i+1:]...)...)
