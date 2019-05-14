@@ -476,7 +476,7 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 		case "BFILE":
 			return "ora.Bfile", nil
 		default:
-			return "", errors.Wrap(UnknownSimpleType, arg.Type)
+			return "", errors.Wrapf(UnknownSimpleType, "%v", arg)
 		}
 	}
 	typName = arg.TypeName
