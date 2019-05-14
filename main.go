@@ -311,9 +311,24 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		qry := `SELECT coll_type, elem_type_owner, elem_type_name, elem_type_package,
 				   length, precision, scale, character_set_name, index_by,
 				   (SELECT MIN(typecode) FROM all_plsql_types B
-				      WHERE B.owner = A.elem_type_owner AND B.type_name = A.elem_type_name AND B.package_name = A.elem_type_package) typecode
+				      WHERE B.owner = A.elem_type_owner AND
+					        B.type_name = A.elem_type_name AND
+							B.package_name = A.elem_type_package) typecode
 			  FROM all_plsql_coll_types A
-			  WHERE owner = :1 AND package_name = :2 AND type_name = :3`
+			  WHERE owner = :owner AND package_name = :pkg AND type_name = :sub
+			UNION
+			SELECT coll_type, elem_type_owner, elem_type_name, NULL elem_type_package,
+				   length, precision, scale, character_set_name, NULL index_by,
+				   (SELECT MIN(typecode) FROM all_types B
+				      WHERE B.owner = A.elem_type_owner AND
+					        B.type_name = A.elem_type_name) typecode
+			  FROM all_coll_types A
+			  WHERE (owner, type_name) IN (
+			    SELECT :owner, :pkg FROM DUAL
+				UNION
+				SELECT table_owner, table_name||NVL2(db_link, '@'||db_link, NULL)
+				  FROM user_synonyms
+				  WHERE synonym_name = :pkg)`
 		var err error
 		if collStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
 			logger.Log("WARN", errors.Wrap(err, qry))
@@ -324,7 +339,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				      (SELECT MIN(typecode) FROM all_plsql_types B
 				         WHERE B.owner = A.attr_type_owner AND B.type_name = A.attr_type_name AND B.package_name = A.attr_type_package) typecode
 			     FROM all_plsql_type_attrs A
-				 WHERE owner = :1 AND package_name = :2 AND type_name = :3
+				 WHERE owner = :owner AND package_name = :pkg AND type_name = :sub
 				 ORDER BY attr_no`
 			if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
 				return errors.Wrap(err, qry)
@@ -360,7 +375,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				return grpCtx.Err()
 			case dbCh <- row:
 			}
-			if row.Data == "PL/SQL TABLE" || row.Data == "PL/SQL RECORD" || row.Data == "REF CURSOR" {
+			if row.Data == "PL/SQL TABLE" || row.Data == "PL/SQL RECORD" || row.Data == "REF CURSOR" || row.Data == "TABLE" {
 				plus, err := resolveTypeShort(grpCtx, row.Data, row.Owner, row.Name, row.Subname)
 				if err != nil {
 					return err
@@ -657,12 +672,14 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 	var err error
 
 	switch typ {
-	case "PL/SQL TABLE":
+	case "PL/SQL TABLE", "PL/SQL INDEX TABLE", "TABLE":
 		/*SELECT coll_type, elem_type_owner, elem_type_name, elem_type_package,
 			   length, precision, scale, character_set_name, index_by
 		  FROM all_plsql_coll_types
 		  WHERE owner = :1 AND package_name = :2 AND type_name = :3*/
-		if rows, err = collStmt.QueryContext(ctx, owner, pkg, sub); err != nil {
+		if rows, err = collStmt.QueryContext(ctx,
+			sql.Named("owner", owner), sql.Named("pkg", pkg), sql.Named("sub", sub),
+		); err != nil {
 			return plus, err
 		}
 		defer rows.Close()
@@ -677,6 +694,12 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 			if typeCode != "COLLECTION" {
 				t.Data = typeCode
 			}
+			if t.Data == "" {
+				t.Data = t.Subname
+			}
+			if t.Data == "PL/SQL INDEX TABLE" {
+				t.Data = "PL/SQL TABLE"
+			}
 			t.Level = 1
 			plus = append(plus, t)
 		}
@@ -687,7 +710,9 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 					     FROM all_plsql_type_attrs
 						 WHERE owner = :1 AND package_name = :2 AND type_name = :3
 						 ORDER BY attr_no*/
-		if rows, err = attrStmt.QueryContext(ctx, owner, pkg, sub); err != nil {
+		if rows, err = attrStmt.QueryContext(ctx,
+			sql.Named("owner", owner), sql.Named("pkg", pkg), sql.Named("sub", sub),
+		); err != nil {
 			return plus, err
 		}
 		defer rows.Close()
@@ -706,6 +731,9 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 			}
 			if t.Owner == "" && t.Subname != "" {
 				t.Data = t.Subname
+			}
+			if t.Data == "PL/SQL INDEX TABLE" {
+				t.Data = "PL/SQL TABLE"
 			}
 			t.Level = 1
 			plus = append(plus, t)
@@ -759,7 +787,7 @@ func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx co
 			p.Data = "PL/SQL TABLE"
 		}
 		//logger.Log("i", i, "arg", p.Argument, "data", p.Data, "owner", p.Owner, "name", p.Name, "sub", p.Subname)
-		if p.Data == "PL/SQL TABLE" || p.Data == "PL/SQL RECORD" || p.Data == "REF CURSOR" {
+		if p.Data == "TABLE" || p.Data == "PL/SQL TABLE" || p.Data == "PL/SQL RECORD" || p.Data == "REF CURSOR" {
 			q, err := resolveTypeShort(ctx, p.Data, p.Owner, p.Name, p.Subname)
 			if err != nil {
 				return plus, errors.Wrapf(err, "%+v", p)
