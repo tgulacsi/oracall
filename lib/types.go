@@ -62,6 +62,8 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		return fmt.Sprintf("%s = int32(%s)", dst, src)
 	case "NUMBER":
 		return fmt.Sprintf("%s = string(%s)", dst, src)
+	case "":
+		panic(fmt.Sprintf("empty \"ora\" type: %#v", arg))
 	}
 	return fmt.Sprintf("%s = %s // %s fromOra", dst, src, arg.ora)
 }

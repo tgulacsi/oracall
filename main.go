@@ -403,6 +403,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		return errors.Wrap(err, "walking rows")
 	})
 
+	var cwMu sync.Mutex
 	var cw *csv.Writer
 	if dumpFn != "" {
 		var lastOk bool
@@ -446,16 +447,22 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			return functions, annotations, errors.Wrap(err, dumpFn)
 		}
 		defer func() {
+			cwMu.Lock()
 			cw.Flush()
-			if err = cw.Error(); err != nil {
+			err = errors.WithMessage(cw.Error(), "csv flush")
+			cwMu.Unlock()
+			if err != nil {
 				logger.Log("msg", "flush", "csv", fh.Name(), "error", err)
 			}
 			if err = fh.Close(); err != nil {
 				logger.Log("msg", "close", "dump", fh.Name(), "error", err)
 			}
 		}()
+		cwMu.Lock()
 		cw = csv.NewWriter(fh)
-		if err = cw.Write(colNames); err != nil {
+		err = cw.Write(colNames)
+		cwMu.Unlock()
+		if err != nil {
 			logger.Log("msg", "write header to csv", "error", err)
 			return functions, annotations, errors.Wrap(err, "write header")
 		}
@@ -480,6 +487,15 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				if !ok {
 					break Loop
 				}
+				if row.Name == "" {
+					row.PLS = row.Data
+				} else {
+					row.PLS = row.Owner + "." + row.Name + "." + row.Subname
+					if row.Link != "" {
+						row.PLS += "@" + row.Link
+					}
+				}
+				//logger.Log("arg", row.Argument, "name", row.Name, "sub", row.Subname, "data", row.Data, "pls", row.PLS)
 			}
 			//logger.Log("row", row)
 			var ua oracall.UserArgument
@@ -487,13 +503,16 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			ua.InOut = row.InOut.String
 			if cw != nil {
 				N := i64ToString
-				if err = cw.Write([]string{
+				cwMu.Lock()
+				err := errors.WithMessage(cw.Write([]string{
 					strconv.Itoa(row.OID), N(row.SubID), strconv.Itoa(row.Seq), row.Package.String, row.Object.String,
 					strconv.Itoa(row.Level), row.Argument, ua.InOut,
 					ua.DataType, N(row.Prec), N(row.Scale), row.Charset,
 					row.PLS, N(row.Length),
 					row.Owner, row.Name, row.Subname, row.Link,
-				}); err != nil {
+				}), "write csv")
+				cwMu.Unlock()
+				if err != nil {
 					return errors.Wrapf(err, "writing csv")
 				}
 			}

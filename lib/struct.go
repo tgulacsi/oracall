@@ -209,6 +209,9 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 		Charset: charset,
 		mu:      new(sync.Mutex),
 	}
+	if arg.ora == "" {
+		panic(fmt.Sprintf("empty PLS type of %#v", arg))
+	}
 	switch arg.Type {
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
