@@ -724,7 +724,23 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 			plus = append(plus, t)
 		}
 
-	case "PL/SQL RECORD", "REF CURSOR":
+	case "REF CURSOR":
+		/*
+			ARGUMENT_NAME	SEQUENCE	DATA_LEVEL	DATA_TYPE
+			        	1	0	REF CURSOR
+			        	2	1	PL/SQL RECORD
+			SZERZ_AZON	3	2	NUMBER
+			UZENET_TIP	4	2	CHAR
+			HIBAKOD  	5	2	VARCHAR2
+			DATUM   	6	2	DATE
+			UTOLSO_TIP	7	2	CHAR
+			JAVITVA  	8	2	VARCHAR2
+			P_IDO_TOL	9	0	DATE
+			P_IDO_IG	10	0	DATE
+		*/
+		plus = append(plus, dbType{Owner: owner, Name: pkg, Subname: sub, Data: "PL/SQL RECORD", Level: 1})
+
+	case "PL/SQL RECORD":
 		/*SELECT attr_name, attr_type_owner, attr_type_name, attr_type_package,
 		                      length, precision, scale, character_set_name, attr_no
 					     FROM all_plsql_type_attrs
@@ -761,7 +777,9 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 	default:
 		return nil, errors.Wrap(errors.New("unknown type"), typ)
 	}
-	err = rows.Err()
+	if rows != nil {
+		err = rows.Err()
+	}
 	if len(plus) == 0 && err == nil {
 		err = errors.Wrapf(errors.New("not found"), "%s/%s.%s.%s", typ, owner, pkg, sub)
 	}

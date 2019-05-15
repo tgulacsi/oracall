@@ -41,7 +41,8 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		if varName != "" {
 			switch arg.ora {
 			case "DATE", "TIMESTAMP":
-				return fmt.Sprintf("%s = &custom.DateTime{Time:%s}", dst, varName)
+				return fmt.Sprintf("%s = &%s", dst, varName)
+				//return fmt.Sprintf("%s = &custom.DateTime{Time:%s}", dst, varName)
 			}
 		}
 	}

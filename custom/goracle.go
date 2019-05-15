@@ -274,29 +274,31 @@ func AsInt64(v interface{}) int64 {
 	}
 	return 0
 }
-func AsDate(v interface{}) *time.Time {
+func AsDate(v interface{}) *DateTime {
 	//log.Printf("AsDate(%[1]v %[1]T)", v)
 	if v == nil {
-		return new(time.Time)
+		return new(DateTime)
 	}
 	switch d := v.(type) {
 	case *time.Time:
 		if d == nil {
-			return new(time.Time)
+			return new(DateTime)
 		}
-		return d
+		return &DateTime{Time: *d}
 	case *DateTime:
 		if d == nil {
-			return new(time.Time)
+			return new(DateTime)
 		}
-		return &d.Time
+		return d
 	}
-	d := new(time.Time)
+	d := new(DateTime)
 	switch x := v.(type) {
-	case time.Time:
+	case DateTime:
 		*d = x
+	case time.Time:
+		d.Time = x
 	case string:
-		_ = ParseTime(d, x)
+		_ = ParseTime(&d.Time, x)
 	default:
 		log.Printf("WARN: unknown Date type %T", v)
 	}
@@ -311,5 +313,5 @@ func AsTime(v interface{}) time.Time {
 	if t, ok := v.(time.Time); ok {
 		return t
 	}
-	return *AsDate(v)
+	return AsDate(v).Time
 }
