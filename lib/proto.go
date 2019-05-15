@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 
 	fstructs "github.com/fatih/structs"
@@ -57,20 +56,9 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 
 	services := make([]string, 0, len(functions))
 
-	// Sort only the names, as this slice is used concurrently!
-	funNames := make([]string, len(functions))
-	funIdx := make(map[string]int, len(functions))
-	for i, f := range functions {
-		fn := f.Name()
-		funNames[i] = fn
-		funIdx[fn] = i
-	}
-	sort.Strings(funNames)
-
 FunLoop:
-	for _, fName := range funNames {
-		fun := functions[funIdx[fName]]
-		fName = fun.name
+	for _, fun := range functions {
+		fName := fun.name
 		if fun.alias != "" {
 			fName = fun.alias
 		}
