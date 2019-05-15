@@ -330,25 +330,41 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				SELECT table_owner, table_name||NVL2(db_link, '@'||db_link, NULL)
 				  FROM user_synonyms
 				  WHERE synonym_name = :pkg)`
+		var resolveTypeShort func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error)
 		var err error
 		if collStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
 			logger.Log("WARN", errors.Wrap(err, qry))
 		} else {
-			defer collStmt.Close()
-			qry = `SELECT attr_name, attr_type_owner, attr_type_name, attr_type_package,
+			if rows, err := collStmt.QueryContext(grpCtx, sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", "")); err != nil {
+				collStmt.Close()
+				collStmt = nil
+			} else {
+				rows.Close()
+				defer collStmt.Close()
+
+				qry = `SELECT attr_name, attr_type_owner, attr_type_name, attr_type_package,
                       length, precision, scale, character_set_name, attr_no,
 				      (SELECT MIN(typecode) FROM all_plsql_types B
 				         WHERE B.owner = A.attr_type_owner AND B.type_name = A.attr_type_name AND B.package_name = A.attr_type_package) typecode
 			     FROM all_plsql_type_attrs A
 				 WHERE owner = :owner AND package_name = :pkg AND type_name = :sub
 				 ORDER BY attr_no`
-			if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
-				return errors.Wrap(err, qry)
+				if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
+					collStmt.Close()
+					logger.Log("WARN", errors.Wrap(err, qry))
+				} else {
+					if rows, err := attrStmt.QueryContext(grpCtx, sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", "")); err != nil {
+						attrStmt.Close()
+						attrStmt = nil
+					} else {
+						rows.Close()
+						defer attrStmt.Close()
+						resolveTypeShort = func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error) {
+							return resolveType(ctx, collStmt, attrStmt, typ, owner, name, sub)
+						}
+					}
+				}
 			}
-			defer attrStmt.Close()
-		}
-		resolveTypeShort := func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error) {
-			return resolveType(ctx, collStmt, attrStmt, typ, owner, name, sub)
 		}
 
 		qry = argumentsQry
@@ -375,6 +391,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			case <-grpCtx.Done():
 				return grpCtx.Err()
 			case dbCh <- row:
+			}
+			if resolveTypeShort == nil {
+				continue
 			}
 			if row.Data == "PL/SQL TABLE" || row.Data == "PL/SQL RECORD" || row.Data == "REF CURSOR" || row.Data == "TABLE" {
 				plus, err := resolveTypeShort(grpCtx, row.Data, row.Owner, row.Name, row.Subname)
