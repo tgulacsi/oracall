@@ -41,7 +41,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		if varName != "" {
 			switch arg.ora {
 			case "DATE", "TIMESTAMP":
-				return fmt.Sprintf("%s = &%s", dst, varName)
+				return fmt.Sprintf("%s = &custom.DateTime{Time:%s}", dst, varName)
 				//return fmt.Sprintf("%s = &custom.DateTime{Time:%s}", dst, varName)
 			}
 		}
@@ -100,15 +100,11 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 	}
 	if Gogo {
 		switch arg.ora {
-		case "DATE": // custom.Date = *time.Time
-			//var pointer string
-			//if src[0] == '&' {
-			//pointer = "&"
-			//}
+		case "DATE":
 			np := strings.TrimPrefix(src, "&")
 			if dir.IsOutput() {
 				if !strings.HasPrefix(dst, "params[") {
-					return fmt.Sprintf(`%s = *custom.AsDate(%s)`, dst, np), ""
+					return fmt.Sprintf(`%s = %s.Time`, dst, np), ""
 				}
 				return fmt.Sprintf(`if %s == nil { %s = new(custom.DateTime) }
 					%s = sql.Out{Dest:&%s.Time%s}`,
@@ -117,7 +113,7 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 					),
 					""
 			}
-			return fmt.Sprintf(`%s = *custom.AsDate(%s) // toOra D`, dst, np), ""
+			return fmt.Sprintf(`%s = custom.AsDate(%s).Time // toOra D`, dst, np), ""
 		}
 	}
 	switch arg.ora {
