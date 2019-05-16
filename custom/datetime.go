@@ -30,6 +30,10 @@ type DateTime struct {
 	time.Time
 }
 
+func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
+	//fmt.Printf("Marshal %v: %v\n", start.Name.Local, dt.Time.Format(time.RFC3339))
+	return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339), start)
+}
 func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 	var s string
 	if err := dec.DecodeElement(&s, &st); err != nil {
@@ -52,10 +56,36 @@ func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 	//log.Printf("s=%q time=%v err=%+v", s, dt.Time, err)
 	return err
 }
-func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
-	//fmt.Printf("Marshal %v: %v\n", start.Name.Local, dt.Time.Format(time.RFC3339))
-	return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339), start)
+
+func (dt DateTime) MarshalJSON() ([]byte, error) {
+	return dt.Time.In(time.Local).MarshalJSON()
 }
+func (dt *DateTime) UnmarshalJSON(data []byte) error {
+	// Ignore null, like in the main JSON package.
+	if string(data) == "null" {
+		return nil
+	}
+	// Fractional seconds are handled implicitly by Parse.
+	var err error
+	dt.Time, err = time.ParseInLocation(`"`+time.RFC3339+`"`, string(data), time.Local)
+	return err
+}
+
+// MarshalText implements the encoding.TextMarshaler interface.
+// The time is formatted in RFC 3339 format, with sub-second precision added if present.
+func (dt DateTime) MarshalText() ([]byte, error) {
+	return dt.Time.In(time.Local).MarshalText()
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+// The time is expected to be in RFC 3339 format.
+func (dt *DateTime) UnmarshalText(data []byte) error {
+	// Fractional seconds are handled implicitly by Parse.
+	var err error
+	dt.Time, err = time.ParseInLocation(time.RFC3339, string(data), time.Local)
+	return err
+}
+
 func (dt DateTime) Timestamp() *types.Timestamp {
 	ts, err := types.TimestampProto(dt.Time)
 	if err != nil {
