@@ -20,7 +20,7 @@ But these two is downloaded by `go generate`.
 
 Then you can use it:
 
-	oracall -pattern 'MY_PKG.%' -package main -out my_pkg_functions.go -proto my_pkg.proto 'user/passw@sid'
+	oracall -db-out ./pkg/db -pb-out ./pkg/pb -connect 'user/passw@sid' 'MY_PKG.%'
 
 This will generate
   * `my_pkg_functions.go` with the calling machinery,
