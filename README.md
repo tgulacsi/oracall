@@ -105,6 +105,8 @@ Then only change the type in the BODY:
 	  RETURN v_cur;
 	END;
 
+TL;DR; oracall needs "strongly typed" REF CURSOR - see http://www.dba-oracle.com/plsql/t_plsql_cursor_variables.htm for example!
+
 ## Examples
 ### Minimal
 Minimal is a minimal example using OraCall: a simple main package which

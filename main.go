@@ -548,8 +548,8 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 
 					Log := log.With(logger, "package", ua.PackageName).Log
 					if srcErr := getSource(ctx, buf, cx, ua.PackageName); srcErr != nil {
-						Log("msg", "getSource", "error", srcErr)
-						return errors.WithMessage(srcErr, ua.PackageName)
+						Log("WARN", "getSource", "error", srcErr)
+						return nil
 					}
 					replMu.Lock()
 					for _, b := range rAnnotation.FindAll(buf.Bytes(), -1) {
@@ -669,7 +669,7 @@ func getSource(ctx context.Context, w io.Writer, cx *sql.DB, packageName string)
 	qry := "SELECT text FROM user_source WHERE name = UPPER(:1) AND type = 'PACKAGE' ORDER BY line"
 	rows, err := cx.QueryContext(ctx, qry, packageName)
 	if err != nil {
-		return errors.Wrap(err, qry)
+		return errors.Wrapf(err, "%s [%q]", qry, packageName)
 	}
 	defer rows.Close()
 	for rows.Next() {
