@@ -16,11 +16,12 @@
 package custom
 
 import (
+	"bytes"
 	"encoding/xml"
-	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
 )
 
 var _ = xml.Unmarshaler((*DateTime)(nil))
@@ -39,22 +40,7 @@ func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 	if err := dec.DecodeElement(&s, &st); err != nil {
 		return err
 	}
-	s = strings.TrimSpace(s)
-	n := len(s)
-	if n == 0 {
-		dt.Time = time.Time{}
-		//log.Println("time=")
-		return nil
-	}
-	if n > len(time.RFC3339) {
-		n = len(time.RFC3339)
-	} else if n < 4 {
-		n = 4
-	}
-	var err error
-	dt.Time, err = time.ParseInLocation(time.RFC3339[:n], s, time.Local)
-	//log.Printf("s=%q time=%v err=%+v", s, dt.Time, err)
-	return err
+	return dt.UnmarshalText([]byte(s))
 }
 
 func (dt DateTime) MarshalJSON() ([]byte, error) {
@@ -65,10 +51,7 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil
 	}
-	// Fractional seconds are handled implicitly by Parse.
-	var err error
-	dt.Time, err = time.ParseInLocation(`"`+time.RFC3339+`"`, string(data), time.Local)
-	return err
+	return dt.UnmarshalText(data)
 }
 
 // MarshalText implements the encoding.TextMarshaler interface.
@@ -80,10 +63,25 @@ func (dt DateTime) MarshalText() ([]byte, error) {
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 // The time is expected to be in RFC 3339 format.
 func (dt *DateTime) UnmarshalText(data []byte) error {
-	// Fractional seconds are handled implicitly by Parse.
+	data = bytes.Trim(data, " \"")
+	n := len(data)
+	if n == 0 {
+		dt.Time = time.Time{}
+		//log.Println("time=")
+		return nil
+	}
+	if n > len(time.RFC3339) {
+		n = len(time.RFC3339)
+	} else if n < 4 {
+		n = 4
+	} else if n > 10 && data[10] != time.RFC3339[10] {
+		data[10] = time.RFC3339[10]
+	}
 	var err error
-	dt.Time, err = time.ParseInLocation(time.RFC3339, string(data), time.Local)
-	return err
+	// Fractional seconds are handled implicitly by Parse.
+	dt.Time, err = time.ParseInLocation(time.RFC3339[:n], string(data), time.Local)
+	//log.Printf("s=%q time=%v err=%+v", data, dt.Time, err)
+	return errors.Wrap(err, string(data))
 }
 
 func (dt DateTime) Timestamp() *types.Timestamp {
