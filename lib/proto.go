@@ -245,6 +245,7 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 		return "google.protobuf.Timestamp", protoOptions{
 			//"gogoproto.stdtime":    true,
 			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.DateTime",
+			"gogoproto.moretags":   `xml:",omitempty"`,
 		}
 	case "n":
 		return "string", nil
