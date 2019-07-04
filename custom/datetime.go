@@ -33,6 +33,9 @@ type DateTime struct {
 
 func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
 	//fmt.Printf("Marshal %v: %v\n", start.Name.Local, dt.Time.Format(time.RFC3339))
+	if dt.Time.IsZero() {
+		return enc.EncodeElement("", start)
+	}
 	return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339), start)
 }
 func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
@@ -44,6 +47,9 @@ func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 }
 
 func (dt DateTime) MarshalJSON() ([]byte, error) {
+	if dt.Time.IsZero() {
+		return nil, nil
+	}
 	return dt.Time.In(time.Local).MarshalJSON()
 }
 func (dt *DateTime) UnmarshalJSON(data []byte) error {
@@ -57,6 +63,9 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 // MarshalText implements the encoding.TextMarshaler interface.
 // The time is formatted in RFC 3339 format, with sub-second precision added if present.
 func (dt DateTime) MarshalText() ([]byte, error) {
+	if dt.Time.IsZero() {
+		return nil, nil
+	}
 	return dt.Time.In(time.Local).MarshalText()
 }
 
