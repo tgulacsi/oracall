@@ -16,6 +16,6 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/tgulacsi/go v0.4.5
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	google.golang.org/grpc v1.17.0
+	google.golang.org/grpc v1.23.0
 	gopkg.in/goracle.v2 v2.18.5
 )
