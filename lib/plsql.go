@@ -268,7 +268,7 @@ func demap(plsql, callFun string) (string, string) {
 			}).
 		Parse(callFun)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, callFun)
+		fmt.Fprintln(os.Stderr, callFun)
 		panic(err)
 	}
 	if err = tpl.Execute(callBuf, opts); err != nil {

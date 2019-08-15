@@ -702,8 +702,8 @@ func parsePkgFlag(s string) (string, string) {
 	return s, pkg
 }
 
-var rReplace = regexp.MustCompile("\\s*=>\\s*")
-var rAnnotation = regexp.MustCompile("--oracall:((replace(_json)?|rename)\\s+[a-zA-Z0-9_#]+\\s*=>\\s*[a-zA-Z0-9_#]+)|private\\s+[a-zA-Z0-9_#]+")
+var rReplace = regexp.MustCompile(`\s*=>\s*`)
+var rAnnotation = regexp.MustCompile(`--oracall:((replace(_json)?|rename)\s+[a-zA-Z0-9_#]+\s*=>\s*[a-zA-Z0-9_#]+)|private\s+[a-zA-Z0-9_#]+`)
 
 func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, pkg, sub string) ([]dbType, error) {
 	plus := make([]dbType, 0, 4)

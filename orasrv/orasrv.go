@@ -18,12 +18,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/oklog/ulid"
 
+	"github.com/go-stack/stack"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	_ "google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/status"
-	"gopkg.in/stack.v1"
 
 	goracle "gopkg.in/goracle.v2"
 )

@@ -26,10 +26,10 @@ import (
 var Log = func(...interface{}) error { return nil }
 
 const (
-	MarkNull = "â" // 0x2400 = nul
-	//MarkValid  = "ćťż" // 0x6eff = fill; full, satisfied
+	MarkNull = "\u2400" // 0x2400 = nul
+	//MarkValid  = "\u6eff" // 0x6eff = fill; full, satisfied
 	MarkValid = "Valid" // 0x6eff = fill; full, satisfied
-	//MarkHidden = "ĺż"     // 0x533f = hide
+	//MarkHidden = "\u533f"     // 0x533f = hide
 	MarkHidden = "_hidden"
 
 	DefaultMaxVARCHARLength = 32767
@@ -222,7 +222,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 
 	switch arg.Type {
 	case "CHAR", "NCHAR", "VARCHAR", "NVARCHAR", "VARCHAR2", "NVARCHAR2":
-		if arg.Charlength <= 0 {
+		if arg.Charlength == 0 {
 			if strings.Contains(arg.Type, "VAR") {
 				arg.Charlength = DefaultMaxVARCHARLength
 			} else {
