@@ -20,5 +20,5 @@ require (
 	golang.org/x/net v0.0.0-20190311183353-d8887717615a
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	google.golang.org/grpc v1.23.0
-	gopkg.in/goracle.v2 v2.18.5
+	gopkg.in/goracle.v2 v2.19.0
 )
