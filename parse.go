@@ -19,10 +19,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+
+	errors "golang.org/x/xerrors"
 )
 
 func parseDocs(ctx context.Context, text string) (map[string]string, error) {

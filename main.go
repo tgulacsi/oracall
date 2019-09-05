@@ -39,10 +39,10 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
 	"github.com/tgulacsi/go/loghlp/kitloghlp"
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
+	errors "golang.org/x/xerrors"
 
 	// for Oracle-specific drivers
 	goracle "gopkg.in/goracle.v2"
@@ -140,20 +140,20 @@ func Main(args []string) error {
 	} else {
 		var cx *sql.DB
 		if cx, err = sql.Open("goracle", *flagConnect); err != nil {
-			return errors.Wrap(err, "connect to "+*flagConnect)
+			return errors.Errorf("connect to %s: %w", *flagConnect, err)
 		}
 		defer cx.Close()
 		if *flagVerbose {
 			goracle.Log = log.With(logger, "lib", "goracle").Log
 		}
 		if err = cx.Ping(); err != nil {
-			return errors.Wrap(err, "Ping "+*flagConnect)
+			return errors.Errorf("Ping %s: %w", *flagConnect, err)
 		}
 
 		functions, annotations, err = parseDB(ctx, cx, pattern, *flagDump, filter)
 	}
 	if err != nil {
-		return errors.Wrap(err, "read "+flag.Arg(0))
+		return errors.Errorf("read %s: %w", flag.Arg(0), err)
 	}
 
 	defer os.Stdout.Sync()
@@ -167,7 +167,7 @@ func Main(args []string) error {
 		Log("msg", "Writing generated functions", "file", fn)
 		os.MkdirAll(filepath.Dir(fn), 0775)
 		if out, err = os.Create(fn); err != nil {
-			return errors.Wrap(err, "create "+fn)
+			return errors.Errorf("create %s: %w", fn, err)
 		}
 		defer func() {
 			if err := out.Close(); err != nil {
@@ -204,7 +204,7 @@ func Main(args []string) error {
 			out, functions,
 			dbPkg, pbPath, false,
 		); err != nil {
-			return errors.Wrap(err, "save functions")
+			return errors.Errorf("save functions: %w", err)
 		}
 		return nil
 	})
@@ -219,14 +219,14 @@ func Main(args []string) error {
 		Log("msg", "Writing Protocol Buffers", "file", fn)
 		fh, err := os.Create(fn)
 		if err != nil {
-			return errors.Wrap(err, "create proto")
+			return errors.Errorf("create proto: %w", err)
 		}
 		err = oracall.SaveProtobuf(fh, functions, pbPkg)
 		if closeErr := fh.Close(); closeErr != nil && err == nil {
 			err = closeErr
 		}
 		if err != nil {
-			return errors.Wrap(err, "SaveProtobuf")
+			return errors.Errorf("SaveProtobuf: %w", err)
 		}
 
 		goOut := *flagGenerator + "_out"
@@ -239,7 +239,7 @@ func Main(args []string) error {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return errors.Wrapf(err, "%q", cmd.Args)
+			return errors.Errorf("%q: %w", cmd.Args, err)
 		}
 		return nil
 	})
@@ -333,7 +333,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		var resolveTypeShort func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error)
 		var err error
 		if collStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
-			logger.Log("WARN", errors.Wrap(err, qry))
+			logger.Log("WARN", errors.Errorf("%s: %w", qry, err))
 		} else {
 			if rows, err := collStmt.QueryContext(grpCtx, sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", "")); err != nil {
 				collStmt.Close()
@@ -351,7 +351,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				 ORDER BY attr_no`
 				if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
 					collStmt.Close()
-					logger.Log("WARN", errors.Wrap(err, qry))
+					logger.Log("WARN", errors.Errorf("%s: %w", qry, err))
 				} else {
 					if rows, err := attrStmt.QueryContext(grpCtx, sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", "")); err != nil {
 						attrStmt.Close()
@@ -371,7 +371,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		rows, err := cx.QueryContext(grpCtx, qry, pattern, pattern)
 		if err != nil {
 			logger.Log("qry", qry, "error", err)
-			return errors.Wrap(err, qry)
+			return errors.Errorf("%s: %w", qry, err)
 		}
 		defer rows.Close()
 
@@ -383,7 +383,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				&row.Data, &row.Prec, &row.Scale, &row.Charset,
 				&row.PLS, &row.Length, &row.Owner, &row.Name, &row.Subname, &row.Link,
 			); err != nil {
-				return errors.Wrapf(err, "reading row=%v", rows)
+				return errors.Errorf("reading row=%v: %w", rows, err)
 			}
 			row.Seq = seq
 			seq++
@@ -419,7 +419,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			}
 
 		}
-		return errors.Wrap(err, "walking rows")
+		return errors.Errorf("walking rows: %w", err)
 	})
 
 	var cwMu sync.Mutex
@@ -463,12 +463,12 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
 			logger.Log("msg", "create", "dump", dumpFn, "error", err)
-			return functions, annotations, errors.Wrap(err, dumpFn)
+			return functions, annotations, errors.Errorf("%s: %w", dumpFn, err)
 		}
 		defer func() {
 			cwMu.Lock()
 			cw.Flush()
-			err = errors.WithMessage(cw.Error(), "csv flush")
+			err = errors.Errorf("csv flush: %w", cw.Error())
 			cwMu.Unlock()
 			if err != nil {
 				logger.Log("msg", "flush", "csv", fh.Name(), "error", err)
@@ -483,7 +483,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		cwMu.Unlock()
 		if err != nil {
 			logger.Log("msg", "write header to csv", "error", err)
-			return functions, annotations, errors.Wrap(err, "write header")
+			return functions, annotations, errors.Errorf("write header: %w", err)
 		}
 	}
 
@@ -523,16 +523,16 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			if cw != nil {
 				N := i64ToString
 				cwMu.Lock()
-				err := errors.WithMessage(cw.Write([]string{
+				err := cw.Write([]string{
 					strconv.Itoa(row.OID), N(row.SubID), strconv.Itoa(row.Seq), row.Package.String, row.Object.String,
 					strconv.Itoa(row.Level), row.Argument, ua.InOut,
 					ua.DataType, N(row.Prec), N(row.Scale), row.Charset,
 					row.PLS, N(row.Length),
 					row.Owner, row.Name, row.Subname, row.Link,
-				}), "write csv")
+				})
 				cwMu.Unlock()
 				if err != nil {
-					return errors.Wrapf(err, "writing csv")
+					return errors.Errorf("write csv: %w", err)
 				}
 			}
 			if !row.Package.Valid {
@@ -669,19 +669,19 @@ func getSource(ctx context.Context, w io.Writer, cx *sql.DB, packageName string)
 	qry := "SELECT text FROM user_source WHERE name = UPPER(:1) AND type = 'PACKAGE' ORDER BY line"
 	rows, err := cx.QueryContext(ctx, qry, packageName)
 	if err != nil {
-		return errors.Wrapf(err, "%s [%q]", qry, packageName)
+		return errors.Errorf("%s [%q]: %w", qry, packageName, err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var line sql.NullString
 		if err := rows.Scan(&line); err != nil {
-			return errors.Wrap(err, qry)
+			return errors.Errorf("%s: %w", qry, err)
 		}
 		if _, err := io.WriteString(w, line.String); err != nil {
 			return err
 		}
 	}
-	return errors.Wrap(rows.Err(), qry)
+	return errors.Errorf("%s: %w", qry, rows.Err())
 }
 
 func i64ToString(n sql.NullInt64) string {
@@ -794,13 +794,13 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 			plus = append(plus, t)
 		}
 	default:
-		return nil, errors.Wrap(errors.New("unknown type"), typ)
+		return nil, errors.Errorf("%s: %w", typ, errors.New("unknown type"))
 	}
 	if rows != nil {
 		err = rows.Err()
 	}
 	if len(plus) == 0 && err == nil {
-		err = errors.Wrapf(errors.New("not found"), "%s/%s.%s.%s", typ, owner, pkg, sub)
+		err = errors.Errorf("%s/%s.%s.%s: %w", typ, owner, pkg, sub, errors.New("not found"))
 	}
 	return plus, err
 }
@@ -847,7 +847,7 @@ func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx co
 		if p.Data == "TABLE" || p.Data == "PL/SQL TABLE" || p.Data == "PL/SQL RECORD" || p.Data == "REF CURSOR" {
 			q, err := resolveTypeShort(ctx, p.Data, p.Owner, p.Name, p.Subname)
 			if err != nil {
-				return plus, errors.Wrapf(err, "%+v", p)
+				return plus, errors.Errorf("%+v: %w", p, err)
 			}
 			//logger.Log("q", q)
 			for i, x := range q {

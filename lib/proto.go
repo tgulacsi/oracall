@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	fstructs "github.com/fatih/structs"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 var SkipMissingTableOf = true
@@ -64,12 +64,12 @@ FunLoop:
 		}
 		fName = strings.ToLower(fName)
 		if err := fun.SaveProtobuf(w, seen); err != nil {
-			if SkipMissingTableOf && (errors.Cause(err) == ErrMissingTableOf ||
-				errors.Cause(err) == UnknownSimpleType) {
+			if SkipMissingTableOf && (errors.Is(err, ErrMissingTableOf) ||
+				errors.Is(err, UnknownSimpleType)) {
 				Log("msg", "SKIP function, missing TableOf info", "function", fName)
 				continue FunLoop
 			}
-			return errors.WithMessage(err, fun.name)
+			return errors.Errorf("%s: %w", fun.name, err)
 		}
 		var streamQual string
 		if fun.HasCursorOut() {
@@ -103,10 +103,10 @@ FunLoop:
 func (f Function) SaveProtobuf(dst io.Writer, seen map[string]struct{}) error {
 	var buf bytes.Buffer
 	if err := f.saveProtobufDir(&buf, seen, false); err != nil {
-		return errors.Wrap(err, "input")
+		return errors.Errorf("%s: %w", "input", err)
 	}
 	if err := f.saveProtobufDir(&buf, seen, true); err != nil {
-		return errors.Wrap(err, "output")
+		return errors.Errorf("%s: %w", "output", err)
 	}
 	_, err := dst.Write(buf.Bytes())
 	return err
@@ -141,7 +141,7 @@ var dot2D = strings.NewReplacer(".", "__")
 func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, args ...Argument) error {
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
+			return errors.Errorf("no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf)
 		}
 	}
 
@@ -158,14 +158,14 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		if arg.Flavor == FLAVOR_TABLE {
 			if arg.TableOf == nil {
-				return errors.Wrapf(ErrMissingTableOf, "no table of data for %s.%s (%v)", msgName, arg, arg)
+				return errors.Errorf("no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf)
 			}
 			rule = "repeated "
 		}
 		aName := arg.Name
 		got, err := arg.goType(false)
 		if err != nil {
-			return errors.WithMessage(err, msgName)
+			return errors.Errorf("%s: %w", msgName, err)
 		}
 		got = strings.TrimPrefix(got, "*")
 		if strings.HasPrefix(got, "[]") {
@@ -296,7 +296,7 @@ func CopyStruct(dest interface{}, src interface{}) error {
 			if snm == dnm || dnm == CamelCase(snm) || CamelCase(dnm) == snm {
 				svalue := svalues[i]
 				if err := df.Set(svalue); err != nil {
-					return errors.Wrapf(err, "set %q to %q (%v %T)", dnm, snm, svalue, svalue)
+					return errors.Errorf("set %q to %q (%v %T): %w", dnm, snm, svalue, svalue, err)
 				}
 			}
 		}

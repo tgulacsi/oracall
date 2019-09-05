@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 )
 
 var _ = xml.Unmarshaler((*DateTime)(nil))
@@ -90,7 +90,7 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 	// Fractional seconds are handled implicitly by Parse.
 	dt.Time, err = time.ParseInLocation(time.RFC3339[:n], string(data), time.Local)
 	//log.Printf("s=%q time=%v err=%+v", data, dt.Time, err)
-	return errors.Wrap(err, string(data))
+	return errors.Errorf("%s: %w", string(data), err)
 }
 
 func (dt DateTime) Timestamp() *types.Timestamp {

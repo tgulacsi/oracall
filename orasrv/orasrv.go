@@ -11,9 +11,9 @@ import (
 
 	"github.com/LK4D4/joincontext"
 	"github.com/gogo/protobuf/proto"
-	"github.com/pkg/errors"
 	bp "github.com/tgulacsi/go/bufpool"
 	oracall "github.com/tgulacsi/oracall/lib"
+	errors "golang.org/x/xerrors"
 
 	"github.com/go-kit/kit/log"
 	"github.com/oklog/ulid"
@@ -176,10 +176,9 @@ func StatusError(err error) error {
 		return err
 	}
 	var code codes.Code
-	cerr := errors.Cause(err)
-	if cerr == oracall.ErrInvalidArgument {
+	if errors.Is(err, oracall.ErrInvalidArgument) {
 		code = codes.InvalidArgument
-	} else if sc, ok := cerr.(interface {
+	} else if sc, ok := errors.Unwrap(err).(interface {
 		Code() codes.Code
 	}); ok {
 		code = sc.Code()

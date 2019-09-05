@@ -26,7 +26,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"gopkg.in/goracle.v2"
 )
 
@@ -39,7 +39,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
 		Log("msg", "error preparing", "function", fun, "error", err)
-		panic(errors.Wrap(err, fun.Name()))
+		panic(errors.Errorf("%s: %w", fun.Name(), err))
 	}
 	fn := fun.name
 	if fun.alias != "" {
@@ -153,7 +153,7 @@ if true || DebugLevel > 0 {
 	defer cancel()
 	stmt, stmtErr := s.db.PrepareContext(ctx, qry)
 	if stmtErr != nil {
-		err = errors.Wrap(stmtErr, qry)
+		err = errors.Errorf("%s: %w", qry, stmtErr)
 		return
 	}
 	defer stmt.Close()
@@ -163,7 +163,7 @@ if true || DebugLevel > 0 {
 			_, err = stmt.ExecContext(ctx, params...)
 		}
 		if err != nil {
-			err = errors.Wrapf(err, "%q %+v", qry, params)
+			err = errors.Errorf("%q %+v: %w",  qry, params,err)
 			return
 		}
 	}
@@ -187,7 +187,7 @@ if true || DebugLevel > 0 {
 			for _, it := range iterators {
 				if err = ctx.Err(); err != nil { return }
 				if err = it.Iterate(); err != nil {
-					if errors.Cause(err) != io.EOF {
+					if !errors.Is(err, io.EOF) {
 						_ = stream.Send(output)
 						return
 					}
@@ -356,11 +356,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		)
 		if fun.ReplacementIsJSON {
 			convOut = append(convOut,
-				"if err = json.NewDecoder(strings.NewReader(outCLOB)).Decode(&output); err != nil { err = errors.Wrap(err, outCLOB); return; }",
+				`if err = json.NewDecoder(strings.NewReader(outCLOB)).Decode(&output); err != nil { err = errors.Errorf("%s: %w", outCLOB,err); return; }`,
 			)
 		} else {
 			convOut = append(convOut,
-				"if err = xml.NewDecoder(strings.NewReader(outCLOB)).Decode(&output); err != nil { err = errors.Wrap(err, outCLOB); return; }",
+				`if err = xml.NewDecoder(strings.NewReader(outCLOB)).Decode(&output); err != nil { err = errors.Errorf("%s: %w", outCLOB, err); return; }`,
 			)
 		}
 

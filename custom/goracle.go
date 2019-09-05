@@ -13,7 +13,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/pkg/errors"
+	errors "golang.org/x/xerrors"
 	"gopkg.in/goracle.v2"
 )
 
@@ -80,7 +80,7 @@ func ParseTime(t *time.Time, s string) error {
 	}
 	var err error
 	*t, err = time.ParseInLocation(timeFormat[:n], s, time.Local) // TODO(tgulacsi): more robust parser
-	return errors.Wrap(err, s)
+	return errors.Errorf("%s: %w", s, err)
 }
 
 type Lob struct {
