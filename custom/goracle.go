@@ -80,7 +80,10 @@ func ParseTime(t *time.Time, s string) error {
 	}
 	var err error
 	*t, err = time.ParseInLocation(timeFormat[:n], s, time.Local) // TODO(tgulacsi): more robust parser
-	return errors.Errorf("%s: %w", s, err)
+	if err != nil {
+		return errors.Errorf("%s: %w", s, err)
+	}
+	return nil
 }
 
 type Lob struct {

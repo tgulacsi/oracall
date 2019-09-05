@@ -90,14 +90,14 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 	// Fractional seconds are handled implicitly by Parse.
 	dt.Time, err = time.ParseInLocation(time.RFC3339[:n], string(data), time.Local)
 	//log.Printf("s=%q time=%v err=%+v", data, dt.Time, err)
-	return errors.Errorf("%s: %w", string(data), err)
+	if err != nil {
+		return errors.Errorf("%s: %w", string(data), err)
+	}
+	return nil
 }
 
 func (dt DateTime) Timestamp() *types.Timestamp {
-	ts, err := types.TimestampProto(dt.Time)
-	if err != nil {
-		//fmt.Printf("ERROR: %+v\n", err)
-	}
+	ts, _ := types.TimestampProto(dt.Time)
 	return ts
 }
 func (dt DateTime) MarshalTo(dAtA []byte) (int, error) {

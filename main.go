@@ -419,7 +419,10 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			}
 
 		}
-		return errors.Errorf("walking rows: %w", err)
+		if err != nil {
+			return errors.Errorf("walking rows: %w", err)
+		}
+		return nil
 	})
 
 	var cwMu sync.Mutex
@@ -681,7 +684,10 @@ func getSource(ctx context.Context, w io.Writer, cx *sql.DB, packageName string)
 			return err
 		}
 	}
-	return errors.Errorf("%s: %w", qry, rows.Err())
+	if err := rows.Err(); err != nil {
+		return errors.Errorf("%s: %w", qry, err)
+	}
+	return nil
 }
 
 func i64ToString(n sql.NullInt64) string {

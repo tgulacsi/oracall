@@ -84,7 +84,7 @@ var _ time.Time
 var _ strings.Reader
 var _ xml.Name
 var Log = func(keyvals ...interface{}) error { return nil } // logger.Log of github.com/go-kit/kit/log
-var _ = errors.Wrap
+var _ = errors.New
 var _ = fmt.Printf
 var _ goracle.Lob
 var _ unsafe.Pointer
@@ -340,7 +340,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 		case "NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
-		return errors.Wrap("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
+		return errors.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
