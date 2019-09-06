@@ -176,11 +176,12 @@ func StatusError(err error) error {
 		return err
 	}
 	var code codes.Code
+	var sc interface {
+		Code() codes.Code
+	}
 	if errors.Is(err, oracall.ErrInvalidArgument) {
 		code = codes.InvalidArgument
-	} else if sc, ok := errors.Unwrap(err).(interface {
-		Code() codes.Code
-	}); ok {
+	} else if errors.As(err, &sc) {
 		code = sc.Code()
 	}
 	if code == 0 {
