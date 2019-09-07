@@ -26,15 +26,17 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
-	errors "golang.org/x/xerrors"
 	"golang.org/x/sync/errgroup"
+	errors "golang.org/x/xerrors"
 )
 
 // UserArgument represents the required info from the user_arguments view
 type UserArgument struct {
 	PackageName string `sql:"PACKAGE_NAME"`
 	ObjectName  string `sql:"OBJECT_NAME"`
+	LastDDL     time.Time
 
 	ArgumentName string `sql:"ARGUMENT_NAME"`
 	InOut        string `sql:"IN_OUT"`
@@ -253,7 +255,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 		for i, ua := range uas {
 			row++
 			if i == 0 {
-				fun = Function{Package: ua.PackageName, name: ua.ObjectName}
+				fun = Function{Package: ua.PackageName, name: ua.ObjectName, LastDDL: ua.LastDDL}
 			}
 
 			level = int8(ua.DataLevel)

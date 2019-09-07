@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Log is discarded by default.
@@ -43,6 +44,7 @@ type Function struct {
 	Documentation        string
 	Replacement          *Function
 	ReplacementIsJSON    bool
+	LastDDL              time.Time
 }
 
 func (f Function) Name() string {

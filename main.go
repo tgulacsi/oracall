@@ -273,9 +273,9 @@ func (t dbType) String() string {
 }
 
 func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, annotations []oracall.Annotation, err error) {
-	tbl := "user_arguments"
+	tbl, objTbl := "user_arguments", "user_objects"
 	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
-		tbl = "all_arguments"
+		tbl, objTbl = "all_arguments", "all_objects"
 	}
 	argumentsQry := `` + //nolint:gas
 		`SELECT A.*
@@ -303,6 +303,20 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+
+	objTimeQry := `SELECT last_ddl_time FROM ` + objTbl + ` WHERE object_name = :1 AND object_type <> 'PACKAGE BODY'`
+	objTimeStmt, err := cx.PrepareContext(ctx, objTimeQry)
+	if err != nil {
+		return nil, nil, errors.Errorf("%s: %w", objTimeQry, err)
+	}
+	defer objTimeStmt.Close()
+	getObjTime := func(name string) (time.Time, error) {
+		var t time.Time
+		if err := objTimeStmt.QueryRowContext(ctx, name).Scan(&t); err != nil {
+			return t, errors.Errorf("%s [%q]: %w", objTimeQry, name, err)
+		}
+		return t, nil
+	}
 
 	dbCh := make(chan dbRow)
 	grp, grpCtx := errgroup.WithContext(ctx)
@@ -335,12 +349,11 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		if collStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
 			logger.Log("WARN", errors.Errorf("%s: %w", qry, err))
 		} else {
+			defer collStmt.Close()
 			if rows, err := collStmt.QueryContext(grpCtx, sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", "")); err != nil {
-				collStmt.Close()
 				collStmt = nil
 			} else {
 				rows.Close()
-				defer collStmt.Close()
 
 				qry = `SELECT attr_name, attr_type_owner, attr_type_name, attr_type_package,
                       length, precision, scale, character_set_name, attr_no,
@@ -350,15 +363,13 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				 WHERE owner = :owner AND package_name = :pkg AND type_name = :sub
 				 ORDER BY attr_no`
 				if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
-					collStmt.Close()
 					logger.Log("WARN", errors.Errorf("%s: %w", qry, err))
 				} else {
+					defer attrStmt.Close()
 					if rows, err := attrStmt.QueryContext(grpCtx, sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", "")); err != nil {
-						attrStmt.Close()
 						attrStmt = nil
 					} else {
 						rows.Close()
-						defer attrStmt.Close()
 						resolveTypeShort = func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error) {
 							return resolveType(ctx, collStmt, attrStmt, typ, owner, name, sub)
 						}
@@ -497,6 +508,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 	userArgs := make(chan oracall.UserArgument, 16)
 	grp.Go(func() error {
 		defer close(userArgs)
+		var pkgTime time.Time
 		ctx := grpCtx
 	Loop:
 		for {
@@ -543,6 +555,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			}
 			ua.PackageName = row.Package.String
 			if ua.PackageName != prevPackage {
+				if pkgTime, err = getObjTime(ua.PackageName); err != nil {
+					return err
+				}
 				prevPackage = ua.PackageName
 				grp.Go(func() error {
 					buf := bufPool.Get().(*bytes.Buffer)
@@ -592,6 +607,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 					return docsErr
 				})
 			}
+			ua.LastDDL = pkgTime
 			if row.Object.Valid {
 				ua.ObjectName = row.Object.String
 			}

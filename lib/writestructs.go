@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	errors "golang.org/x/xerrors"
@@ -41,6 +42,15 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 	if pkg != "" {
 		if pbImport != "" {
 			pbImport = `pb "` + pbImport + `"`
+		}
+		var lastDDL time.Time
+		for _, f := range functions {
+			if f.LastDDL.After(lastDDL) {
+				lastDDL = f.LastDDL
+			}
+		}
+		if lastDDL.IsZero() {
+			lastDDL = time.Now()
 		}
 		io.WriteString(w,
 			// https://github.com/golang/go/issues/13560#issuecomment-288457920
@@ -73,6 +83,8 @@ import (
 )
 
 var DebugLevel = uint(0)
+
+const LastDDL = "`+lastDDL.Format(time.RFC3339)+`"
 
 // against "unused import" error
 var _ json.Marshaler
