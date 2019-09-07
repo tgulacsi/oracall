@@ -7,18 +7,19 @@ require (
 	github.com/antzucaro/matchr v0.0.0-20180616170659-cbc221335f3c
 	github.com/davecgh/go-spew v1.1.1
 	github.com/fatih/structs v1.1.0
-	github.com/go-kit/kit v0.8.0
+	github.com/go-kit/kit v0.9.0
 	github.com/go-stack/stack v1.8.0
-	github.com/gogo/protobuf v1.2.1
-	github.com/google/go-cmp v0.2.0
+	github.com/gogo/protobuf v1.3.0
+	github.com/google/go-cmp v0.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.0
-	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
+	github.com/hhrutter/pdfcpu v0.2.1 // indirect
+	github.com/kylelemons/godebug v1.1.0
 	github.com/oklog/ulid v1.3.1
 	github.com/pkg/errors v0.8.1
-	github.com/tgulacsi/go v0.5.0
-	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
+	github.com/tgulacsi/go v0.6.0
+	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
 	google.golang.org/grpc v1.23.0
-	gopkg.in/goracle.v2 v2.20.0
+	gopkg.in/goracle.v2 v2.20.1
 )
