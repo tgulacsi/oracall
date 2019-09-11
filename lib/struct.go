@@ -45,6 +45,7 @@ type Function struct {
 	Replacement          *Function
 	ReplacementIsJSON    bool
 	LastDDL              time.Time
+	handle               []string
 }
 
 func (f Function) Name() string {

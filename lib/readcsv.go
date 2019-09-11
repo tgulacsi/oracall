@@ -373,7 +373,7 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 	}
 	for _, a := range annotations {
 		if a.Name == "" || a.Type == "" ||
-			a.Type != "private" && a.Other == "" {
+			!(a.Type == "private" || a.Type == "handle") && a.Other == "" {
 			continue
 		}
 		switch a.Type {
@@ -398,6 +398,18 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 				delete(funcs, v)
 				Log("delete", v, "add", f.Name())
 				funcs[L(f.Name())] = f
+			}
+
+		// add handler to ALL functions in the same package
+		case "handle":
+			exc := strings.ToUpper(a.Name)
+			for _, f := range funcs {
+				if strings.EqualFold(f.Package, a.Package) {
+					//Log("HANDLE", nm, "of", f.Name(), "pkg", f.Package)
+					f.handle = append(f.handle, exc)
+					//} else {
+					//Log("SKIP", f.Name(), "pkg", f.Package, "a", a.Package, "nm", nm)
+				}
 			}
 		}
 	}

@@ -61,7 +61,18 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	for _, line := range pre {
 		fmt.Fprintf(plsBuf, "  %s\n", line)
 	}
-	fmt.Fprintf(plsBuf, "\n  %s;\n\n", call)
+	if len(fun.handle) == 0 {
+		plsBuf.WriteString("\n")
+	} else {
+		plsBuf.WriteString("  BEGIN\n  ")
+	}
+	fmt.Fprintf(plsBuf, "  %s;\n", call)
+	//Log("handle", fun.handle, "fun", fun.Name())
+	if len(fun.handle) != 0 {
+		fmt.Fprintf(plsBuf, "  EXCEPTION WHEN %s THEN NULL;\n  END;\n",
+			strings.Join(fun.handle, " OR "))
+	}
+	plsBuf.WriteByte('\n')
 	for _, line := range post {
 		fmt.Fprintf(plsBuf, "  %s\n", line)
 	}
