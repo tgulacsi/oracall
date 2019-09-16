@@ -48,13 +48,14 @@ func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 
 func (dt DateTime) MarshalJSON() ([]byte, error) {
 	if dt.Time.IsZero() {
-		return nil, nil
+		return []byte("null"), nil
 	}
 	return dt.Time.In(time.Local).MarshalJSON()
 }
 func (dt *DateTime) UnmarshalJSON(data []byte) error {
 	// Ignore null, like in the main JSON package.
-	if string(data) == "null" {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || string(data) == "null" {
 		return nil
 	}
 	return dt.UnmarshalText(data)
