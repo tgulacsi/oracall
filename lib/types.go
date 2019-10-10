@@ -49,12 +49,12 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	switch arg.ora {
 	case "BLOB":
 		if varName != "" {
-			return fmt.Sprintf("{%s, err = ioutil.ReadAll(%s)", dst, varName)
+			return fmt.Sprintf("{ if %s.Reader != nil { %s, err = ioutil.ReadAll(%s) }", varName, dst, varName)
 		}
 		return fmt.Sprintf("%s = goracle.Lob{Reader:bytes.NewReader(%s)}", dst, src)
 	case "CLOB":
 		if varName != "" {
-			return fmt.Sprintf("{var b []byte; b, err = ioutil.ReadAll(%s); %s = string(b)}", varName, dst)
+			return fmt.Sprintf("{var b []byte; if %s.Reader != nil {b, err = ioutil.ReadAll(%s); %s = string(b)}}", varName, varName, dst)
 		}
 		return fmt.Sprintf("%s = goracle.Lob{IsClob:true, Reader:strings.NewReader(%s)}", dst, src)
 	case "DATE", "TIMESTAMP":
