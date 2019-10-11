@@ -458,10 +458,6 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2", "ROWID":
-			if !isTable && arg.IsOutput() {
-				//return "*string", nil
-				return "string", nil
-			}
 			return "string", nil // NULL is the same as the empty string for Oracle
 		case "RAW":
 			return "string", nil
@@ -487,8 +483,14 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 			return "time.Time", nil
 		case "REF CURSOR":
 			return "*sql.Rows", nil
-		case "CLOB", "BLOB":
+		/*
+	case "CLOB", "BLOB":
 			return "goracle.Lob", nil
+			*/
+		case "CLOB":
+			return "string", nil
+		case "BLOB":
+			return "[]byte", nil
 		case "BFILE":
 			return "ora.Bfile", nil
 		default:

@@ -47,6 +47,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		}
 	}
 	switch arg.ora {
+		/*
 	case "BLOB":
 		if varName != "" {
 			return fmt.Sprintf("{ if %s.Reader != nil { %s, err = ioutil.ReadAll(%s) }", varName, dst, varName)
@@ -57,6 +58,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 			return fmt.Sprintf("{var b []byte; if %s.Reader != nil {b, err = ioutil.ReadAll(%s); %s = string(b)}}", varName, varName, dst)
 		}
 		return fmt.Sprintf("%s = goracle.Lob{IsClob:true, Reader:strings.NewReader(%s)}", dst, src)
+		*/
 	case "DATE", "TIMESTAMP":
 		return fmt.Sprintf("%s = (%s)", dst, src)
 	case "PLS_INTEGER":
@@ -125,11 +127,13 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 		if src[0] != '&' {
 			return fmt.Sprintf("%s := goracle.Number(%s); %s = %s", dstVar, src, dst, dstVar), dstVar
 		}
+		/*
 	case "CLOB":
 		if dir.IsOutput() {
 			return fmt.Sprintf("%s := goracle.Lob{IsClob:true}; %s = sql.Out{Dest:&%s}", dstVar, dst, dstVar), dstVar
 		}
 		return fmt.Sprintf("%s := goracle.Lob{IsClob:true,Reader:strings.NewReader(%s)}; %s = %s", dstVar, src, dst, dstVar), dstVar
+	*/
 	}
 	if dir.IsOutput() && !(strings.HasSuffix(dst, "]") && !strings.HasPrefix(dst, "params[")) {
 		if arg.ora == "NUMBER" {
