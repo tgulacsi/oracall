@@ -464,7 +464,7 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 			}
 			return "string", nil // NULL is the same as the empty string for Oracle
 		case "RAW":
-			return "string", nil
+			return "[]byte", nil
 		case "NUMBER":
 			return "goracle.Number", nil
 		case "INTEGER":
@@ -487,8 +487,10 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 			return "time.Time", nil
 		case "REF CURSOR":
 			return "*sql.Rows", nil
-		case "CLOB", "BLOB":
-			return "goracle.Lob", nil
+		case "BLOB":
+			return "[]byte", nil
+		case "CLOB":
+			return "string", nil
 		case "BFILE":
 			return "ora.Bfile", nil
 		default:
