@@ -34,6 +34,8 @@ type DateTime struct {
 func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
 	//fmt.Printf("Marshal %v: %v\n", start.Name.Local, dt.Time.Format(time.RFC3339))
 	if dt.Time.IsZero() {
+		start.Attr = append(start.Attr,
+			xml.Attr{Name: xml.Name{Space: "http://www.w3.org/2001/XMLSchema-instance", Local: "nil"}, Value: "true"})
 		return enc.EncodeElement("", start)
 	}
 	return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339), start)
@@ -55,7 +57,7 @@ func (dt DateTime) MarshalJSON() ([]byte, error) {
 func (dt *DateTime) UnmarshalJSON(data []byte) error {
 	// Ignore null, like in the main JSON package.
 	data = bytes.TrimSpace(data)
-	if len(data) == 0 || bytes.Equal(data, []byte(`""`)) || bytes.Equal(data, []byte("null"))   {
+	if len(data) == 0 || bytes.Equal(data, []byte(`""`)) || bytes.Equal(data, []byte("null")) {
 		return nil
 	}
 	return dt.UnmarshalText(data)
