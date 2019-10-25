@@ -171,10 +171,10 @@ if true || DebugLevel > 0 {
 	if _, err = stmt.ExecContext(ctx, append(params, goracle.PlSQLArrays)...); err != nil {
 		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
 			// "existing state of packages has been discarded"
-			_, err = stmt.ExecContext(ctx, params...)
+			_, err = stmt.ExecContext(ctx, append(params, goracle.PlSQLArrays)...)
 		}
 		if err != nil {
-			err = errors.Errorf("%q %+v: %w",  qry, params,err)
+			err = errors.Errorf("%q %+v: %w",  qry, params, err)
 			return
 		}
 	}
@@ -954,6 +954,21 @@ func (arg Argument) getConvRec(
 
 	if arg.IsOutput() {
 		too, varName := arg.ToOra(paramName, "&output."+name, arg.Direction)
+		if arg.TableOf != nil {
+			st, err := arg.TableOf.goType(true)
+			if err != nil {
+				panic(err)
+			}
+			convIn = append(convIn, fmt.Sprintf(`
+					if %d > cap(output.%s) {
+						output.%s = append(make([]%s, 0, %d), output.%s...) // gcr2-fr1
+                    }
+					`,
+					MaxTableSize, name,
+				name, st, MaxTableSize, name),
+			)
+		}
+
 		convIn = append(convIn, too+" // gcr2 var="+varName)
 		if varName != "" {
 			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest:&%s} // gcr2out", paramName, varName))
