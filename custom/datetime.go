@@ -16,9 +16,13 @@
 package custom
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/xml"
 	"time"
+
+	"reflect"
+	"unsafe"
 
 	"github.com/gogo/protobuf/types"
 	errors "golang.org/x/xerrors"
@@ -31,12 +35,32 @@ type DateTime struct {
 	time.Time
 }
 
+func getWriter(enc *xml.Encoder) *bufio.Writer {
+	rEnc := reflect.ValueOf(enc)
+	rP := rEnc.Elem().FieldByName("p").Addr()
+	return *(**bufio.Writer)(unsafe.Pointer(rP.Elem().FieldByName("Writer").UnsafeAddr()))
+}
+
 func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
 	//fmt.Printf("Marshal %v: %v\n", start.Name.Local, dt.Time.Format(time.RFC3339))
 	if dt.Time.IsZero() {
 		start.Attr = append(start.Attr,
 			xml.Attr{Name: xml.Name{Space: "http://www.w3.org/2001/XMLSchema-instance", Local: "nil"}, Value: "true"})
-		return enc.EncodeElement("", start)
+
+		bw := getWriter(enc)
+		bw.Flush()
+		old := *bw
+		var buf bytes.Buffer
+		*bw = *bufio.NewWriter(&buf)
+		if err := enc.EncodeElement("", start); err != nil {
+			return err
+		}
+		b := bytes.ReplaceAll(bytes.ReplaceAll(buf.Bytes(),
+			[]byte("XMLSchema-instance:"), []byte("xsi:")),
+			[]byte("xmlns:XMLSchema-instance="), []byte("xmlns:xsi="))
+		*bw = old
+		bw.Write(b)
+		return bw.Flush()
 	}
 	return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339), start)
 }
