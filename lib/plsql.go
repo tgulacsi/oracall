@@ -31,7 +31,8 @@ import (
 )
 
 // MaxTableSize is the maximum size of the array elements
-const MaxTableSize = 512
+var MaxTableSize = 128
+
 const batchSize = 128
 
 // SavePlsqlBlock saves the plsql block definition into writer
@@ -444,6 +445,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		}
 		return fmt.Sprintf(`params[{{paramsIdx %q}}]`, paramName)
 	}
+	maxTableSize := fun.maxTableSize
+	if maxTableSize <= 0 {
+		maxTableSize = MaxTableSize
+	}
 	for _, arg := range args {
 		switch arg.Flavor {
 		case FLAVOR_SIMPLE:
@@ -509,7 +514,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 				convIn, convOut = v.getConvRec(convIn, convOut,
 					name, addParam(tmp),
-					0, arg, k)
+					0, arg, k, maxTableSize)
 			}
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
@@ -520,7 +525,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				name := (CamelCase(arg.Name))
 				//name := capitalize(replHidden(arg.Name))
 				convIn, convOut = arg.getConvSimpleTable(convIn, convOut,
-					name, addParam(arg.Name), MaxTableSize)
+					name, addParam(arg.Name), maxTableSize)
 			} else {
 				switch arg.TableOf.Flavor {
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
@@ -561,7 +566,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					name := (CamelCase(arg.Name))
 					//name := capitalize(replHidden(arg.Name))
 					convIn, convOut = arg.getConvSimpleTable(convIn, convOut,
-						name, addParam(arg.Name), MaxTableSize)
+						name, addParam(arg.Name), maxTableSize)
 
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
@@ -582,9 +587,9 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
                     }
 					output.%s = output.%s[:%d]
 					`,
-							MaxTableSize, aname, tgot,
+							maxTableSize, aname, tgot,
 							aname, aname, aname, st,
-							aname, aname, MaxTableSize))
+							aname, aname, maxTableSize))
 					}
 					if !arg.IsInput() {
 						pre = append(pre, vn+".DELETE;")
@@ -638,7 +643,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							convIn, convOut,
 							[2]string{aname, kName},
 							addParam(tmp),
-							MaxTableSize,
+							uint(maxTableSize),
 							k, *arg.TableOf)
 
 						if arg.IsInput() {
@@ -950,6 +955,7 @@ func (arg Argument) getConvRec(
 	tableSize uint,
 	parentArg Argument,
 	key string,
+	maxTableSize int,
 ) ([]string, []string) {
 
 	if arg.IsOutput() {
@@ -964,8 +970,8 @@ func (arg Argument) getConvRec(
 						output.%s = append(make([]%s, 0, %d), output.%s...) // gcr2-fr1
                     }
 					`,
-					MaxTableSize, name,
-				name, st, MaxTableSize, name),
+				maxTableSize, name,
+				name, st, maxTableSize, name),
 			)
 		}
 

@@ -46,6 +46,7 @@ type Function struct {
 	ReplacementIsJSON    bool
 	LastDDL              time.Time
 	handle               []string
+	maxTableSize int
 }
 
 func (f Function) Name() string {

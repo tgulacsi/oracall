@@ -337,6 +337,7 @@ func mustBeUint8(text string) uint8 {
 
 type Annotation struct {
 	Package, Type, Name, Other string
+	Size int
 }
 
 func (a Annotation) FullName() string {
@@ -410,6 +411,13 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 					//} else {
 					//Log("SKIP", f.Name(), "pkg", f.Package, "a", a.Package, "nm", nm)
 				}
+			}
+
+		case "max-table-size":
+			nm := L(a.FullName())
+			Log("max-table-size", nm, "size", a.Size)
+			if f := funcs[nm]; f != nil {
+				f.maxTableSize = a.Size
 			}
 		}
 	}

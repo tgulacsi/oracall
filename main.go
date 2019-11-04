@@ -80,6 +80,7 @@ func Main(args []string) error {
 	flagVerbose := flag.Bool("v", false, "verbose logging")
 	flagExcept := flag.String("except", "", "except these functions")
 	flagReplace := flag.String("replace", "", "funcA=>funcB")
+	flag.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
 
 	flag.Parse()
 	if *flagPbOut == "" {
@@ -579,7 +580,14 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 							a.Type, b = string(b[:i]), b[i+1:]
 						}
 						if i := bytes.Index(b, []byte("=>")); i < 0 {
-							a.Name = string(bytes.TrimSpace(b))
+							if i = bytes.IndexByte(b, '='); i < 0 {
+								a.Name = string(bytes.TrimSpace(b))
+							} else {
+								a.Name = string(bytes.TrimSpace(b[:i]))
+								if a.Size, err = strconv.Atoi(string(bytes.TrimSpace(b[i+1:]))); err != nil {
+									return err
+								}
+							}
 						} else {
 							a.Name, a.Other = string(bytes.TrimSpace(b[:i])), string(bytes.TrimSpace(b[i+2:]))
 						}
@@ -725,7 +733,7 @@ func parsePkgFlag(s string) (string, string) {
 }
 
 var rReplace = regexp.MustCompile(`\s*=>\s*`)
-var rAnnotation = regexp.MustCompile(`--oracall:(?:(replace(_json)?|rename)\s+[a-zA-Z0-9_#]+\s*=>\s*[a-zA-Z0-9_#]+|(handle|private)\s+[a-zA-Z0-9_#]+)`)
+var rAnnotation = regexp.MustCompile(`--oracall:(?:(replace(_json)?|rename)\s+[a-zA-Z0-9_#]+\s*=>\s*[a-zA-Z0-9_#]+|(handle|private)\s+[a-zA-Z0-9_#]+|max-table-size\s+[a-zA-Z0-9_$]+\s*=\s*[0-9]+)`)
 
 func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, pkg, sub string) ([]dbType, error) {
 	plus := make([]dbType, 0, 4)
