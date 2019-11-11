@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	fstructs "github.com/fatih/structs"
@@ -78,7 +79,7 @@ FunLoop:
 		name := CamelCase(dot2D.Replace(fName))
 		var comment string
 		if fun.Documentation != "" {
-			comment = "\n/// " + strings.Replace(fun.Documentation, "\n", "\n/// ", -1) + "\n\t"
+			comment = asComment(fun.Documentation, "")
 		}
 		services = append(services,
 			fmt.Sprintf(`%srpc %s (%s) returns (%s%s) {}`,
@@ -133,12 +134,12 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 	}
 	return protoWriteMessageTyp(dst,
 		CamelCase(dot2D.Replace(strings.ToLower(nm))+"__"+dirname),
-		seen, args...)
+		seen, getDirDoc(f.Documentation, dirmap), args...)
 }
 
 var dot2D = strings.NewReplacer(".", "__")
 
-func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, args ...Argument) error {
+func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, D argDocs, args ...Argument) error {
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			return errors.Errorf("no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf)
@@ -146,8 +147,8 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 	}
 
 	var err error
-	w := errWriter{Writer: dst, err: &err}
-	fmt.Fprintf(w, "\nmessage %s {\n", msgName)
+	w := &errWriter{Writer: dst, err: &err}
+	fmt.Fprintf(w, "%smessage %s {\n", asComment(strings.TrimRight(D.Pre+D.Post, " \n\t"), ""), msgName)
 
 	buf := Buffers.Get()
 	defer Buffers.Put(buf)
@@ -182,7 +183,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			optS = " " + s
 		}
 		if arg.Flavor == FLAVOR_SIMPLE || arg.Flavor == FLAVOR_TABLE && arg.TableOf.Flavor == FLAVOR_SIMPLE {
-			fmt.Fprintf(w, "\t// %s\n\t%s%s %s = %d%s;\n", arg.AbsType, rule, typ, aName, i+1, optS)
+			fmt.Fprintf(w, "%s\t// %s\n\t%s%s %s = %d%s;\n", asComment(D.Map[aName], "\t"), arg.AbsType, rule, typ, aName, i+1, optS)
 			continue
 		}
 		typ = CamelCase(typ)
@@ -203,7 +204,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 					}
 				}
 			}
-			if err = protoWriteMessageTyp(buf, typ, seen, subArgs...); err != nil {
+			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, subArgs...); err != nil {
 				Log("msg", "protoWriteMessageTyp", "error", err)
 				return err
 			}
@@ -304,3 +305,99 @@ func CopyStruct(dest interface{}, src interface{}) error {
 	return nil
 }
 func mkRecTypName(name string) string { return strings.ToLower(name) + "_rek_typ" }
+
+var (
+	rBegInput  = regexp.MustCompile("\n\\s*(?:- )?in(?:put)?:? *\n")
+	rBegOutput = regexp.MustCompile("\n\\s*(?:(?:- )?out(?:put)?|ret(?:urns?)?):? *\n")
+)
+
+func getDirDoc(doc string, dirmap direction) argDocs {
+	var D argDocs
+	doc = strings.TrimRight(strings.TrimLeft(doc, " \t"), " \n\t")
+	ii := rBegOutput.FindStringIndex(doc)
+	if ii == nil {
+		D.Parse(doc)
+		return D
+	}
+	if dirmap == DIR_IN {
+		D.Parse(doc[:ii[0]])
+		return D
+	}
+	D.Parse(doc[ii[0]:])
+	return D
+}
+
+type argDocs struct {
+	Pre, Post string
+	Docs      []string
+	Map       map[string]string
+}
+
+func (D *argDocs) Parse(doc string) {
+	ii := rBegInput.FindStringIndex(doc)
+	if ii == nil {
+		ii = rBegOutput.FindStringIndex(doc)
+	}
+	if ii != nil {
+		D.Pre, doc = doc[:ii[0]], doc[ii[1]:]
+	}
+
+	last, lastOff := "\npre", 0
+	var accum []string
+	flush := func() {
+		if len(accum) == 0 {
+			return
+		}
+		s := "\n" + strings.Join(accum, "\n")
+		accum = accum[:0]
+		switch last {
+		case "\npre":
+			D.Pre += s
+		case "\npost":
+			D.Post += s
+		default:
+			D.Map[last] += s
+			if len(D.Docs) == 0 {
+				D.Docs = append(D.Docs, D.Map[last])
+			} else {
+				D.Docs[len(D.Docs)-1] = D.Map[last]
+			}
+		}
+	}
+	for _, line := range strings.Split(doc, "\n") {
+		sline := strings.TrimSpace(line)
+		var off int
+		if sline != "" {
+			off = strings.IndexByte(line, sline[0])
+		}
+		if sline == "" || !(sline[0] == '-' || sline[0] == '*') {
+			if line != "" && off < lastOff {
+				flush()
+				lastOff = off
+				if last != "\npre" {
+					last = "\npost"
+				}
+			}
+			accum = append(accum, line)
+			continue
+		}
+		sline = strings.TrimLeft(sline[1:], " \t")
+		i := strings.IndexAny(sline, "-:")
+		if i < 0 {
+			accum = append(accum, line)
+			continue
+		}
+		D.Docs = append(D.Docs, sline)
+		if D.Map == nil {
+			D.Map = make(map[string]string)
+		}
+		last = strings.TrimRight(sline[:i], " \t")
+		D.Map[last] = strings.TrimLeft(sline[i+1:], " \t")
+		D.Docs = append(D.Docs, line)
+		lastOff = off
+	}
+	flush()
+}
+func asComment(s, prefix string) string {
+	return "\n" + prefix + "// " + strings.Replace(s, "\n", "\n"+prefix+"// ", -1) + "\n"
+}

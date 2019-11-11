@@ -337,7 +337,7 @@ func mustBeUint8(text string) uint8 {
 
 type Annotation struct {
 	Package, Type, Name, Other string
-	Size int
+	Size                       int
 }
 
 func (a Annotation) FullName() string {
@@ -356,8 +356,11 @@ func (a Annotation) String() string {
 	if a.Type == "" || a.Name == "" {
 		return ""
 	}
-	if a.Type == "private" {
+	switch a.Type {
+	case "private":
 		return a.Type + " " + a.FullName()
+	case "max-table-size":
+		return fmt.Sprintf("%s.MaxTableSize=%d", a.FullName(), a.Size)
 	}
 	return a.Type + " " + a.FullName() + "=>" + a.FullOther()
 }
@@ -373,8 +376,13 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 		funcs[L(f.RealName())] = &f
 	}
 	for _, a := range annotations {
-		if a.Name == "" || a.Type == "" ||
-			!(a.Type == "private" || a.Type == "handle") && a.Other == "" {
+		if a.Name == "" || a.Type == "" {
+			continue
+		}
+		if a.Other == "" && !(a.Type == "private" || a.Type == "handle" || a.Type == "max-table-size") {
+			continue
+		}
+		if a.Size <= 0 && a.Type == "max-table-size" {
 			continue
 		}
 		switch a.Type {
@@ -416,7 +424,7 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 		case "max-table-size":
 			nm := L(a.FullName())
 			Log("max-table-size", nm, "size", a.Size)
-			if f := funcs[nm]; f != nil {
+			if f := funcs[nm]; f != nil && a.Size >= f.maxTableSize {
 				f.maxTableSize = a.Size
 			}
 		}

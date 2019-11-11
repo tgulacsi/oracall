@@ -192,6 +192,7 @@ func Main(args []string) error {
 		}
 		annotations = append(annotations, a)
 	}
+	Log("annotations", annotations)
 	functions = oracall.ApplyAnnotations(functions, annotations)
 	sort.Slice(functions, func(i, j int) bool { return functions[i].Name() < functions[j].Name() })
 
