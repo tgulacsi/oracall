@@ -19,8 +19,8 @@ package oracall
 import (
 	"bytes"
 	"fmt"
+	//"encoding/json"
 	"io"
-	"regexp"
 	"strings"
 
 	fstructs "github.com/fatih/structs"
@@ -59,6 +59,8 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
 
 FunLoop:
 	for _, fun := range functions {
+		//b, _ := json.Marshal(struct{Name, Documentation string}{Name:fun.Name(), Documentation:fun.Documentation})
+		//fmt.Println(string(b))
 		fName := fun.name
 		if fun.alias != "" {
 			fName = fun.alias
@@ -306,98 +308,6 @@ func CopyStruct(dest interface{}, src interface{}) error {
 }
 func mkRecTypName(name string) string { return strings.ToLower(name) + "_rek_typ" }
 
-var (
-	rBegInput  = regexp.MustCompile("\n\\s*(?:- )?in(?:put)?:? *\n")
-	rBegOutput = regexp.MustCompile("\n\\s*(?:(?:- )?out(?:put)?|ret(?:urns?)?):? *\n")
-)
-
-func getDirDoc(doc string, dirmap direction) argDocs {
-	var D argDocs
-	doc = strings.TrimRight(strings.TrimLeft(doc, " \t"), " \n\t")
-	ii := rBegOutput.FindStringIndex(doc)
-	if ii == nil {
-		D.Parse(doc)
-		return D
-	}
-	if dirmap == DIR_IN {
-		D.Parse(doc[:ii[0]])
-		return D
-	}
-	D.Parse(doc[ii[0]:])
-	return D
-}
-
-type argDocs struct {
-	Pre, Post string
-	Docs      []string
-	Map       map[string]string
-}
-
-func (D *argDocs) Parse(doc string) {
-	ii := rBegInput.FindStringIndex(doc)
-	if ii == nil {
-		ii = rBegOutput.FindStringIndex(doc)
-	}
-	if ii != nil {
-		D.Pre, doc = doc[:ii[0]], doc[ii[1]:]
-	}
-
-	last, lastOff := "\npre", 0
-	var accum []string
-	flush := func() {
-		if len(accum) == 0 {
-			return
-		}
-		s := "\n" + strings.Join(accum, "\n")
-		accum = accum[:0]
-		switch last {
-		case "\npre":
-			D.Pre += s
-		case "\npost":
-			D.Post += s
-		default:
-			D.Map[last] += s
-			if len(D.Docs) == 0 {
-				D.Docs = append(D.Docs, D.Map[last])
-			} else {
-				D.Docs[len(D.Docs)-1] = D.Map[last]
-			}
-		}
-	}
-	for _, line := range strings.Split(doc, "\n") {
-		sline := strings.TrimSpace(line)
-		var off int
-		if sline != "" {
-			off = strings.IndexByte(line, sline[0])
-		}
-		if sline == "" || !(sline[0] == '-' || sline[0] == '*') {
-			if line != "" && off < lastOff {
-				flush()
-				lastOff = off
-				if last != "\npre" {
-					last = "\npost"
-				}
-			}
-			accum = append(accum, line)
-			continue
-		}
-		sline = strings.TrimLeft(sline[1:], " \t")
-		i := strings.IndexAny(sline, "-:")
-		if i < 0 {
-			accum = append(accum, line)
-			continue
-		}
-		D.Docs = append(D.Docs, sline)
-		if D.Map == nil {
-			D.Map = make(map[string]string)
-		}
-		last = strings.TrimRight(sline[:i], " \t")
-		D.Map[last] = strings.TrimLeft(sline[i+1:], " \t")
-		D.Docs = append(D.Docs, line)
-		lastOff = off
-	}
-	flush()
-}
 func asComment(s, prefix string) string {
 	return "\n" + prefix + "// " + strings.Replace(s, "\n", "\n"+prefix+"// ", -1) + "\n"
 }
