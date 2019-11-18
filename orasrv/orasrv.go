@@ -109,9 +109,9 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 
 				wss := grpc_middleware.WrapServerStream(ss)
 				wss.WrappedContext = ctx
+				start := time.Now()
 				err = handler(srv, wss)
-
-				lgr.Log("RESP", info.FullMethod, "error", err)
+				lgr.Log("RESP", info.FullMethod, "dur", time.Since(start), "error", err)
 				commit(err)
 				return StatusError(err)
 			}),
@@ -154,9 +154,10 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 					}
 				}
 
+				start := time.Now()
 				res, err := handler(ctx, req)
 
-				logger.Log("RESP", info.FullMethod, "error", err)
+				logger.Log("RESP", info.FullMethod, "dur", time.Since(start), "error", err)
 				commit(err)
 
 				buf.Reset()
