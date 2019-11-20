@@ -169,7 +169,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 				return res, StatusError(err)
 			}),
 	}
-	return grpc.NewServer(opts...)
+	return grpc.NewServer(append(opts, options...)...)
 }
 
 func StatusError(err error) error {
