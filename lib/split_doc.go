@@ -97,7 +97,7 @@ type argDocs struct {
 }
 
 func (D *argDocs) Parse(doc string) {
-	D.Docs = splitByOffset(doc) 
+	D.Docs = splitByOffset(doc)
 	for _, line := range D.Docs {
 		sline := strings.TrimSpace(line)
 		if sline == "" || !(sline[0] == '-' || sline[0] == '*') {

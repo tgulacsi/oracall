@@ -159,6 +159,7 @@ func Main(args []string) error {
 
 	defer os.Stdout.Sync()
 	out := os.Stdout
+	var testOut *os.File
 	if dbPath != "" && dbPath != "-" {
 		fn := "oracall.go"
 		if dbPkg != "main" {
@@ -170,9 +171,16 @@ func Main(args []string) error {
 		if out, err = os.Create(fn); err != nil {
 			return errors.Errorf("create %s: %w", fn, err)
 		}
+		testFn := fn[:len(fn)-3] + "_test.go"
+		if testOut, err = os.Create(testFn); err != nil {
+			return errors.Errorf("create %s: %w", testFn, err)
+		}
 		defer func() {
 			if err := out.Close(); err != nil {
 				Log("msg", "close", "file", out.Name(), "error", err)
+			}
+			if err := testOut.Close(); err != nil {
+				Log("msg", "close", "file", testOut.Name(), "error", err)
 			}
 		}()
 	}
@@ -210,6 +218,21 @@ func Main(args []string) error {
 		}
 		return nil
 	})
+	if testOut != nil {
+		grp.Go(func() error {
+			pbPath := pbPath
+			if pbPath == dbPath {
+				pbPath = ""
+			}
+			if err := oracall.SaveFunctionTests(
+				testOut, functions,
+				dbPkg, pbPath, false,
+			); err != nil {
+				return errors.Errorf("save function tests: %w", err)
+			}
+			return nil
+		})
+	}
 
 	grp.Go(func() error {
 		fn := "oracall.proto"
