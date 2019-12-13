@@ -45,7 +45,7 @@ import (
 	errors "golang.org/x/xerrors"
 
 	// for Oracle-specific drivers
-	goracle "gopkg.in/goracle.v2"
+	godror "github.com/godror/godror"
 )
 
 //go:generate go generate ./lib
@@ -140,12 +140,12 @@ func Main(args []string) error {
 		functions, err = oracall.ParseCsvFile("", filter)
 	} else {
 		var cx *sql.DB
-		if cx, err = sql.Open("goracle", *flagConnect); err != nil {
+		if cx, err = sql.Open("godror", *flagConnect); err != nil {
 			return errors.Errorf("connect to %s: %w", *flagConnect, err)
 		}
 		defer cx.Close()
 		if *flagVerbose {
-			goracle.Log = log.With(logger, "lib", "goracle").Log
+			godror.Log = log.With(logger, "lib", "godror").Log
 		}
 		if err = cx.Ping(); err != nil {
 			return errors.Errorf("Ping %s: %w", *flagConnect, err)

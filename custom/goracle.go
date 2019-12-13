@@ -14,18 +14,18 @@ import (
 	"unsafe"
 
 	errors "golang.org/x/xerrors"
-	"gopkg.in/goracle.v2"
+	"github.com/godror/godror"
 )
 
 var ZeroIsAlmostZero bool
 
-type Number goracle.Number
+type Number godror.Number
 
-func (n *Number) Set(num goracle.Number) {
+func (n *Number) Set(num godror.Number) {
 	*n = Number(num)
 }
-func (n Number) Get() goracle.Number {
-	return goracle.Number(n)
+func (n Number) Get() godror.Number {
+	return godror.Number(n)
 }
 
 // Value returns a driver Value.
@@ -51,11 +51,11 @@ func (n *Number) Scan(src interface{}) error {
 	return nil
 }
 
-func NumbersFromStrings(s *[]string) *[]goracle.Number {
+func NumbersFromStrings(s *[]string) *[]godror.Number {
 	if s == nil {
 		return nil
 	}
-	return (*[]goracle.Number)(unsafe.Pointer(s))
+	return (*[]godror.Number)(unsafe.Pointer(s))
 }
 
 const timeFormat = time.RFC3339
@@ -87,7 +87,7 @@ func ParseTime(t *time.Time, s string) error {
 }
 
 type Lob struct {
-	*goracle.Lob
+	*godror.Lob
 	data []byte
 	err  error
 }
@@ -182,12 +182,12 @@ func AsFloat64(v interface{}) float64 {
 		result = float64(x)
 	case sql.NullFloat64:
 		result = x.Float64
-	case string, goracle.Number:
+	case string, godror.Number:
 		var s string
 		switch x := x.(type) {
 		case string:
 			s = x
-		case goracle.Number:
+		case godror.Number:
 			s = string(x)
 		}
 		if s == "" {
@@ -223,12 +223,12 @@ func AsInt32(v interface{}) int32 {
 		return int32(x)
 	case sql.NullInt64:
 		return int32(x.Int64)
-	case string, goracle.Number:
+	case string, godror.Number:
 		var s string
 		switch x := x.(type) {
 		case string:
 			s = x
-		case goracle.Number:
+		case godror.Number:
 			s = string(x)
 		}
 		if s == "" {
@@ -256,12 +256,12 @@ func AsInt64(v interface{}) int64 {
 		return int64(x)
 	case sql.NullInt64:
 		return x.Int64
-	case string, goracle.Number:
+	case string, godror.Number:
 		var s string
 		switch x := x.(type) {
 		case string:
 			s = x
-		case goracle.Number:
+		case godror.Number:
 			s = string(x)
 		}
 		if s == "" {

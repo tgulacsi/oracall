@@ -34,7 +34,7 @@ import (
 	"github.com/antzucaro/matchr"
 	"github.com/kylelemons/godebug/pretty"
 	oracall "github.com/tgulacsi/oracall/lib"
-	_ "gopkg.in/goracle.v2"
+	_ "github.com/godror/godror"
 )
 
 var (
@@ -605,7 +605,7 @@ func getConnection(t *testing.T) *sql.DB {
 		t.FailNow()
 	}
 	var err error
-	db, err = sql.Open("goracle", *flagConnect)
+	db, err = sql.Open("godror", *flagConnect)
 	if err != nil {
 		log.Panicf("error creating connection to %s: %s", *flagConnect, err)
 	}

@@ -27,7 +27,7 @@ import (
 	"text/template"
 
 	errors "golang.org/x/xerrors"
-	"gopkg.in/goracle.v2"
+	"github.com/godror/godror"
 )
 
 // MaxTableSize is the maximum size of the array elements
@@ -126,7 +126,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		var i int
 		paramsMap := make(map[string][]int, bytes.Count(plsBuf.Bytes(), []byte{':'}))
 		first := make(map[string]int, len(paramsMap))
-		pls, _ = goracle.MapToSlice(
+		pls, _ = godror.MapToSlice(
 			plsBuf.String(),
 			func(key string) interface{} {
 				paramsMap[key] = append(paramsMap[key], i)
@@ -169,10 +169,10 @@ if true || DebugLevel > 0 {
 		return
 	}
 	defer stmt.Close()
-	if _, err = stmt.ExecContext(ctx, append(params, goracle.PlSQLArrays)...); err != nil {
+	if _, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...); err != nil {
 		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
 			// "existing state of packages has been discarded"
-			_, err = stmt.ExecContext(ctx, append(params, goracle.PlSQLArrays)...)
+			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
 		}
 		if err != nil {
 			err = errors.Errorf("%q %+v: %w",  qry, params, err)
@@ -239,7 +239,7 @@ func demap(plsql, callFun string) (string, string) {
 	var i int
 	paramsMap := make(map[string][]int, 16)
 	first := make(map[string]int, len(paramsMap))
-	plsql, paramsArr := goracle.MapToSlice(
+	plsql, paramsArr := godror.MapToSlice(
 		plsql,
 		func(key string) interface{} {
 			paramsMap[key] = append(paramsMap[key], i)
@@ -782,7 +782,7 @@ func (arg Argument) getConvSimpleTable(
 				convIn = append(convIn, fmt.Sprintf("output.%s = input.%s", name, name))
 			} else {
 				got = CamelCase(got)
-				if got == "[]goracle.Number" {
+				if got == "[]godror.Number" {
 					convIn = append(convIn,
 						fmt.Sprintf("output.%s = make([]string, 0, %d) // gcst3", name, tableSize))
 				} else {
@@ -798,7 +798,7 @@ func (arg Argument) getConvSimpleTable(
 		convIn = append(convIn,
 			//fmt.Sprintf(`if cap(input.%s) == 0 { input.%s = append(input.%s, make(%s, 1)...)[:0] }`, name, name, name, arg.goType(true)[1:]),
 			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
-		if got == "[]goracle.Number" { // don't copy, hack
+		if got == "[]godror.Number" { // don't copy, hack
 			convIn = append(convIn,
 				fmt.Sprintf(`if cap(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
 				fmt.Sprintf(`%s = sql.Out{Dest: custom.NumbersFromStrings(&output.%s)}  // gcst1`, paramName, name))
@@ -812,9 +812,9 @@ func (arg Argument) getConvSimpleTable(
 			arg.Direction)
 		convIn = append(convIn,
 			fmt.Sprintf(`// in=%q varName=%q`, in, varName))
-		if got, _ := arg.goType(true); got == "[]goracle.Number" {
+		if got, _ := arg.goType(true); got == "[]godror.Number" {
 			convIn = append(convIn,
-				fmt.Sprintf(`if len(input.%s) == 0 { %s = []goracle.Number{} } else {
+				fmt.Sprintf(`if len(input.%s) == 0 { %s = []godror.Number{} } else {
 			%s = *custom.NumbersFromStrings(&input.%s) // gcst2
 		}`,
 					name, paramName,

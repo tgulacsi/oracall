@@ -25,7 +25,7 @@ import (
 	_ "google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/status"
 
-	goracle "gopkg.in/goracle.v2"
+	godror "github.com/godror/godror"
 )
 
 var Timeout = DefaultTimeout
@@ -62,7 +62,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 			wasThere = verbose
 		}
 		if verbose {
-			ctx = goracle.ContextWithLog(ctx, log.With(lgr, "lib", "goracle").Log)
+			ctx = godror.ContextWithLog(ctx, log.With(lgr, "lib", "godror").Log)
 		}
 		commit := func(err error) {
 			if wasThere && err == nil {

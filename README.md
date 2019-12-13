@@ -5,7 +5,7 @@ As OCI does not allow using PL/SQL record types, this causes some difficulty.
 # Getting Started
 ## Prerequisities
 Of course you'll need a working Oracle environment. For instructions, see
-[goracle](https://github.com/go-goracle/goracle/blob/master/README.md).
+[godror](https://github.com/godror/godror/blob/master/README.md).
 
 As OraCall uses [gRPC](grpc.io) for the interface, you'll need `protoc`, the
 [Protocol Buffers](https://developers.google.com/protocol-buffers/)

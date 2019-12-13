@@ -49,7 +49,7 @@ func main() {
 	if *flagConnect == "" {
 		log.Fatalf("connect string is needed")
 	}
-	db, err := sql.Open("goracle", *flagConnect)
+	db, err := sql.Open("godror", *flagConnect)
 	if err != nil {
 		panic(err)
 	}

@@ -239,7 +239,7 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 		}
 		return "double", nil
 
-	case "goracle.number":
+	case "godror.number":
 		return "string", protoOptions{
 			"gogoproto.jsontag": aName + ",omitempty",
 		}
@@ -254,7 +254,7 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 		return "string", nil
 	case "raw":
 		return "bytes", nil
-	case "goracle.lob", "ora.lob":
+	case "godror.lob", "ora.lob":
 		if absType == "CLOB" {
 			return "string", nil
 		}

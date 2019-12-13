@@ -76,7 +76,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	errors "golang.org/x/xerrors"
 
-    goracle "gopkg.in/goracle.v2" // Oracle
+    godror "github.com/godror/godror" // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.AsDate
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 	`+pbImport+`
@@ -98,7 +98,7 @@ var _ xml.Name
 var Log = func(keyvals ...interface{}) error { return nil } // logger.Log of github.com/go-kit/kit/log
 var _ = errors.New
 var _ = fmt.Printf
-var _ goracle.Lob
+var _ godror.Lob
 var _ unsafe.Pointer
 var _ = spew.Sdump
 var _ = os.Stdout
@@ -211,7 +211,7 @@ import (
 
 	"github.com/go-logfmt/logfmt"
 
-	_ "gopkg.in/goracle.v2" // Oracle
+	_ "github.com/godror/godror" // Oracle
 	`+pbImport+`
 )
 
@@ -226,7 +226,7 @@ func testSetup(t *testing.T) *oracallServer {
 	connectOnce.Do(func() {
 		flag.Parse() 
 		var err error
-		if testDB, err = sql.Open("goracle", *flagConnect); err != nil {
+		if testDB, err = sql.Open("godror", *flagConnect); err != nil {
 			panic(errors.Errorf("%s: %s", *flagConnect, err))
 		}
 		testServer = NewServer(testDB, nil)
@@ -502,7 +502,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
-		case "goracle.Number":
+		case "godror.Number":
 			checks = append(checks,
 				fmt.Sprintf(
 					`if err := oracall.ParseDigits(%s, %d, %d); err != nil {
@@ -612,7 +612,7 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 		case "RAW":
 			return "[]byte", nil
 		case "NUMBER":
-			return "goracle.Number", nil
+			return "godror.Number", nil
 		case "INTEGER":
 			if !isTable && arg.IsOutput() {
 				return "*int64", nil
