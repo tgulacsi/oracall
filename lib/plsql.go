@@ -145,6 +145,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
+	ctx = godror.ContextWithTraceTag(ctx, godror.TraceTag{Module: %q, Action: %q})
 if s.DBLog != nil {
 	const funName = "%s"
 	if err := s.DBLog(ctx, s.db, funName, input); err != nil {
@@ -157,13 +158,19 @@ if true || DebugLevel > 0 {
 }
 	qry := %s
 `,
+		fun.Package, fun.name,
 		fun.Name(),
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
 		fun.getPlsqlConstName())
 	callBuf.WriteString(`
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	stmt, stmtErr := s.db.PrepareContext(ctx, qry)
+	var tx *sql.Tx
+	if tx, err = s.db.BeginTx(ctx, nil); err != nil {
+		return 
+	}
+	defer tx.Rollback()
+	stmt, stmtErr := tx.PrepareContext(ctx, qry)
 	if stmtErr != nil {
 		err = errors.Errorf("%s: %w", qry, stmtErr)
 		return
@@ -186,11 +193,13 @@ if true || DebugLevel > 0 {
 		io.WriteString(callBuf, line+"\n")
 	}
 	if !hasCursorOut {
-		fmt.Fprintf(callBuf, "\nreturn\n")
+		fmt.Fprintf(callBuf, "\nerr = tx.Commit()\nreturn\n")
 	} else {
 		fmt.Fprintf(callBuf, `
 		if len(iterators) == 0 {
-			err = stream.Send(output)
+			if err = stream.Send(output); err == nil {
+				err = tx.Commit()
+			}
 			return
 		}
 		reseters := make([]func(), 0, len(iterators))
@@ -214,6 +223,7 @@ if true || DebugLevel > 0 {
 			if len(iterators) != len(iterators2) {
 				if len(iterators2) == 0 {
 					//err = stream.Send(output)
+					err = tx.Commit()
 					return
 				}
 				iterators = append(iterators[:0], iterators2...)

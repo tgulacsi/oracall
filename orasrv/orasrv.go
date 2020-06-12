@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LK4D4/joincontext"
 	"github.com/gogo/protobuf/proto"
 	bp "github.com/tgulacsi/go/bufpool"
 	oracall "github.com/tgulacsi/oracall/lib"
@@ -39,15 +38,9 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 	var erroredMethodsMu sync.RWMutex
 
 	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context, context.CancelFunc) {
-		var toCancel context.CancelFunc
-		if _, ok := ctx.Deadline(); !ok && Timeout > 0 {
-			ctx, toCancel = context.WithTimeout(ctx, Timeout) //nolint:govet
-		}
-		var cancel context.CancelFunc
-		ctx, cancel = joincontext.Join(ctx, globalCtx)
-		if toCancel != nil {
-			origCancel := cancel
-			cancel = func() { toCancel(); origCancel() }
+		var cancel context.CancelFunc = func() {} 
+		if Timeout != 0 {
+			ctx, cancel = context.WithTimeout(ctx, Timeout) //nolint:govet
 		}
 		reqID := ContextGetReqID(ctx)
 		ctx = ContextWithReqID(ctx, reqID)
