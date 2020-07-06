@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Tamás Gulácsi
+Copyright 2017, 2020 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -140,10 +140,16 @@ func Main(args []string) error {
 		functions, err = oracall.ParseCsvFile("", filter)
 	} else {
 		var cx *sql.DB
-		if cx, err = sql.Open("godror", *flagConnect); err != nil {
-			return errors.Errorf("connect to %s: %w", *flagConnect, err)
+		P, err := godror.ParseConnString(*flagConnect)
+		if err != nil {
+			return errors.Errorf("%s: %w", *flagConnect, err)
+		}
+		P.StandaloneConnection = false
+		if cx, err = sql.Open("godror", P.StringWithPassword()); err != nil {
+			return errors.Errorf("connect to %s: %w", P, err)
 		}
 		defer cx.Close()
+		cx.SetMaxIdleConns(0)
 		if *flagVerbose {
 			godror.Log = log.With(logger, "lib", "godror").Log
 		}

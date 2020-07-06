@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Tamás Gulácsi
+Copyright 2017, 2020 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		return fmt.Sprintf("%s = godror.Lob{IsClob:true, Reader:strings.NewReader(%s)}", dst, src)
 	case "DATE", "TIMESTAMP":
 		return fmt.Sprintf("%s = (%s)", dst, src)
-	case "PLS_INTEGER":
+	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		return fmt.Sprintf("%s = int32(%s)", dst, src)
 	case "NUMBER":
 		return fmt.Sprintf("%s = string(%s)", dst, src)
@@ -117,7 +117,7 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 		}
 	}
 	switch arg.ora {
-	case "PLS_INTEGER":
+	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		if src[0] != '&' {
 			return fmt.Sprintf("var %s sql.NullInt64; if %s != 0 { %s.Int64, %s.Valid = int64(%s), true }; %s = int32(%s.Int64)", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}

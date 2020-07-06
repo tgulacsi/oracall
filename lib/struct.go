@@ -1,5 +1,5 @@
 /*
-Copyright 2013 TamĂĄs GulĂĄcsi
+Copyright 2013, 2020 TamĂĄs GulĂĄcsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -217,6 +217,10 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 		panic(fmt.Sprintf("empty PLS type of %#v", arg))
 	}
 	switch arg.Type {
+	case "PL/SQL PLS INTEGER":
+		arg.Type = "PLS_INTEGER"
+	case "PL/SQL BINARY INTEGER":
+		arg.Type = "BINARY_INTEGER"
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
 		arg.RecordOf = make([]NamedArgument, 0, 1)
