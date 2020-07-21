@@ -1,5 +1,5 @@
 /*
-Copyright 2013 Tamás Gulácsi
+Copyright 2013, 2020 Tamás Gulácsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -113,10 +113,10 @@ type iterator struct {
 
 type oracallServer struct {
 	db *sql.DB
-	DBLog func(context.Context, *sql.DB, string, interface{}) error
+	DBLog func(context.Context, *sql.DB, string, interface{}) (context.Context, error)
 }
 
-func NewServer(db *sql.DB, dbLog func(context.Context, *sql.DB, string, interface{}) error) *oracallServer {
+func NewServer(db *sql.DB, dbLog func(context.Context, *sql.DB, string, interface{}) (context.Context, error)) *oracallServer {
 	return &oracallServer{db: db, DBLog: dbLog}
 }
 

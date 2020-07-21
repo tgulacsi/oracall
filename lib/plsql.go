@@ -148,7 +148,8 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	const funName = "%s"
 	ctx = godror.ContextWithTraceTag(ctx, godror.TraceTag{Module: %q, Action: %q})
 if s.DBLog != nil {
-	if err := s.DBLog(ctx, s.db, funName, input); err != nil {
+	var err error
+	if ctx, err = s.DBLog(ctx, s.db, funName, input); err != nil {
 		Log("dbLog", funName, "error", err)
 	}
 }
@@ -184,7 +185,10 @@ if true || DebugLevel > 0 {
 		if err != nil {
 			err = errors.Errorf("%q %+v: %w", qry, params, err)
 			if s.DBLog != nil {
-				s.DBLog(ctx, s.db, funName, err)
+				var logErr error
+				if ctx, logErr = s.DBLog(ctx, s.db, funName, err); logErr != nil {
+					Log("dbLog", funName, "logErr", logErr, "error", err)
+				}
 			}
 			return
 		}
