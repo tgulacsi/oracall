@@ -145,9 +145,9 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
+	const funName = "%s"
 	ctx = godror.ContextWithTraceTag(ctx, godror.TraceTag{Module: %q, Action: %q})
 if s.DBLog != nil {
-	const funName = "%s"
 	if err := s.DBLog(ctx, s.db, funName, input); err != nil {
 		Log("dbLog", funName, "error", err)
 	}
@@ -182,7 +182,10 @@ if true || DebugLevel > 0 {
 			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
 		}
 		if err != nil {
-			err = errors.Errorf("%q %+v: %w",  qry, params, err)
+			err = errors.Errorf("%q %+v: %w", qry, params, err)
+			if s.DBLog != nil {
+				s.DBLog(ctx, s.db, funName, err)
+			}
 			return
 		}
 	}
