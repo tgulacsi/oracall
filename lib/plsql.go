@@ -26,8 +26,8 @@ import (
 	"strings"
 	"text/template"
 
-	errors "golang.org/x/xerrors"
 	"github.com/godror/godror"
+	errors "golang.org/x/xerrors"
 )
 
 // MaxTableSize is the maximum size of the array elements
@@ -146,10 +146,17 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
 	const funName = "%s"
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var tx *sql.Tx
+	if tx, err = s.db.BeginTx(ctx, nil); err != nil {
+		return 
+	}
+	defer tx.Rollback()
 	ctx = godror.ContextWithTraceTag(ctx, godror.TraceTag{Module: %q, Action: %q})
 if s.DBLog != nil {
 	var err error
-	if ctx, err = s.DBLog(ctx, s.db, funName, input); err != nil {
+	if ctx, err = s.DBLog(ctx, tx, funName, input); err != nil {
 		Log("dbLog", funName, "error", err)
 	}
 }
@@ -164,13 +171,6 @@ if true || DebugLevel > 0 {
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
 		fun.getPlsqlConstName())
 	callBuf.WriteString(`
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var tx *sql.Tx
-	if tx, err = s.db.BeginTx(ctx, nil); err != nil {
-		return 
-	}
-	defer tx.Rollback()
 	stmt, stmtErr := tx.PrepareContext(ctx, qry)
 	if stmtErr != nil {
 		err = errors.Errorf("%s: %w", qry, stmtErr)
@@ -186,7 +186,7 @@ if true || DebugLevel > 0 {
 			err = errors.Errorf("%q %+v: %w", qry, params, err)
 			if s.DBLog != nil {
 				var logErr error
-				if ctx, logErr = s.DBLog(ctx, s.db, funName, err); logErr != nil {
+				if ctx, logErr = s.DBLog(ctx, tx, funName, err); logErr != nil {
 					Log("dbLog", funName, "logErr", logErr, "error", err)
 				}
 			}

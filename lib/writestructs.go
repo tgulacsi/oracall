@@ -113,10 +113,10 @@ type iterator struct {
 
 type oracallServer struct {
 	db *sql.DB
-	DBLog func(context.Context, *sql.DB, string, interface{}) (context.Context, error)
+	DBLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error)
 }
 
-func NewServer(db *sql.DB, dbLog func(context.Context, *sql.DB, string, interface{}) (context.Context, error)) *oracallServer {
+func NewServer(db *sql.DB, dbLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error)) *oracallServer {
 	return &oracallServer{db: db, DBLog: dbLog}
 }
 
@@ -268,8 +268,8 @@ func TestCalls(t *testing.T) {
 	}
 }
 `)
-}
-	FN := func(f Function) string { 
+	}
+	FN := func(f Function) string {
 		fn := f.name
 		if f.alias != "" {
 			fn = f.alias
@@ -299,12 +299,12 @@ func test%s(t *testing.T, jsonText []byte) {
 }
 
 `,
-fn,
-structName,
-fn,
-)
-funNames = append(funNames, fn)
-}
+			fn,
+			structName,
+			fn,
+		)
+		funNames = append(funNames, fn)
+	}
 	io.WriteString(w, `
 var TestFunctions = map[string]func(t *testing.T, jsonText []byte) {
 	`)
@@ -316,9 +316,8 @@ var TestFunctions = map[string]func(t *testing.T, jsonText []byte) {
 	io.WriteString(w, `
 }
 `)
-return nil
+	return nil
 }
-
 
 func (f Function) getPlsqlConstName() string {
 	nm := f.name

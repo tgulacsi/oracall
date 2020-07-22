@@ -1,6 +1,7 @@
 package custom
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
@@ -16,6 +17,11 @@ import (
 	errors "golang.org/x/xerrors"
 	"github.com/godror/godror"
 )
+
+type SQLExecer interface {
+	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+}
+
 
 var ZeroIsAlmostZero bool
 
