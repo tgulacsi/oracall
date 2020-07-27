@@ -9,7 +9,7 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/go-kit/kit v0.10.0
 	github.com/go-stack/stack v1.8.0
-	github.com/godror/godror v0.17.5
+	github.com/godror/godror v0.18.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/google/go-cmp v0.4.0
 	github.com/gopherjs/jsbuiltin v0.0.0-20170427220125-67703bfb044e // indirect
