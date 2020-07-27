@@ -166,8 +166,8 @@ if true || DebugLevel > 0 {
 }
 	qry := %s
 `,
+		fun.Name(), 
 		fun.Package, fun.name,
-		fun.Name(),
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
 		fun.getPlsqlConstName())
 	callBuf.WriteString(`
