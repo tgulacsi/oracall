@@ -140,9 +140,9 @@ func Main(args []string) error {
 		functions, err = oracall.ParseCsvFile("", filter)
 	} else {
 		var cx *sql.DB
-		P, err := godror.ParseConnString(*flagConnect)
-		if err != nil {
-			return errors.Errorf("%s: %w", *flagConnect, err)
+		P, parseErr := godror.ParseConnString(*flagConnect)
+		if parseErr != nil {
+			return errors.Errorf("%s: %w", *flagConnect, parseErr)
 		}
 		P.StandaloneConnection = false
 		if cx, err = sql.Open("godror", P.StringWithPassword()); err != nil {
