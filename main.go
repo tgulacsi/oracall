@@ -145,9 +145,7 @@ func Main(args []string) error {
 			return errors.Errorf("%s: %w", *flagConnect, parseErr)
 		}
 		P.StandaloneConnection = false
-		if cx, err = sql.Open("godror", P.StringWithPassword()); err != nil {
-			return errors.Errorf("connect to %s: %w", P, err)
-		}
+		cx = sql.OpenDB(godror.NewConnector(P))
 		defer cx.Close()
 		cx.SetMaxIdleConns(0)
 		if *flagVerbose {
@@ -381,7 +379,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			logger.Log("WARN", errors.Errorf("%s: %w", qry, err))
 		} else {
 			defer collStmt.Close()
-			if rows, err := collStmt.QueryContext(grpCtx, sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", "")); err != nil {
+			if rows, err := collStmt.QueryContext(grpCtx,
+				sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", ""),
+			); err != nil {
 				collStmt = nil
 			} else {
 				rows.Close()
@@ -397,7 +397,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 					logger.Log("WARN", errors.Errorf("%s: %w", qry, err))
 				} else {
 					defer attrStmt.Close()
-					if rows, err := attrStmt.QueryContext(grpCtx, sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", "")); err != nil {
+					if rows, err := attrStmt.QueryContext(grpCtx,
+						sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", ""),
+					); err != nil {
 						attrStmt = nil
 					} else {
 						rows.Close()
@@ -410,7 +412,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		}
 
 		qry = argumentsQry
-		rows, err := cx.QueryContext(grpCtx, qry, pattern, pattern)
+		rows, err := cx.QueryContext(grpCtx,
+			qry, pattern, pattern, godror.FetchArraySize(1024), godror.PrefetchCount(1025),
+		)
 		if err != nil {
 			logger.Log("qry", qry, "error", err)
 			return errors.Errorf("%s: %w", qry, err)
@@ -724,7 +728,7 @@ var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]
 
 func getSource(ctx context.Context, w io.Writer, cx *sql.DB, packageName string) error {
 	qry := "SELECT text FROM user_source WHERE name = UPPER(:1) AND type = 'PACKAGE' ORDER BY line"
-	rows, err := cx.QueryContext(ctx, qry, packageName)
+	rows, err := cx.QueryContext(ctx, qry, packageName, godror.PrefetchCount(129))
 	if err != nil {
 		return errors.Errorf("%s [%q]: %w", qry, packageName, err)
 	}

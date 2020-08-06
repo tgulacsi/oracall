@@ -32,9 +32,9 @@ import (
 	"time"
 
 	"github.com/antzucaro/matchr"
+	_ "github.com/godror/godror"
 	"github.com/kylelemons/godebug/pretty"
 	oracall "github.com/tgulacsi/oracall/lib"
-	_ "github.com/godror/godror"
 )
 
 var (
