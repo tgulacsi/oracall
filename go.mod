@@ -16,6 +16,7 @@ require (
 	github.com/oklog/ulid v1.3.1
 	github.com/pkg/errors v0.9.1
 	github.com/tgulacsi/go v0.12.5
+	github.com/tgulacsi/goracle v0.0.0-20151008113136-976826e46446
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/sys v0.0.0-20200806060901-a37d78b92225 // indirect
@@ -24,6 +25,8 @@ require (
 	google.golang.org/genproto v0.0.0-20200804151602-45615f50871c // indirect
 	google.golang.org/grpc v1.31.0
 	google.golang.org/protobuf v1.25.0 // indirect
+	gopkg.in/errgo.v1 v1.0.1 // indirect
+	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1 // indirect
 )
 
-replace github.com/godror/godror => ../../godror/godror
+//replace github.com/godror/godror => ../../godror/godror

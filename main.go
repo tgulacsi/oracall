@@ -45,7 +45,7 @@ import (
 	errors "golang.org/x/xerrors"
 
 	// for Oracle-specific drivers
-	godror "github.com/godror/godror"
+	"github.com/godror/godror"
 )
 
 //go:generate go generate ./lib
