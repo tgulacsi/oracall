@@ -18,6 +18,7 @@ package oracall
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/format"
 	"io"
@@ -28,8 +29,6 @@ import (
 	"sync"
 	"time"
 	"unicode"
-
-	errors "golang.org/x/xerrors"
 )
 
 var ErrMissingTableOf = errors.New("missing TableOf info")
@@ -64,6 +63,7 @@ import (
 	"encoding/xml"
 	"io"
 	"io/ioutil"
+	"errors"
     "fmt"
 	"strings"
 	"database/sql"
@@ -74,7 +74,6 @@ import (
 	"unsafe"
 
 	"github.com/davecgh/go-spew/spew"
-	errors "golang.org/x/xerrors"
 
     godror "github.com/godror/godror" // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.AsDate
@@ -135,7 +134,7 @@ FunLoop:
 		var checkName string
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(structW, dir); err != nil {
-				if SkipMissingTableOf && (errors.Is(err, ErrMissingTableOf) || errors.Is(err, UnknownSimpleType)) {
+				if SkipMissingTableOf && (errors.Is(err, ErrMissingTableOf) || errors.Is(err, ErrUnknownSimpleType)) {
 					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name(), "error", err)
 					continue FunLoop
 				}
@@ -227,7 +226,7 @@ func testSetup(t *testing.T) *oracallServer {
 		flag.Parse() 
 		var err error
 		if testDB, err = sql.Open("godror", *flagConnect); err != nil {
-			panic(errors.Errorf("%s: %s", *flagConnect, err))
+			panic(fmt.Errorf("%s: %s", *flagConnect, err))
 		}
 		testServer = NewServer(testDB, nil)
 	})
@@ -380,12 +379,12 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	//Log("msg","SaveStruct", "function", fmt.Sprintf("%#v", f) )
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return errors.Errorf("no table of data for %s.%s (%v): %w", f.Name(), arg, arg, ErrMissingTableOf)
+			return fmt.Errorf("no table of data for %s.%s (%v): %w", f.Name(), arg, arg, ErrMissingTableOf)
 		}
 		//aName = capitalize(goName(arg.Name))
 		aName = capitalize(replHidden(arg.Name))
 		if got, err = arg.goType(arg.Flavor == FLAVOR_TABLE); err != nil {
-			return errors.Errorf("%s: %w", arg.Name, err)
+			return fmt.Errorf("%s: %w", arg.Name, err)
 		}
 		if got == "" || got == "*" {
 			got = got + mkRecTypName(arg.Name)
@@ -412,7 +411,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 
 	var b []byte
 	if b, err = format.Source(buf.Bytes()); err != nil {
-		return errors.Errorf("save struct %q (%s): %w", structName, buf.String(), err)
+		return fmt.Errorf("save struct %q (%s): %w", structName, buf.String(), err)
 	}
 	_, err = dst.Write(b)
 
@@ -452,7 +451,7 @@ func %s(s *pb.%s) error {
 	}
 	b, err := format.Source(buf.Bytes())
 	if err != nil {
-		return nm, errors.Errorf("write check of %s (%s): %w", structName, buf.String(), err)
+		return nm, fmt.Errorf("write check of %s (%s): %w", structName, buf.String(), err)
 	}
 	_, err = w.Write(b)
 	return nm, err
@@ -477,27 +476,27 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 		case "string":
 			checks = append(checks,
 				fmt.Sprintf(`if len(%s) > %d {
-		return errors.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
+		return fmt.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
     }`,
 					name, arg.Charlength, name, arg.Charlength))
 		case "*string":
 			checks = append(checks,
 				fmt.Sprintf(`if %s != nil && len(*%s) > %d {
-		return errors.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
+		return fmt.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
 		case "sql.NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
-		return errors.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
+		return fmt.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
 		case "NullString":
 			checks = append(checks,
 				fmt.Sprintf(`if %s.Valid && len(%s.String) > %d {
-		return errors.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
+		return fmt.Errorf("%s is longer than accepted (%d): %%w", oracall.ErrInvalidArgument)
     }`,
 					name, name, arg.Charlength,
 					name, arg.Charlength))
@@ -505,7 +504,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 			checks = append(checks,
 				fmt.Sprintf(
 					`if err := oracall.ParseDigits(%s, %d, %d); err != nil {
-						return errors.Errorf("%s: %%w", oracall.ErrInvalidArgument)
+						return fmt.Errorf("%s: %%w", oracall.ErrInvalidArgument)
 					}`,
 					name, arg.Precision, arg.Scale,
 					name))
@@ -516,7 +515,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 				cons := strings.Repeat("9", int(arg.Precision))
 				checks = append(checks,
 					fmt.Sprintf(`if (%s <= -%s || %s > %s) {
-		return errors.Errorf("%s is out of bounds (-%s..%s): %%w", oracall.ErrInvalidArgument)
+		return fmt.Errorf("%s is out of bounds (-%s..%s): %%w", oracall.ErrInvalidArgument)
     }`,
 						name, cons, name, cons,
 						name, cons, cons))
@@ -527,7 +526,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 				cons := strings.Repeat("9", int(arg.Precision))
 				checks = append(checks,
 					fmt.Sprintf(`if %s.Valid && (%s.%s <= -%s || %s.%s > %s) {
-		return errors.Errorf("%s is out of bounds (-%s..%s): %%w", oracall.ErrInvalidArgument)
+		return fmt.Errorf("%s is out of bounds (-%s..%s): %%w", oracall.ErrInvalidArgument)
     }`,
 						name, name, vn, cons, name, vn, cons,
 						name, cons, cons))
@@ -564,7 +563,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 		}
 	default:
 		Log("msg", "unknown flavor", "flavor", arg.Flavor)
-		panic(errors.Errorf("unknown flavor %v", arg.Flavor))
+		panic(fmt.Errorf("unknown flavor %v", arg.Flavor))
 	}
 	return checks
 }
@@ -576,7 +575,7 @@ func capitalize(text string) string {
 	return strings.ToUpper(text[:1]) + strings.ToLower(text[1:])
 }
 
-var UnknownSimpleType = errors.New("unknown simple type")
+var ErrUnknownSimpleType = errors.New("unknown simple type")
 
 func (arg *Argument) goType(isTable bool) (typName string, err error) {
 	defer func() {
@@ -639,7 +638,7 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 		case "BFILE":
 			return "ora.Bfile", nil
 		default:
-			return "", errors.Errorf("%v: %w", arg, UnknownSimpleType)
+			return "", fmt.Errorf("%v: %w", arg, ErrUnknownSimpleType)
 		}
 	}
 	typName = arg.TypeName

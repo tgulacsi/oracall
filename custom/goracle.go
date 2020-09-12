@@ -14,14 +14,12 @@ import (
 	"time"
 	"unsafe"
 
-	errors "golang.org/x/xerrors"
 	"github.com/godror/godror"
 )
 
 type SQLExecer interface {
 	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
 }
-
 
 var ZeroIsAlmostZero bool
 
@@ -87,7 +85,7 @@ func ParseTime(t *time.Time, s string) error {
 	var err error
 	*t, err = time.ParseInLocation(timeFormat[:n], s, time.Local) // TODO(tgulacsi): more robust parser
 	if err != nil {
-		return errors.Errorf("%s: %w", s, err)
+		return fmt.Errorf("%s: %w", s, err)
 	}
 	return nil
 }
@@ -150,7 +148,7 @@ func (L *Lob) Scan(src interface{}) error {
 	case string:
 		L.data = []byte(x)
 	default:
-		return errors.Errorf("unknown type %T", src)
+		return fmt.Errorf("unknown type %T", src)
 	}
 	return nil
 }

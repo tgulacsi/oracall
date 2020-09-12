@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -12,7 +13,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	bp "github.com/tgulacsi/go/bufpool"
 	oracall "github.com/tgulacsi/oracall/lib"
-	errors "golang.org/x/xerrors"
 
 	"github.com/go-kit/kit/log"
 	"github.com/oklog/ulid"
@@ -38,7 +38,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 	var erroredMethodsMu sync.RWMutex
 
 	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context, context.CancelFunc) {
-		var cancel context.CancelFunc = func() {} 
+		var cancel context.CancelFunc = func() {}
 		if Timeout != 0 {
 			ctx, cancel = context.WithTimeout(ctx, Timeout) //nolint:govet
 		}
@@ -82,7 +82,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 							logger.Log("PANIC", err, "trace", trace)
 							return
 						}
-						err = errors.Errorf("%+v", r)
+						err = fmt.Errorf("%+v", r)
 						logger.Log("PANIC", fmt.Sprintf("%+v", err), "trace", trace)
 					}
 				}()
@@ -119,7 +119,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 							logger.Log("PANIC", err, "trace", trace)
 							return
 						}
-						err = errors.Errorf("%+v", r)
+						err = fmt.Errorf("%+v", r)
 						logger.Log("PANIC", fmt.Sprintf("%+v", err), "trace", trace)
 					}
 				}()

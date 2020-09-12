@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
-	errors "golang.org/x/xerrors"
 )
 
 // UserArgument represents the required info from the user_arguments view
@@ -141,7 +140,7 @@ func MustOpenCsv(filename string) *os.File {
 	fh, err := OpenCsv(filename)
 	if err != nil {
 		Log("msg", "MustOpenCsv", "file", filename, "error", err)
-		panic(errors.Errorf("%s: %w", filename, err))
+		panic(fmt.Errorf("%s: %w", filename, err))
 	}
 	return fh
 }

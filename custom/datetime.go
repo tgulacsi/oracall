@@ -19,13 +19,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/xml"
-	"time"
-
+	"fmt"
 	"reflect"
+	"time"
 	"unsafe"
 
 	"github.com/gogo/protobuf/types"
-	errors "golang.org/x/xerrors"
 )
 
 var _ = xml.Unmarshaler((*DateTime)(nil))
@@ -118,7 +117,7 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 	dt.Time, err = time.ParseInLocation(time.RFC3339[:n], string(data), time.Local)
 	//log.Printf("s=%q time=%v err=%+v", data, dt.Time, err)
 	if err != nil {
-		return errors.Errorf("%s: %w", string(data), err)
+		return fmt.Errorf("%s: %w", string(data), err)
 	}
 	return nil
 }

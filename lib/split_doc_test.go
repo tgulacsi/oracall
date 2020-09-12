@@ -18,11 +18,10 @@ package oracall
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"testing"
-
-	errors "golang.org/x/xerrors"
 )
 
 func TestSplitDoc(t *testing.T) {
