@@ -5,10 +5,11 @@ go 1.12
 require (
 	github.com/antzucaro/matchr v0.0.0-20180616170659-cbc221335f3c
 	github.com/davecgh/go-spew v1.1.1
+	github.com/dvyukov/go-fuzz v0.0.0-20200318091601-be3528f3a813 // indirect
 	github.com/fatih/structs v1.1.0
 	github.com/go-kit/kit v0.10.0
 	github.com/go-stack/stack v1.8.0
-	github.com/godror/godror v0.19.3
+	github.com/godror/godror v0.20.1
 	github.com/gogo/protobuf v1.3.1
 	github.com/google/go-cmp v0.5.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.0
@@ -17,6 +18,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/tgulacsi/go v0.12.5
 	github.com/tgulacsi/goracle v0.0.0-20151008113136-976826e46446
+	golang.org/dl v0.0.0-20200724191219-e4fbcf8a7a81 // indirect
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/sys v0.0.0-20200806060901-a37d78b92225 // indirect
