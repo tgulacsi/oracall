@@ -62,7 +62,7 @@ func TestQuery078(t *testing.T) {
 	}
 
 	buf.Reset()
-	if err = SaveProtobuf(&buf, functions, "spl3"); err != nil {
+	if err = SaveProtobuf(&buf, functions, "spl3", "unosoft.hu/ws/aeg/pb/spl3"); err != nil {
 		t.Fatal(err)
 	}
 	t.Log(buf.String())

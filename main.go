@@ -250,7 +250,7 @@ func Main(args []string) error {
 		if err != nil {
 			return fmt.Errorf("create proto: %w", err)
 		}
-		err = oracall.SaveProtobuf(fh, functions, pbPkg)
+		err = oracall.SaveProtobuf(fh, functions, pbPkg, pbPath)
 		if closeErr := fh.Close(); closeErr != nil && err == nil {
 			err = closeErr
 		}
@@ -258,11 +258,14 @@ func Main(args []string) error {
 			return fmt.Errorf("SaveProtobuf: %w", err)
 		}
 
-		goOut := *flagGenerator + "_out"
+		plugin := "--go-grpc_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types:"
+		if *flagGenerator != "go" {
+			plugin = "--" +*flagGenerator + "_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"
+		}
 		cmd := exec.Command(
 			"protoc",
 			"--proto_path="+*flagBaseDir+":.",
-			"--"+goOut+"=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir,
+			plugin+*flagBaseDir,
 			fn,
 		)
 		cmd.Stdout = os.Stdout

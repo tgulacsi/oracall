@@ -32,25 +32,26 @@ var Gogo bool
 var NumberAsString bool
 
 //go:generate sh ./download-protoc.sh
-//go:generate go get -u github.com/gogo/protobuf/protoc-gen-gogofast
+// go:generate go get -u github.com/gogo/protobuf/protoc-gen-gogofast
+//go:generate go get -u google.golang.org/protobuf/protoc-gen-go
+//go:generate go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
 
-// build: protoc --gogofast_out=plugins=grpc:. my.proto
-// build: protoc --go_out=plugins=grpc:. my.proto
+// build: protoc --go_out=. --go-grpc_out=. my.proto
 
-func SaveProtobuf(dst io.Writer, functions []Function, pkg string) error {
+func SaveProtobuf(dst io.Writer, functions []Function, pkg, path string) error {
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
 	io.WriteString(w, `syntax = "proto3";`+"\n\n")
 
 	if pkg != "" {
-		fmt.Fprintf(w, "package %s;\n", pkg)
+		fmt.Fprintf(w, `package %s;
+option go_package = "%s";`, pkg, path)
 	}
+	io.WriteString(w, "\nimport \"google/protobuf/timestamp.proto\";\n")
+
 	if Gogo {
-		io.WriteString(w, `
-	import "google/protobuf/timestamp.proto";
-	import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-`)
+		io.WriteString(w, "\nimport \"github.com/gogo/protobuf/gogoproto/gogo.proto\";\n")
 	}
 	seen := make(map[string]struct{}, 16)
 
@@ -225,30 +226,36 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 
 	case "int32":
 		if NumberAsString {
-			return "sint32", protoOptions{
-				"gogoproto.jsontag": aName + ",string,omitempty",
+			if Gogo {
+				return "sint32", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
 			}
 		}
 		return "sint32", nil
 	case "float64", "sql.nullfloat64":
 		if NumberAsString {
-			return "double", protoOptions{
-				"gogoproto.jsontag": aName + ",string,omitempty",
+			if Gogo {
+				return "double", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
 			}
 		}
 		return "double", nil
 
 	case "godror.number":
-		return "string", protoOptions{
-			"gogoproto.jsontag": aName + ",omitempty",
+		if Gogo {
+			return "string", protoOptions{
+				"gogoproto.jsontag": aName + ",omitempty",
+			}
 		}
+		return "string", nil
 
 	case "custom.date", "time.time":
-		return "google.protobuf.Timestamp", protoOptions{
-			//"gogoproto.stdtime":    true,
-			"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.DateTime",
-			"gogoproto.moretags":   `xml:",omitempty"`,
+		if Gogo {
+			return "google.protobuf.Timestamp", protoOptions{
+				//"gogoproto.stdtime":    true,
+				"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.DateTime",
+				"gogoproto.moretags":   `xml:",omitempty"`,
+			}
 		}
+		return "google.protobuf.Timestamp", nil
 	case "n":
 		return "string", nil
 	case "raw":
