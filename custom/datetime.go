@@ -1,4 +1,4 @@
-// Copyright 2019 Tamás Gulácsi
+// Copyright 2019, 2020 Tamás Gulácsi
 //
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,8 @@ package custom
 import (
 	"bufio"
 	"bytes"
+	"encoding"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"reflect"
@@ -27,8 +29,14 @@ import (
 	"github.com/gogo/protobuf/types"
 )
 
-var _ = xml.Unmarshaler((*DateTime)(nil))
-var _ = xml.Marshaler(DateTime{})
+var (
+	_ = json.Marshaler(DateTime{})
+	_ = json.Unmarshaler((*DateTime)(nil))
+	_ = encoding.TextMarshaler(DateTime{})
+	_ = encoding.TextUnmarshaler((*DateTime)(nil))
+	_ = xml.Marshaler(DateTime{})
+	_ = xml.Unmarshaler((*DateTime)(nil))
+)
 
 type DateTime struct {
 	time.Time
