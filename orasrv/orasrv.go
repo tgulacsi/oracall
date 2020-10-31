@@ -89,13 +89,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 				lgr, commit, ctx, cancel := getLogger(ss.Context(), info.FullMethod)
 				defer cancel()
 
-				buf := bufpool.Get()
-				defer bufpool.Put(buf)
-				jenc := json.NewEncoder(buf)
-				if err = jenc.Encode(srv); err != nil {
-					lgr.Log("marshal error", err, "srv", srv)
-				}
-				lgr.Log("REQ", info.FullMethod, "srv", buf.String())
+				lgr.Log("REQ", info.FullMethod)
 				if err = checkAuth(ctx, info.FullMethod); err != nil {
 					return status.Error(codes.Unauthenticated, err.Error())
 				}
