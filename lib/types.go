@@ -25,14 +25,15 @@ import (
 )
 
 type PlsType struct {
-	ora string
+	ora              string
+	Precision, Scale uint8
 }
 
 func (arg PlsType) String() string { return arg.ora }
 
 // NewArg returns a new argument to ease arument conversions.
-func NewPlsType(ora string) PlsType {
-	return PlsType{ora: ora}
+func NewPlsType(ora string, precision, scale uint8) PlsType {
+	return PlsType{ora: ora, Precision: precision, Scale: scale}
 }
 
 // FromOra retrieves the value of the argument with arg type, from src variable to dst variable.
@@ -62,7 +63,15 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		return fmt.Sprintf("%s = int32(%s)", dst, src)
 	case "NUMBER":
+		if arg.Precision < 19 {
+			typ := goNumType(arg.Precision, arg.Scale)
+			if typ == "godror.Number" {
+				typ = "string"
+			}
+			return fmt.Sprintf("%s = %s(%s)", dst, typ, src)
+		}
 		return fmt.Sprintf("%s = string(%s)", dst, src)
+
 	case "":
 		panic(fmt.Sprintf("empty \"ora\" type: %#v", arg))
 	}
@@ -119,11 +128,12 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 	switch arg.ora {
 	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		if src[0] != '&' {
-			return fmt.Sprintf("var %s sql.NullInt64; if %s != 0 { %s.Int64, %s.Valid = int64(%s), true }; %s = int32(%s.Int64)", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
+			return fmt.Sprintf("var %s sql.NullInt32; if %s != 0 { %s.Int32, %s.Valid = int32(%s), true }; %s = int32(%s.Int32)", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}
 	case "NUMBER":
 		if src[0] != '&' {
-			return fmt.Sprintf("%s := godror.Number(%s); %s = %s", dstVar, src, dst, dstVar), dstVar
+
+			return fmt.Sprintf("%s := %s(%s); %s = %s", dstVar, goNumType(arg.Precision, arg.Scale), src, dst, dstVar), dstVar
 		}
 	case "CLOB":
 		if dir.IsOutput() {
@@ -181,6 +191,22 @@ func ParseDigits(s string, precision, scale int) error {
 		}
 	}
 	return nil
+}
+
+func goNumType(precision, scale uint8) string {
+	if precision >= 19 || precision == 0 {
+		return "godror.Number"
+	}
+	if scale != 0 {
+		if precision < 10 {
+			return "float32"
+		}
+		return "float64"
+	}
+	if precision < 10 {
+		return "int32"
+	}
+	return "int64"
 }
 
 // vim: set fileencoding=utf-8 noet:

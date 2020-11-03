@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	fstructs "github.com/fatih/structs"
@@ -221,8 +222,8 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 
 func protoType(got, aName, absType string) (string, protoOptions) {
 	switch trimmed := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")); trimmed {
-	case "string":
-		return "string", nil
+	case "bool", "string":
+		return trimmed, nil
 
 	case "int32":
 		if NumberAsString {
@@ -231,7 +232,24 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 			}
 		}
 		return "sint32", nil
-	case "float64", "sql.nullfloat64":
+
+	case "int64":
+		if NumberAsString {
+			if Gogo {
+				return "sint64", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
+			}
+		}
+		return "sint64", nil
+
+	case "float32", "sql.nullfloat32":
+		if NumberAsString {
+			if Gogo {
+				return "float", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
+			}
+		}
+		return "float", nil
+
+	case "double", "float64", "sql.nullfloat64":
 		if NumberAsString {
 			if Gogo {
 				return "double", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
@@ -239,7 +257,32 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 		}
 		return "double", nil
 
-	case "godror.number":
+	case "godror.number", "n":
+		if i := strings.IndexByte(absType, '('); i >= 0 && absType[len(absType)-1] == ')' {
+			if strings.HasPrefix(absType, "INTEGER(") || strings.HasPrefix(absType, "NUMBER(") {
+				s := absType[i+1 : len(absType)-1]
+				integer := true
+				if j := strings.IndexByte(s, ','); j >= 0 {
+					s = s[:j]
+					integer = false
+				}
+				scale, err := strconv.Atoi(s)
+				if err != nil {
+					panic(fmt.Errorf("%s(%q): %w", s, absType, err))
+				}
+				if scale < 10 {
+					if integer {
+						return "sint32", nil
+					}
+					return "float", nil
+				} else if scale < 19 {
+					if integer {
+						return "sint64", nil
+					}
+					return "double", nil
+				}
+			}
+		}
 		if Gogo {
 			return "string", protoOptions{
 				"gogoproto.jsontag": aName + ",omitempty",
@@ -256,16 +299,20 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 			}
 		}
 		return "google.protobuf.Timestamp", nil
-	case "n":
-		return "string", nil
+
 	case "raw":
 		return "bytes", nil
+
 	case "godror.lob", "ora.lob":
 		if absType == "CLOB" {
 			return "string", nil
 		}
 		return "bytes", nil
+
 	default:
+		if !strings.Contains(trimmed, "_") {
+			panic(trimmed)
+		}
 		return trimmed, nil
 	}
 }

@@ -610,15 +610,20 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 		case "RAW":
 			return "[]byte", nil
 		case "NUMBER":
-			return "godror.Number", nil
+			return goNumType(arg.Precision, arg.Scale), nil
 		case "INTEGER":
 			if !isTable && arg.IsOutput() {
+				if arg.Scale < 10 {
+					return "*int32", nil
+				}
 				return "*int64", nil
+			}
+			if arg.Scale < 10 {
+				return "int32", nil
 			}
 			return "int64", nil
 		case "PLS_INTEGER", "BINARY_INTEGER":
 			if !isTable && arg.IsOutput() {
-				//return "*int32", nil
 				return "int32", nil
 			}
 			return "int32", nil

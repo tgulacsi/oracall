@@ -207,7 +207,9 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 		dir = DIR_IN
 	}
 
-	arg := Argument{Name: name, Type: dataType, PlsType: NewPlsType(plsType),
+	arg := Argument{
+		Name: name, Type: dataType,
+		PlsType:  NewPlsType(plsType, precision, scale),
 		TypeName: typeName, Direction: dir,
 		Precision: precision, Scale: scale, Charlength: charlength,
 		Charset: charset,
