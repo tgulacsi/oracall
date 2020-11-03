@@ -185,7 +185,7 @@ if true || DebugLevel > 0 {
 			err = fmt.Errorf("%q %+v: %w", qry, params, err)
 			if s.DBLog != nil {
 				var logErr error
-				if ctx, logErr = s.DBLog(ctx, tx, funName, err); logErr != nil {
+				if _, logErr = s.DBLog(ctx, tx, funName, err); logErr != nil {
 					Log("dbLog", funName, "logErr", logErr, "error", err)
 				}
 			}

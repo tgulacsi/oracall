@@ -17,7 +17,6 @@ require (
 	github.com/oklog/ulid v1.3.1
 	github.com/pkg/errors v0.9.1
 	github.com/tgulacsi/go v0.12.5
-	github.com/tgulacsi/goracle v0.0.0-20151008113136-976826e46446
 	golang.org/dl v0.0.0-20200724191219-e4fbcf8a7a81 // indirect
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
