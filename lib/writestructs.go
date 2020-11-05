@@ -112,11 +112,16 @@ type iterator struct {
 
 type oracallServer struct {
 	db *sql.DB
+	Log func(...interface{}) error
 	DBLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error)
 }
 
-func NewServer(db *sql.DB, dbLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error)) *oracallServer {
-	return &oracallServer{db: db, DBLog: dbLog}
+func NewServer(
+	db *sql.DB, 
+	Log func(...interface{}) error, 
+    dbLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error),
+) *oracallServer {
+	return &oracallServer{db: db, Log: Log, DBLog: dbLog}
 }
 
 `)
@@ -228,7 +233,7 @@ func testSetup(t *testing.T) *oracallServer {
 		if testDB, err = sql.Open("godror", *flagConnect); err != nil {
 			panic(fmt.Errorf("%s: %s", *flagConnect, err))
 		}
-		testServer = NewServer(testDB, nil)
+		testServer = NewServer(testDB, nil, nil)
 	})
 	return testServer
 }

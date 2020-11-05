@@ -115,7 +115,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 			CamelCase(fun.getStructName(true, false)),
 		)
 	}
-	fmt.Fprintf(callBuf, "\nif err = ctx.Err(); err != nil { return }\n")
+	fmt.Fprintf(callBuf, "\nLog := Log\nif s.Log != nil { Log = s.Log }\nif err = ctx.Err(); err != nil { return }\n")
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
