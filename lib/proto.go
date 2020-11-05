@@ -261,25 +261,16 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 		if i := strings.IndexByte(absType, '('); i >= 0 && absType[len(absType)-1] == ')' {
 			if strings.HasPrefix(absType, "INTEGER(") || strings.HasPrefix(absType, "NUMBER(") {
 				s := absType[i+1 : len(absType)-1]
-				integer := true
-				if j := strings.IndexByte(s, ','); j >= 0 {
-					s = s[:j]
-					integer = false
-				}
-				scale, err := strconv.Atoi(s)
-				if err != nil {
-					panic(fmt.Errorf("%s(%q): %w", s, absType, err))
-				}
-				if scale < 10 {
-					if integer {
-						return "sint32", nil
+				if !strings.ContainsRune(s, ',') {
+					prec, err := strconv.Atoi(s)
+					if err != nil {
+						panic(fmt.Errorf("%s(%q): %w", s, absType, err))
 					}
-					return "float", nil
-				} else if scale < 19 {
-					if integer {
+					if prec < 10 {
+						return "sint32", nil
+					} else if prec < 19 {
 						return "sint64", nil
 					}
-					return "double", nil
 				}
 			}
 		}

@@ -194,7 +194,7 @@ func ParseDigits(s string, precision, scale int) error {
 }
 
 func goNumType(precision, scale uint8) string {
-	if precision >= 19 || precision == 0 {
+	if precision >= 19 || precision == 0 || scale != 0 {
 		return "godror.Number"
 	}
 	if scale != 0 {
