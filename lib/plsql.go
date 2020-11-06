@@ -115,7 +115,11 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 			CamelCase(fun.getStructName(true, false)),
 		)
 	}
-	fmt.Fprintf(callBuf, "\nLog := Log\nif s.Log != nil { Log = s.Log }\nif err = ctx.Err(); err != nil { return }\n")
+	fmt.Fprintf(callBuf, `
+	Log := Log
+	if s.Log != nil { Log = s.Log }
+	if err = ctx.Err(); err != nil { return }
+	`)
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -156,12 +160,12 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 if s.DBLog != nil {
 	var err error
 	if ctx, err = s.DBLog(ctx, tx, funName, input); err != nil {
-		Log("dbLog", funName, "error", err)
+		Log("msg", "dbLog", "fun", funName, "error", err)
 	}
 }
 const callText = `+"`%s`"+`
 if true || DebugLevel > 0 {
-	Log("calling", callText, "stmt", `+"`%s`"+`, "params", params)
+	Log("msg", "calling", "qry", callText, "stmt", `+"`%s`"+`, "params", params)
 }
 	qry := %s
 `,
@@ -186,7 +190,7 @@ if true || DebugLevel > 0 {
 			if s.DBLog != nil {
 				var logErr error
 				if _, logErr = s.DBLog(ctx, tx, funName, err); logErr != nil {
-					Log("dbLog", funName, "logErr", logErr, "error", err)
+					Log("msg", "dbLog", "fun", funName, "logErr", logErr, "error", err)
 				}
 			}
 			return
@@ -213,9 +217,13 @@ if true || DebugLevel > 0 {
 		for {
 			for _, it := range iterators {
 				if err = ctx.Err(); err != nil { return }
-				if err = it.Iterate(); err != nil {
+				err = it.Iterate()
+				if sendErr := stream.Send(output); sendErr != nil && err == nil {
+					err = sendErr
+				}
+				if err != nil {
 					if !errors.Is(err, io.EOF) {
-						_ = stream.Send(output)
+						Log("msg", "iterate", "error", err)
 						return
 					}
 					reseters = append(reseters, it.Reset)
@@ -223,12 +231,8 @@ if true || DebugLevel > 0 {
 				}
 				iterators2 = append(iterators2, it)
 			}
-			if err = stream.Send(output); err != nil {
-				return
-			}
 			if len(iterators) != len(iterators2) {
 				if len(iterators2) == 0 {
-					//err = stream.Send(output)
 					err = tx.Commit()
 					return
 				}
@@ -862,7 +866,7 @@ func (arg Argument) getConvRefCursor(
 		rset := *(%s.(sql.Out).Dest.(*driver.Rows))
 		if rset != nil { defer rset.Close() }
 		iterators = append(iterators, iterator{
-			Reset: func() { output.%s = nil },
+			Reset: func() { output.%s = output.%s[:0] },
 			Iterate: func() error {
 		a := output.%s[:0]
 		I := make([]driver.Value, %d)
@@ -879,7 +883,7 @@ func (arg Argument) getConvRefCursor(
 		})
 	}`,
 		paramName,
-		name,
+		name, name,
 		name,
 		len(arg.TableOf.RecordOf),
 		batchSize,
