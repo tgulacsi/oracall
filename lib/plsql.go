@@ -32,7 +32,7 @@ import (
 // MaxTableSize is the maximum size of the array elements
 var MaxTableSize = 128
 
-const batchSize = 128
+const batchSize = 1024
 
 // SavePlsqlBlock saves the plsql block definition into writer
 func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
@@ -221,15 +221,16 @@ if true || DebugLevel > 0 {
 				if sendErr := stream.Send(output); sendErr != nil && err == nil {
 					err = sendErr
 				}
-				if err != nil {
-					if !errors.Is(err, io.EOF) {
-						Log("msg", "iterate", "error", err)
-						return
-					}
+				if err == nil {
 					reseters = append(reseters, it.Reset)
+					iterators2 = append(iterators2, it)
 					continue
 				}
-				iterators2 = append(iterators2, it)
+				it.Reset()
+				if !errors.Is(err, io.EOF) {
+					Log("msg", "iterate", "error", err)
+					return
+				}
 			}
 			if len(iterators) != len(iterators2) {
 				if len(iterators2) == 0 {
@@ -864,23 +865,25 @@ func (arg Argument) getConvRefCursor(
 	convOut = append(convOut, fmt.Sprintf(`
 	{
 		rset := *(%s.(sql.Out).Dest.(*driver.Rows))
-		if rset != nil { defer rset.Close() }
-		iterators = append(iterators, iterator{
-			Reset: func() { output.%s = output.%s[:0] },
-			Iterate: func() error {
-		a := output.%s[:0]
-		I := make([]driver.Value, %d)
-		var err error
-		for i := 0; i < %d; i++ {
-			if err = rset.Next(I); err != nil {
-				break
+		if rset != nil { 
+			defer rset.Close()
+			iterators = append(iterators, iterator{
+				Reset: func() { output.%s = output.%s[:0] },
+				Iterate: func() error {
+			a := output.%s[:0]
+			I := make([]driver.Value, %d)
+			var err error
+			for i := 0; i < %d; i++ {
+				if err = rset.Next(I); err != nil {
+					break
+				}
+				a = append(a, %s)
 			}
-			a = append(a, %s)
+			output.%s = a
+			return err
+			},
+			})
 		}
-		output.%s = a
-		return err
-		},
-		})
 	}`,
 		paramName,
 		name, name,
