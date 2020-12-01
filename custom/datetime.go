@@ -30,16 +30,16 @@ import (
 )
 
 var (
-	_ = json.Marshaler(DateTime{})
+	_ = json.Marshaler((*DateTime)(nil))
 	_ = json.Unmarshaler((*DateTime)(nil))
-	_ = encoding.TextMarshaler(DateTime{})
+	_ = encoding.TextMarshaler((*DateTime)(nil))
 	_ = encoding.TextUnmarshaler((*DateTime)(nil))
-	_ = xml.Marshaler(DateTime{})
+	_ = xml.Marshaler((*DateTime)(nil))
 	_ = xml.Unmarshaler((*DateTime)(nil))
 )
 
 type DateTime struct {
-	time.Time
+	Time time.Time
 }
 
 func getWriter(enc *xml.Encoder) *bufio.Writer {
@@ -48,9 +48,8 @@ func getWriter(enc *xml.Encoder) *bufio.Writer {
 	return *(**bufio.Writer)(unsafe.Pointer(rP.Elem().FieldByName("Writer").UnsafeAddr()))
 }
 
-func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
-	//fmt.Printf("Marshal %v: %v\n", start.Name.Local, dt.Time.Format(time.RFC3339))
-	if dt.Time.IsZero() {
+func (dt *DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
+	if dt.IsZero() {
 		start.Attr = append(start.Attr,
 			xml.Attr{Name: xml.Name{Space: "http://www.w3.org/2001/XMLSchema-instance", Local: "nil"}, Value: "true"})
 
@@ -79,8 +78,19 @@ func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 	return dt.UnmarshalText([]byte(s))
 }
 
-func (dt DateTime) MarshalJSON() ([]byte, error) {
-	if dt.Time.IsZero() {
+func (dt *DateTime) IsZero() (zero bool) {
+	if dt == nil {
+		return true
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			zero = true
+		}
+	}()
+	return dt.Time.IsZero()
+}
+func (dt *DateTime) MarshalJSON() ([]byte, error) {
+	if dt.IsZero() {
 		return []byte(`""`), nil
 	}
 	return dt.Time.In(time.Local).MarshalJSON()
@@ -96,8 +106,8 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 
 // MarshalText implements the encoding.TextMarshaler interface.
 // The time is formatted in RFC 3339 format, with sub-second precision added if present.
-func (dt DateTime) MarshalText() ([]byte, error) {
-	if dt.Time.IsZero() {
+func (dt *DateTime) MarshalText() ([]byte, error) {
+	if dt.IsZero() {
 		return nil, nil
 	}
 	return dt.Time.In(time.Local).MarshalText()
@@ -130,23 +140,49 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 	return nil
 }
 
-func (dt DateTime) Timestamp() *types.Timestamp {
+func (dt *DateTime) Timestamp() *types.Timestamp {
+	if dt.IsZero() {
+		return nil
+	}
 	ts, _ := types.TimestampProto(dt.Time)
 	return ts
 }
-func (dt DateTime) MarshalTo(dAtA []byte) (int, error) {
+func (dt *DateTime) MarshalTo(dAtA []byte) (int, error) {
+	if dt.IsZero() {
+		return 0, nil
+	}
 	return dt.Timestamp().MarshalTo(dAtA)
 }
-func (dt DateTime) Marshal() (dAtA []byte, err error) {
+func (dt *DateTime) Marshal() (dAtA []byte, err error) {
+	if dt.IsZero() {
+		return nil, nil
+	}
 	return dt.Timestamp().Marshal()
 }
-func (dt DateTime) String() string { return dt.Time.In(time.Local).Format(time.RFC3339) }
-func (DateTime) ProtoMessage()     {}
-func (dt DateTime) ProtoSize() (n int) {
+func (dt *DateTime) String() string {
+	if dt.IsZero() {
+		return ""
+	}
+	return dt.Time.In(time.Local).Format(time.RFC3339)
+}
+func (dt *DateTime) ProtoMessage() {}
+func (dt *DateTime) ProtoSize() (n int) {
+	if dt.IsZero() {
+		return 0
+	}
 	return dt.Timestamp().ProtoSize()
 }
-func (dt *DateTime) Reset()       { dt.Time = time.Time{} }
-func (dt DateTime) Size() (n int) { return dt.Timestamp().Size() }
+func (dt *DateTime) Reset() {
+	if dt != nil {
+		dt.Time = time.Time{}
+	}
+}
+func (dt *DateTime) Size() (n int) {
+	if dt.IsZero() {
+		return 0
+	}
+	return dt.Timestamp().Size()
+}
 func (dt *DateTime) Unmarshal(dAtA []byte) error {
 	var ts types.Timestamp
 	err := ts.Unmarshal(dAtA)

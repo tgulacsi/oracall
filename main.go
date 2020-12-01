@@ -260,7 +260,7 @@ func Main(args []string) error {
 
 		plugin := "--go-grpc_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types:"
 		if *flagGenerator != "go" {
-			plugin = "--" +*flagGenerator + "_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"
+			plugin = "--" + *flagGenerator + "_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"
 		}
 		cmd := exec.Command(
 			"protoc",

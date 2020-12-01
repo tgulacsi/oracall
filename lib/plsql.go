@@ -118,6 +118,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	fmt.Fprintf(callBuf, `
 	Log := Log
 	if s.Log != nil { Log = s.Log }
+	if Log == nil { Log = func(...interface{}) error { return nil } }
 	if err = ctx.Err(); err != nil { return }
 	`)
 	for _, line := range convIn {
@@ -164,8 +165,8 @@ if s.DBLog != nil {
 	}
 }
 const callText = `+"`%s`"+`
-if true || DebugLevel > 0 {
-	Log("msg", "calling", "qry", callText, "stmt", `+"`%s`"+`, "params", params)
+if DebugLevel > 0 {
+	Log("msg", "calling", "qry", callText, "stmt", `+"`%s`"+`)
 }
 	qry := %s
 `,
@@ -198,7 +199,7 @@ if true || DebugLevel > 0 {
 	}
     `)
 
-	callBuf.WriteString("\nif true || DebugLevel > 0 { Log(`result params`, params, `output`, output) }\n")
+	callBuf.WriteString("\nif DebugLevel > 0 { Log(`result params`, params, `output`, output) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
