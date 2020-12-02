@@ -125,6 +125,9 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 			return fmt.Sprintf(`%s = custom.AsDate(%s).Time // toOra D`, dst, np), ""
 		}
 	}
+	if arg.ora == "NUMBER" && arg.Precision != 0 && arg.Precision < 10 && arg.Scale == 0 {
+		arg.ora = "PLS_INTEGER"
+	}
 	switch arg.ora {
 	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		if src[0] != '&' {
