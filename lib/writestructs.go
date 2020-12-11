@@ -73,8 +73,6 @@ import (
     "time"    // for datetimes
 	"unsafe"
 
-	"github.com/davecgh/go-spew/spew"
-
     godror "github.com/godror/godror" // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.AsDate
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
@@ -99,7 +97,6 @@ var _ = errors.New
 var _ = fmt.Printf
 var _ godror.Lob
 var _ unsafe.Pointer
-var _ = spew.Sdump
 var _ = os.Stdout
 var _ driver.Rows
 var _ = oracall.ErrInvalidArgument
