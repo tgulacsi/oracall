@@ -315,8 +315,8 @@ func mustBeUint(text string) uint {
 	if e != nil {
 		panic(e)
 	}
-	if u < 0 || u > 1<<32 {
-		panic(fmt.Sprintf("%d out of range (not uint8)", u))
+	if u < 0 || u > (1<<32-1) {
+		panic(fmt.Sprintf("%d out of range (not uint)", u))
 	}
 	return uint(u)
 }
