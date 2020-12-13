@@ -311,12 +311,9 @@ func mustBeUint(text string) uint {
 	if text == "" {
 		return 0
 	}
-	u, e := strconv.Atoi(text)
+	u, e := strconv.ParseUint(text, 10, uintWidthBits)
 	if e != nil {
 		panic(e)
-	}
-	if u < 0 || u > (1<<32-1) {
-		panic(fmt.Sprintf("%d out of range (not uint)", u))
 	}
 	return uint(u)
 }
