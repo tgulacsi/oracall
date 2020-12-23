@@ -4,10 +4,11 @@ go 1.15
 
 require (
 	github.com/antzucaro/matchr v0.0.0-20180616170659-cbc221335f3c
+	github.com/dvyukov/go-fuzz v0.0.0-20201003075337-90825f39c90b // indirect
 	github.com/fatih/structs v1.1.0
 	github.com/go-kit/kit v0.10.0
 	github.com/go-stack/stack v1.8.0
-	github.com/godror/godror v0.21.0
+	github.com/godror/godror v0.22.3
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/google/go-cmp v0.5.1
