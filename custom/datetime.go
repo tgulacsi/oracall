@@ -78,7 +78,13 @@ func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 	return dt.UnmarshalText([]byte(s))
 }
 
+var (
+	d1970_0 = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Add(-7200 * time.Second)
+	d1970_1 = d1970_0.Add(7200 * 2 * time.Second)
+)
+
 func (dt *DateTime) IsZero() (zero bool) {
+	//defer func() { log.Printf("IsZero(%#v): %t", dt, zero) }()
 	if dt == nil {
 		return true
 	}
@@ -87,7 +93,7 @@ func (dt *DateTime) IsZero() (zero bool) {
 			zero = true
 		}
 	}()
-	return dt.Time.IsZero()
+	return dt.Time.IsZero() || (dt.Time.After(d1970_0) && dt.Time.Before(d1970_1))
 }
 func (dt *DateTime) MarshalJSON() ([]byte, error) {
 	if dt.IsZero() {
