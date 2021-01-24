@@ -20,7 +20,7 @@ func TestDateTimeMarshalXML(t *testing.T) {
 	} {
 		buf.Reset()
 		if err := tC.In.MarshalXML(enc, st); err != nil {
-			t.Fatalf("%v: %w", tC.In, err)
+			t.Fatalf("%v: %+v", tC.In, err)
 		}
 		if got := buf.String(); tC.Want != got {
 			t.Errorf("%v: got %q wanted %q", tC.In, got, tC.Want)

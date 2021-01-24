@@ -26,7 +26,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gogo/protobuf/types"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -78,8 +79,6 @@ func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 	return dt.UnmarshalText([]byte(s))
 }
 
-var epoch = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-
 func (dt *DateTime) IsZero() (zero bool) {
 	//defer func() { log.Printf("IsZero(%#v): %t", dt, zero) }()
 	if dt == nil {
@@ -90,7 +89,7 @@ func (dt *DateTime) IsZero() (zero bool) {
 			zero = true
 		}
 	}()
-	return dt.Time.IsZero() || dt.Time.Equal(epoch)
+	return dt.Time.IsZero()
 }
 func (dt *DateTime) MarshalJSON() ([]byte, error) {
 	if dt.IsZero() {
@@ -143,24 +142,25 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 	return nil
 }
 
-func (dt *DateTime) Timestamp() *types.Timestamp {
+func (dt *DateTime) Timestamp() *timestamppb.Timestamp {
 	if dt.IsZero() {
 		return nil
 	}
-	ts, _ := types.TimestampProto(dt.Time)
-	return ts
+	return timestamppb.New(dt.Time)
 }
 func (dt *DateTime) MarshalTo(dAtA []byte) (int, error) {
 	if dt.IsZero() {
 		return 0, nil
 	}
-	return dt.Timestamp().MarshalTo(dAtA)
+	b, err := proto.MarshalOptions{}.MarshalAppend(dAtA[:0], dt.Timestamp())
+	_ = dAtA[len(b)-1] // panic if buffer is too short
+	return len(b), err
 }
 func (dt *DateTime) Marshal() (dAtA []byte, err error) {
 	if dt.IsZero() {
 		return nil, nil
 	}
-	return dt.Timestamp().Marshal()
+	return proto.Marshal(dt.Timestamp())
 }
 func (dt *DateTime) String() string {
 	if dt.IsZero() {
@@ -168,12 +168,14 @@ func (dt *DateTime) String() string {
 	}
 	return dt.Time.In(time.Local).Format(time.RFC3339)
 }
+
 func (dt *DateTime) ProtoMessage() {}
+
 func (dt *DateTime) ProtoSize() (n int) {
 	if dt.IsZero() {
 		return 0
 	}
-	return dt.Timestamp().ProtoSize()
+	return proto.Size(dt.Timestamp())
 }
 func (dt *DateTime) Reset() {
 	if dt != nil {
@@ -184,15 +186,17 @@ func (dt *DateTime) Size() (n int) {
 	if dt.IsZero() {
 		return 0
 	}
-	return dt.Timestamp().Size()
+	return proto.Size(dt.Timestamp())
 }
 func (dt *DateTime) Unmarshal(dAtA []byte) error {
-	var ts types.Timestamp
-	err := ts.Unmarshal(dAtA)
-	if err != nil {
-		dt.Time = time.Time{}
+	var ts timestamppb.Timestamp
+	if err := proto.Unmarshal(dAtA, &ts); err != nil {
 		return err
 	}
-	dt.Time, err = types.TimestampFromProto(&ts)
-	return err
+	if ts.Seconds == 0 && ts.Nanos == 0 {
+		dt.Time = time.Time{}
+	} else {
+		dt.Time = ts.AsTime()
+	}
+	return nil
 }
