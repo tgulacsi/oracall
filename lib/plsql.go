@@ -213,7 +213,6 @@ if DebugLevel > 0 {
 			}
 			return
 		}
-		reseters := make([]func(), 0, len(iterators))
 		iterators2 := make([]iterator, 0, len(iterators))
 		for {
 			for _, it := range iterators {
@@ -222,12 +221,11 @@ if DebugLevel > 0 {
 				if sendErr := stream.Send(output); sendErr != nil && err == nil {
 					err = sendErr
 				}
+				it.Reset()
 				if err == nil {
-					reseters = append(reseters, it.Reset)
 					iterators2 = append(iterators2, it)
 					continue
 				}
-				it.Reset()
 				if !errors.Is(err, io.EOF) {
 					Log("msg", "iterate", "error", err)
 					return
@@ -240,12 +238,7 @@ if DebugLevel > 0 {
 				}
 				iterators = append(iterators[:0], iterators2...)
 			}
-			// reset the all arrays
-			for _, reset := range reseters {
-				reset()
-			}
 			iterators2 = iterators2[:0]
-			reseters = reseters[:0]
 		}
 		`)
 	}
