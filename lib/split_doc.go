@@ -91,9 +91,9 @@ func getDirDoc(doc string, dirmap direction) argDocs {
 }
 
 type argDocs struct {
+	Map       map[string]string
 	Pre, Post string
 	Docs      []string
-	Map       map[string]string
 }
 
 func (D *argDocs) Parse(doc string) {

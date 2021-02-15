@@ -32,8 +32,8 @@ func TestParseDocs(t *testing.T) {
 	defer cancel()
 
 	type testCase struct {
-		Source string
 		Want   map[string]string
+		Source string
 	}
 
 	for tcName, tc := range map[string]testCase{

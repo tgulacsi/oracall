@@ -38,15 +38,15 @@ const (
 )
 
 type Function struct {
-	Package, name, alias string
-	Returns              *Argument
-	Args                 []Argument
-	Documentation        string
-	Replacement          *Function
-	ReplacementIsJSON    bool
 	LastDDL              time.Time
+	Replacement          *Function
+	Returns              *Argument
+	Package, name, alias string
+	Documentation        string
+	Args                 []Argument
 	handle               []string
 	maxTableSize         int
+	ReplacementIsJSON    bool
 }
 
 func (f Function) Name() string {
@@ -144,24 +144,24 @@ const (
 )
 
 type Argument struct {
-	RecordOf       []NamedArgument //this argument is a record (map) of this type
+	TableOf        *Argument // this argument is a table (array) of this type
+	mu             *sync.Mutex
+	goTypeName     string
 	Name           string
 	Type, TypeName string
 	AbsType        string
 	Charset        string
-	Charlength     uint
-	TableOf        *Argument // this argument is a table (array) of this type
-	goTypeName     string
+	RecordOf       []NamedArgument //this argument is a record (map) of this type
 	PlsType
-	Flavor    flavor
-	Direction direction
-	Precision uint8
-	Scale     uint8
-	mu        *sync.Mutex
+	Charlength uint
+	Flavor     flavor
+	Direction  direction
+	Precision  uint8
+	Scale      uint8
 }
 type NamedArgument struct {
-	Name string
 	*Argument
+	Name string
 }
 
 func (a Argument) String() string {

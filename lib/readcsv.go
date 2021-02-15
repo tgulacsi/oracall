@@ -97,8 +97,8 @@ func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err 
 func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgument, filter func(string) bool) {
 	defer close(filteredArgs)
 	type program struct {
-		ObjectID, SubprogramID  uint
 		PackageName, ObjectName string
+		ObjectID, SubprogramID  uint
 	}
 	var lastProg, zeroProg program
 	args := make([]UserArgument, 0, 4)

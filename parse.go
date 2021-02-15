@@ -138,8 +138,8 @@ func lexBlockComment(l *lexer) stateFn {
 }
 
 type item struct {
-	typ itemType
 	val string
+	typ itemType
 }
 
 func (i item) String() string {
@@ -160,13 +160,13 @@ func (i item) String() string {
 
 // lexer holds the state of the scanner.
 type lexer struct {
+	items chan item // channel of scanned items.
+	state stateFn
 	name  string // used only for error reports.
 	input string // the string being scanned.
 	start int    // start position of this item.
 	pos   int    // current position in the input.
 	//width int       // width of last rune read from input.
-	items chan item // channel of scanned items.
-	state stateFn
 }
 
 // run lexes the input by executing state functions until

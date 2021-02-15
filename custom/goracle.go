@@ -91,9 +91,9 @@ func ParseTime(t *time.Time, s string) error {
 }
 
 type Lob struct {
+	err error
 	*godror.Lob
 	data []byte
-	err  error
 }
 
 func (L *Lob) read() error {

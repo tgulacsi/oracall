@@ -284,9 +284,9 @@ func Main(args []string) error {
 
 type dbRow struct {
 	Package, Object, InOut sql.NullString
-	OID, Seq               int
-	SubID                  sql.NullInt64
 	dbType
+	SubID    sql.NullInt64
+	OID, Seq int
 }
 
 func (r dbRow) String() string {
