@@ -146,8 +146,12 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 	}
 	if dir.IsOutput() && !(strings.HasSuffix(dst, "]") && !strings.HasPrefix(dst, "params[")) {
 		if arg.ora == "NUMBER" {
-			return fmt.Sprintf("%s = sql.Out{Dest:(*%s)(unsafe.Pointer(%s))%s} // NUMBER(%d,%d)",
-				dst, goNumType(arg.Precision, arg.Scale), src, inTrue, arg.Precision, arg.Scale), ""
+			if goNumType(arg.Precision, arg.Scale) == "godror.Number" {
+				return fmt.Sprintf("%s = sql.Out{Dest:(*%s)(unsafe.Pointer(%s))%s} // NUMBER(%d,%d)",
+					dst, goNumType(arg.Precision, arg.Scale), src, inTrue, arg.Precision, arg.Scale), ""
+			}
+			return fmt.Sprintf("%s = sql.Out{Dest:%s%s} // NUMBER(%d,%d)",
+				dst, src, inTrue, arg.Precision, arg.Scale), ""
 		}
 		return fmt.Sprintf("%s = sql.Out{Dest:%s%s} // %s", dst, src, inTrue, arg.ora), ""
 	}
