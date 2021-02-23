@@ -8,7 +8,7 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/go-kit/kit v0.10.0
 	github.com/go-stack/stack v1.8.0
-	github.com/godror/godror v0.22.3
+	github.com/godror/godror v0.24.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/google/go-cmp v0.5.1
