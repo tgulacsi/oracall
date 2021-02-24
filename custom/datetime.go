@@ -62,7 +62,10 @@ func (dt *DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
 		if err := enc.EncodeElement("", start); err != nil {
 			return err
 		}
-		b := bytes.ReplaceAll(bytes.ReplaceAll(buf.Bytes(),
+		b := bytes.ReplaceAll(bytes.ReplaceAll(bytes.ReplaceAll(bytes.ReplaceAll(
+		buf.Bytes(),
+			[]byte("_XMLSchema-instance:"), []byte("xsi:")),
+			[]byte("xmlns:_XMLSchema-instance="), []byte("xmlns:xsi=")),
 			[]byte("XMLSchema-instance:"), []byte("xsi:")),
 			[]byte("xmlns:XMLSchema-instance="), []byte("xmlns:xsi="))
 		*bw = old
