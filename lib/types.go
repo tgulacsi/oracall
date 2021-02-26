@@ -50,14 +50,14 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	switch arg.ora {
 	case "BLOB":
 		if varName != "" {
-			return fmt.Sprintf("{ if %s.Reader != nil { %s, err = ioutil.ReadAll(%s) }", varName, dst, varName)
+			return fmt.Sprintf("{ if %s.Reader != nil { var buf bytes.Buffer; if _, err = io.Copy(&buf, %s.Reader); err != nil { return }; %s = buf.Bytes() }", varName, varName, dst)
 		}
-		return fmt.Sprintf("%s = godror.Lob{Reader:bytes.NewReader(%s)}", dst, src)
+		return fmt.Sprintf("%s = godror.Lob{Reader: bytes.NewReader(%s)}", dst, src)
 	case "CLOB":
 		if varName != "" {
-			return fmt.Sprintf("{var b []byte; if %s.Reader != nil {b, err = ioutil.ReadAll(%s); %s = string(b)}}", varName, varName, dst)
+			return fmt.Sprintf("{ var buf strings.Builder; if %s.Reader != nil { if _, err = io.Copy(&buf, %s); err != nil { return }; %s = buf.String() } }", varName, varName, dst)
 		}
-		return fmt.Sprintf("%s = godror.Lob{IsClob:true, Reader:strings.NewReader(%s)}", dst, src)
+		return fmt.Sprintf("%s = godror.Lob{IsClob:true, Reader: strings.NewReader(%s)}", dst, src)
 	case "DATE", "TIMESTAMP":
 		return fmt.Sprintf("%s = (%s)", dst, src)
 	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
