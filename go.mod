@@ -15,7 +15,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0
 	github.com/oklog/ulid v1.3.1
 	github.com/stretchr/testify v1.6.1 // indirect
-	github.com/tgulacsi/go v0.14.0
+	github.com/tgulacsi/go v0.15.1
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20200806060901-a37d78b92225 // indirect
