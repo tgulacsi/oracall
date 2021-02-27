@@ -50,12 +50,12 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 	switch arg.ora {
 	case "BLOB":
 		if varName != "" {
-			return fmt.Sprintf("{ if %s.Reader != nil { var buf bytes.Buffer; if _, err = io.Copy(&buf, %s.Reader); err != nil { return }; %s = buf.Bytes() }", varName, varName, dst)
+			return fmt.Sprintf("if %s.Reader != nil { if %s, err = custom.ReadAll(%s.Reader, 1<<20); err != nil { return } }", varName, dst, varName)
 		}
 		return fmt.Sprintf("%s = godror.Lob{Reader: bytes.NewReader(%s)}", dst, src)
 	case "CLOB":
 		if varName != "" {
-			return fmt.Sprintf("{ var buf strings.Builder; if %s.Reader != nil { if _, err = io.Copy(&buf, %s); err != nil { return }; %s = buf.String() } }", varName, varName, dst)
+			return fmt.Sprintf("if %s.Reader != nil { if %s, err = custom.ReadAllString(%s.Reader, 1<<20); err != nil { return } }", varName, dst, varName)
 		}
 		return fmt.Sprintf("%s = godror.Lob{IsClob:true, Reader: strings.NewReader(%s)}", dst, src)
 	case "DATE", "TIMESTAMP":
