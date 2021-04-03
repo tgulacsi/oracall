@@ -49,7 +49,7 @@ func getWriter(enc *xml.Encoder) *bufio.Writer {
 	return *(**bufio.Writer)(unsafe.Pointer(rP.Elem().FieldByName("Writer").UnsafeAddr()))
 }
 
-func (dt *DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
+func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
 	if dt.IsZero() {
 		start.Attr = append(start.Attr,
 			xml.Attr{Name: xml.Name{Space: "http://www.w3.org/2001/XMLSchema-instance", Local: "nil"}, Value: "true"})
@@ -63,7 +63,7 @@ func (dt *DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
 			return err
 		}
 		b := bytes.ReplaceAll(bytes.ReplaceAll(bytes.ReplaceAll(bytes.ReplaceAll(
-		buf.Bytes(),
+			buf.Bytes(),
 			[]byte("_XMLSchema-instance:"), []byte("xsi:")),
 			[]byte("xmlns:_XMLSchema-instance="), []byte("xmlns:xsi=")),
 			[]byte("XMLSchema-instance:"), []byte("xsi:")),
@@ -94,7 +94,7 @@ func (dt *DateTime) IsZero() (zero bool) {
 	}()
 	return dt.Time.IsZero()
 }
-func (dt *DateTime) MarshalJSON() ([]byte, error) {
+func (dt DateTime) MarshalJSON() ([]byte, error) {
 	if dt.IsZero() {
 		return []byte(`""`), nil
 	}
@@ -104,6 +104,7 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 	// Ignore null, like in the main JSON package.
 	data = bytes.TrimSpace(data)
 	if len(data) == 0 || bytes.Equal(data, []byte(`""`)) || bytes.Equal(data, []byte("null")) {
+		dt.Time = time.Time{}
 		return nil
 	}
 	return dt.UnmarshalText(data)
@@ -111,7 +112,7 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 
 // MarshalText implements the encoding.TextMarshaler interface.
 // The time is formatted in RFC 3339 format, with sub-second precision added if present.
-func (dt *DateTime) MarshalText() ([]byte, error) {
+func (dt DateTime) MarshalText() ([]byte, error) {
 	if dt.IsZero() {
 		return nil, nil
 	}
@@ -140,7 +141,7 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 	dt.Time, err = time.ParseInLocation(time.RFC3339[:n], string(data), time.Local)
 	//log.Printf("s=%q time=%v err=%+v", data, dt.Time, err)
 	if err != nil {
-		return fmt.Errorf("%s: %w", string(data), err)
+		return fmt.Errorf("ParseInLocation(%q, %q): %w", time.RFC3339[:n], string(data), err)
 	}
 	return nil
 }
