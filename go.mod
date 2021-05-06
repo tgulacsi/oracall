@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/antzucaro/matchr v0.0.0-20180616170659-cbc221335f3c
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/structs v1.1.0
 	github.com/go-kit/kit v0.10.0
 	github.com/go-stack/stack v1.8.0

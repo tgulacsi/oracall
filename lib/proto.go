@@ -148,6 +148,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			return fmt.Errorf("no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf)
 		}
 	}
+	//Log("msg", "protoWriteMessageTyp", "msg", msgName, "args", args)
 
 	var err error
 	w := &errWriter{Writer: dst, err: &err}
@@ -189,7 +190,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			fmt.Fprintf(w, "%s\t// %s\n\t%s%s %s = %d%s;\n", asComment(D.Map[aName], "\t"), arg.AbsType, rule, typ, aName, i+1, optS)
 			continue
 		}
-		typ = CamelCase(typ)
+		typ = CamelCase(strings.Replace(strings.ToUpper(typ), "%ROWTYPE", "_rt", 1))
 		if _, ok := seen[typ]; !ok {
 			seen[typ] = struct{}{}
 			//lName := strings.ToLower(arg.Name)

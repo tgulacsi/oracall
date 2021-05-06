@@ -395,6 +395,15 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				         WHERE B.owner = A.attr_type_owner AND B.type_name = A.attr_type_name AND B.package_name = A.attr_type_package) typecode
 			     FROM all_plsql_type_attrs A
 				 WHERE owner = :owner AND package_name = :pkg AND type_name = :sub
+				UNION ALL
+				SELECT column_name, data_type_owner, data_type, NULL AS attr_type_package,
+                      data_length, data_precision, data_scale, character_set_name, column_id AS attr_no,
+                      'PL/SQL RECORD' AS typecode
+                 FROM all_tab_cols A
+                 WHERE NOT EXISTS (SELECT 1 FROM all_plsql_type_attrs B
+                                     WHERE B.owner = :owner AND package_name = :pkg AND type_name = :sub) AND
+                       hidden_column = 'NO' AND INSTR(column_name, '$') = 0 AND 
+                       owner = :owner AND table_name = :pkg
 				 ORDER BY attr_no`
 				if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
 					logger.Log("WARN", fmt.Errorf("%s: %w", qry, err))
@@ -698,12 +707,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 	})
 	filteredArgs := make(chan []oracall.UserArgument, 16)
 	grp.Go(func() error { oracall.FilterAndGroup(filteredArgs, userArgs, filter); return nil })
-	functions, err = oracall.ParseArguments(filteredArgs, filter)
+	functions = oracall.ParseArguments(filteredArgs, filter)
 	if grpErr := grp.Wait(); grpErr != nil {
-		if err == nil {
-			err = grpErr
-		}
-		logger.Log("msg", "ParseArguments", "error", grpErr)
+		logger.Log("msg", "ParseArguments", "error", fmt.Sprintf("%+v", grpErr))
 	}
 	docNames := make([]string, 0, len(docs))
 	for k := range docs {
@@ -837,6 +843,7 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 		); err != nil {
 			return plus, err
 		}
+		//logger.Log("owner", owner, "pkg", pkg, "sub", sub)
 		defer rows.Close()
 		for rows.Next() {
 			var t dbType
