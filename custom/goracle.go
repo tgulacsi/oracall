@@ -204,7 +204,7 @@ func AsFloat64(v interface{}) float64 {
 		result = f
 
 	default:
-		log.Printf("WARN: unknown Int64 type %T", v)
+		log.Printf("WARN: unknown Float64 type %T", v)
 		return 0
 	}
 	if ZeroIsAlmostZero && result == 0 {
@@ -249,6 +249,9 @@ func AsInt32(v interface{}) int32 {
 	return 0
 }
 func AsInt64(v interface{}) int64 {
+	if v == nil {
+		return 0
+	}
 	switch x := v.(type) {
 	case int64:
 		return x
