@@ -383,7 +383,6 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			return fmt.Errorf("no table of data for %s.%s (%v): %w", f.Name(), arg, arg, ErrMissingTableOf)
 		}
-		//aName = capitalize(goName(arg.Name))
 		aName = capitalize(replHidden(arg.Name))
 		if got, err = arg.goType(arg.Flavor == FLAVOR_TABLE); err != nil {
 			return fmt.Errorf("%s: %w", arg.Name, err)
@@ -648,7 +647,7 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 			return "", fmt.Errorf("%v: %w", arg, ErrUnknownSimpleType)
 		}
 	}
-	typName = arg.TypeName
+	typName = strings.Replace(arg.TypeName, "%ROWTYPE", "_rt", 1)
 	chunks := strings.Split(typName, ".")
 	switch len(chunks) {
 	case 1:

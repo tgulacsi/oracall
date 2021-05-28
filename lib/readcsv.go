@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/csv"
-	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
@@ -87,11 +86,8 @@ func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err 
 	grp.Go(func() error { return ReadCsv(userArgs, r) })
 	filteredArgs := make(chan []UserArgument, 16)
 	grp.Go(func() error { FilterAndGroup(filteredArgs, userArgs, filter); return nil })
-	functions, err = ParseArguments(filteredArgs, filter)
-	if err == nil {
-		err = grp.Wait()
-	}
-	return functions, err
+	functions = ParseArguments(filteredArgs, filter)
+	return functions, grp.Wait()
 }
 
 func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgument, filter func(string) bool) {
@@ -226,20 +222,10 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	return err
 }
 
-func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (functions []Function, err error) {
+func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []Function {
 	// Split args by functions
-	var dumpBuf strings.Builder
-	dumpEnc := xml.NewEncoder(&dumpBuf)
-	dumpEnc.Indent("", "  ")
-	dumpXML := func(v interface{}) string {
-		dumpBuf.Reset()
-		if err := dumpEnc.Encode(v); err != nil {
-			panic(err)
-		}
-		return dumpBuf.String()
-	}
-	_ = dumpXML
 	names := make([]string, 0, len(userArgs)/4)
+	functions := make([]Function, cap(names))
 	var row int
 	for uas := range userArgs {
 		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
@@ -258,10 +244,14 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 			}
 
 			level = int8(ua.DataLevel)
+			typeName := ua.TypeOwner + "." + ua.TypeName + "." + ua.TypeSubname + "@" + ua.TypeLink
+			if ua.TypeSubname == "" && ua.PlsType+"@" == typeName {
+				typeName = ua.TypeOwner + "." + ua.TypeName + "%ROWTYPE"
+			}
 			arg := NewArgument(ua.ArgumentName,
 				ua.DataType,
 				ua.PlsType,
-				ua.TypeOwner+"."+ua.TypeName+"."+ua.TypeSubname+"@"+ua.TypeLink,
+				typeName,
 				ua.InOut,
 				0,
 				ua.CharacterSetName,
@@ -269,7 +259,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 				ua.DataScale,
 				ua.CharLength,
 			)
-			//Log("level", level, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor)
+			//Log("level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
 			// Possibilities:
 			// 1. SIMPLE
 			// 2. RECORD at level 0
@@ -304,7 +294,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) (f
 		names = append(names, fun.Name())
 	}
 	Log("functions", names)
-	return
+	return functions
 }
 
 func mustBeUint(text string) uint {
