@@ -49,6 +49,11 @@ func getWriter(enc *xml.Encoder) *bufio.Writer {
 	return *(**bufio.Writer)(unsafe.Pointer(rP.Elem().FieldByName("Writer").UnsafeAddr()))
 }
 
+func (dt DateTime) Format(layout string) string { return dt.Time.Format(layout) }
+func (dt DateTime) AppendFormat(b []byte, layout string) []byte {
+	return dt.Time.AppendFormat(b, layout)
+}
+
 func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
 	if dt.IsZero() {
 		start.Attr = append(start.Attr,
@@ -129,19 +134,35 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 		//log.Println("time=")
 		return nil
 	}
-	if n > len(time.RFC3339) {
-		n = len(time.RFC3339)
-	} else if n < 4 {
-		n = 4
-	} else if n > 10 && data[10] != time.RFC3339[10] {
-		data[10] = time.RFC3339[10]
+	layout := time.RFC3339
+	if bytes.IndexByte(data, '.') >= 19 {
+		layout = time.RFC3339Nano
+	}
+	if n < 10 {
+		layout = "20060102"
+	} else {
+		if n > len(layout) {
+			data = data[:len(layout)]
+		} else if n < 4 {
+			layout = layout[:4]
+		} else {
+			for _, i := range []int{4, 7, 10} {
+				if n <= i {
+					break
+				}
+				if data[i] != layout[i] {
+					data[i] = layout[i]
+				}
+			}
+			layout = layout[:n]
+		}
 	}
 	var err error
 	// Fractional seconds are handled implicitly by Parse.
-	dt.Time, err = time.ParseInLocation(time.RFC3339[:n], string(data), time.Local)
+	dt.Time, err = time.ParseInLocation(layout, string(data), time.Local)
 	//log.Printf("s=%q time=%v err=%+v", data, dt.Time, err)
 	if err != nil {
-		return fmt.Errorf("ParseInLocation(%q, %q): %w", time.RFC3339[:n], string(data), err)
+		return fmt.Errorf("ParseInLocation(%q, %q): %w", layout, string(data), err)
 	}
 	return nil
 }
