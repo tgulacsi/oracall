@@ -1,4 +1,4 @@
-// Copyright 2019, 2020 Tamás Gulácsi
+// Copyright 2019, 2021 Tamás Gulácsi
 //
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,7 @@ package custom
 import (
 	"bufio"
 	"bytes"
+	"database/sql/driver"
 	"encoding"
 	"encoding/json"
 	"encoding/xml"
@@ -52,6 +53,17 @@ func getWriter(enc *xml.Encoder) *bufio.Writer {
 func (dt DateTime) Format(layout string) string { return dt.Time.Format(layout) }
 func (dt DateTime) AppendFormat(b []byte, layout string) []byte {
 	return dt.Time.AppendFormat(b, layout)
+}
+func (dt *DateTime) Scan(src interface{}) error {
+	t, ok := src.(time.Time)
+	if !ok {
+		return fmt.Errorf("cannot scan %T to DateTime", src)
+	}
+	dt.Time = t
+    return nil
+}
+func (dt DateTime) Value() (driver.Value, error) {
+	return dt.Time, nil
 }
 
 func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
