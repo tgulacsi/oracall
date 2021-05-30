@@ -56,6 +56,10 @@ func (dt DateTime) AppendFormat(b []byte, layout string) []byte {
 	return dt.Time.AppendFormat(b, layout)
 }
 func (dt *DateTime) Scan(src interface{}) error {
+    if src == nil {
+        dt.Time = time.Time{}
+        return nil
+    }
 	t, ok := src.(time.Time)
 	if !ok {
 		return fmt.Errorf("cannot scan %T to DateTime", src)
