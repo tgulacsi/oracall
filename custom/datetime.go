@@ -24,6 +24,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -60,7 +61,7 @@ func (dt *DateTime) Scan(src interface{}) error {
 		return fmt.Errorf("cannot scan %T to DateTime", src)
 	}
 	dt.Time = t
-    return nil
+	return nil
 }
 func (dt DateTime) Value() (driver.Value, error) {
 	return dt.Time, nil
@@ -166,7 +167,11 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 					data[i] = layout[i]
 				}
 			}
-			layout = layout[:n]
+			if bytes.IndexByte(data, '.') < 0 {
+				layout = layout[:n]
+			} else if _, err := time.ParseInLocation(layout, string(data), time.Local); err != nil && strings.HasSuffix(err.Error(), `"" as "Z07:00"`) {
+				layout = strings.TrimSuffix(layout, "Z07:00")
+			}
 		}
 	}
 	var err error
