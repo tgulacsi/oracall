@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2020 Tamás Gulácsi
+Copyright 2017, 2020 TamÄÄs GulÄÄcsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -99,7 +99,8 @@ func Main(args []string) error {
 	if pattern == "" {
 		pattern = "%"
 	}
-	oracall.Gogo = *flagGenerator != "go"
+	oracall.Drpc = *flagGenerator == "drpc"
+	oracall.Gogo = !oracall.Drpc && *flagGenerator != "go"
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -259,7 +260,9 @@ func Main(args []string) error {
 		}
 
 		plugin := "--go-grpc_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types:"
-		if *flagGenerator != "go" {
+		if oracall.Drpc {
+			plugin = strings.Replace(plugin, "grpc", "drpc", 1)
+		} else if *flagGenerator != "go" {
 			plugin = "--" + *flagGenerator + "_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"
 		}
 		cmd := exec.Command(
