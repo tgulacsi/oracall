@@ -1,5 +1,5 @@
 /*
-Copyright 2013, 2020 Tamás Gulácsi
+Copyright 2013, 2021 Tamas Gulacsi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,18 +64,21 @@ import (
 	"io"
 	"io/ioutil"
 	"errors"
-    "fmt"
+	"fmt"
 	"strings"
 	"database/sql"
 	"database/sql/driver"
 	"os"
 	"strconv"
-    "time"    // for datetimes
+	"time"    // for datetimes
 	"unsafe"
 
-    godror "github.com/godror/godror" // Oracle
+	godror "github.com/godror/godror" // Oracle
 	"github.com/tgulacsi/oracall/custom"	// custom.AsDate
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
+
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	`+pbImport+`
 )
 
@@ -90,6 +93,7 @@ var _ context.Context
 var _ = custom.AsDate
 var _ strconv.NumError
 var _ time.Time
+var _ timestamppb.Timestamp
 var _ strings.Reader
 var _ xml.Name
 var Log = func(keyvals ...interface{}) error { return nil } // logger.Log of github.com/go-kit/kit/log
