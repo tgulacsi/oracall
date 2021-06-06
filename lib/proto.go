@@ -33,9 +33,10 @@ var Gogo bool
 var NumberAsString bool
 
 //go:generate sh ./download-protoc.sh
+//go:generate go install google.golang.org/protobuf/protoc-gen-go@latest
 // go:generate go get -u github.com/gogo/protobuf/protoc-gen-gogofast
-//go:generate go get -u google.golang.org/protobuf/protoc-gen-go
-//go:generate go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
+// go:generate go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
+//go:generate go install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@latest
 
 // build: protoc --go_out=. --go-grpc_out=. my.proto
 
@@ -47,7 +48,7 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg, path string) error {
 
 	if pkg != "" {
 		fmt.Fprintf(w, `package %s;
-option go_package = "%s";`, pkg, path)
+option go_package = %q;`, pkg, path)
 	}
 	io.WriteString(w, "\nimport \"google/protobuf/timestamp.proto\";\n")
 
