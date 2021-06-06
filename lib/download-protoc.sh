@@ -32,4 +32,4 @@ rm -rf "$tmpdir"
 if which protoc-gen-gofast 2>/dev/null && which protoc-gen-go 2>/dev/null; then
 	exit 0
 fi
-go get -u github.com/gogo/protobuf/protoc-gen-gofast
+go get -u github.com/gogo/protobuf/protoc-gen-gofast@latest google.golang.org/protobuf/cmd/protoc-gen-go@latest google.golang.org/grpc/cmd/protoc-gen-go-grpc
