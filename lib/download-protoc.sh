@@ -22,9 +22,9 @@ rmdir include || echo ''
 if [ ! -e $GOPATH/src/google/api/annotations.proto ] || [ ! -e $GOPATH/src/google/api/timestamp.proto ]; then
 	rm -rf $GOPATH/src/google/api
 	set -x
-	go get github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
+	go get github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway
 	mkdir -p $GOPATH/src/google
-	ln -s $GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis/google/api $GOPATH/src/google/api
+	ln -s $GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/v2/third_party/googleapis/google/api $GOPATH/src/google/api
 fi
 
 rm -rf "$tmpdir"
