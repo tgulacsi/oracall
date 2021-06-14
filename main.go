@@ -62,7 +62,7 @@ func Main(args []string) error {
 	flagBaseDir := flag.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
-	flagGenerator := flag.String("protoc-gen", "gogofast", "use protoc-gen-<generator>")
+	flagGenerator := flag.String("protoc-gen", "go", "use protoc-gen-<generator>")
 	flag.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
 	flag.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
@@ -87,7 +87,7 @@ func Main(args []string) error {
 	if pattern == "" {
 		pattern = "%"
 	}
-	oracall.Gogo = *flagGenerator != "go"
+	oracall.Gogo = strings.HasPrefix(*flagGenerator, "gogo")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -246,24 +246,23 @@ func Main(args []string) error {
 			return fmt.Errorf("SaveProtobuf: %w", err)
 		}
 
-		args := make([]string, 0, 4)
-		if *flagGenerator == "go" {
-			args = append(args,
-				"--"+*flagGenerator+"_out=:"+*flagBaseDir,
-				"--go-grpc_out=:"+*flagBaseDir)
-		} else {
+		args := append(make([]string, 0, 5),
+			"--proto_path="+*flagBaseDir+":.")
+		if oracall.Gogo {
 			args = append(args,
 				"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
+		} else {
+			args = append(args, "--go-grpc_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types:"+*flagBaseDir)
+			if *flagGenerator == "go-vtproto" {
+				args = append(args,
+					"--"+*flagGenerator+"_out=:"+*flagBaseDir)
+			}
 		}
-		cmd := exec.CommandContext(ctx,
-			"protoc",
-			append(args, "--proto_path="+*flagBaseDir+":.",
-				pbFn)...,
-		)
-		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-		err = cmd.Run()
-		Log("msg", "protoc", "args", cmd.Args, "error", err)
-		if err != nil {
+		cmd := exec.Command("protoc", append(args, pbFn)...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		Log("msg", "calling", "protoc", cmd.Args)
+		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("%q: %w", cmd.Args, err)
 		}
 		if *flagGenerator == "go" {
