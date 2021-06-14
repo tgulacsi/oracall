@@ -1060,6 +1060,11 @@ func (arg Argument) getConvTableRec(
 		if err != nil {
 			panic(err)
 		}
+		convert := arg.FromOra(fmt.Sprintf("output.%s[i].%s", name[0], name[1]), "v", "v") 
+		if !Gogo && oraTyp == "time.Time" {
+			convert = fmt.Sprintf("output.%s[i].%s = timestamppb.New(v)", name[0], name[1])
+		}
+
 		convOut = append(convOut,
 			fmt.Sprintf(`if m := len(%s)-cap(output.%s); m > 0 { // gctr3
 			output.%s = append(output.%s, make([]%s, m)...)
@@ -1077,11 +1082,8 @@ func (arg Argument) getConvTableRec(
 				absName,
 				name[0],
 				name[0], withPb(CamelCase(got[1:])),
-				arg.FromOra(
-					fmt.Sprintf("output.%s[i].%s", name[0], name[1]),
-					"v",
-					"v",
-				)))
+				convert,
+			))
 	}
 	return convIn, convOut
 }
