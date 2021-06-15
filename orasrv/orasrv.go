@@ -1,3 +1,7 @@
+// Copyright 2017, 2021 Tamas Gulacsi
+//
+// SPDX-License-Identifier: Apache-2.0
+
 package orasrv
 
 import (
@@ -10,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	bp "github.com/tgulacsi/go/bufpool"
 	oracall "github.com/tgulacsi/oracall/lib"
 
@@ -179,20 +182,8 @@ func StatusError(err error) error {
 	if code == 0 {
 		return err
 	}
-	s := status.New(code, err.Error())
-	if sd, sErr := s.WithDetails(&pbMessage{Message: fmt.Sprintf("%+v", err)}); sErr == nil {
-		s = sd
-	}
-	return s.Err()
+	return status.New(code, err.Error()).Err()
 }
-
-type pbMessage struct {
-	Message string
-}
-
-func (m pbMessage) ProtoMessage()   {}
-func (m *pbMessage) Reset()         { m.Message = "" }
-func (m *pbMessage) String() string { return proto.MarshalTextString(m) }
 
 type ctxKey string
 
