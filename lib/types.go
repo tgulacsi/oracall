@@ -82,7 +82,7 @@ func (arg PlsType) GetOra(src, varName string) string {
 			if varName != "" {
 				return fmt.Sprintf("%s.Format(time.RFC3339)", varName)
 			}
-			return fmt.Sprintf("%s.AsTime()", src)
+			return fmt.Sprintf("custom.AsTimestamp(%s)", src)
 		}
 		return fmt.Sprintf("custom.AsTimestamp(%s)", src)
 	case "NUMBER":

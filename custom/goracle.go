@@ -19,6 +19,7 @@ import (
 	"unsafe"
 
 	"github.com/godror/godror"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type SQLExecer interface {
@@ -417,4 +418,14 @@ func AsTime(v interface{}) time.Time {
 	default:
 		return AsDate(v).Time
 	}
+}
+
+func AsTimestamp(v interface{}) *timestamppb.Timestamp {
+	if v == nil {
+		return nil
+	}
+	if t, ok := v.(time.Time); ok {
+		return timestamppb.New(t)
+	}
+	return AsDate(v).Timestamp()
 }
