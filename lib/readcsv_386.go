@@ -4,7 +4,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-
 package oracall
 
 const uintWidthBits = 32

@@ -195,8 +195,7 @@ import (
 	"flag"
 	"sync"
 	"testing"
-
-	errors "golang.org/x/xerrors"
+	"errors"
 
 	"github.com/go-logfmt/logfmt"
 
