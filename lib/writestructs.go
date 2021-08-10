@@ -186,16 +186,16 @@ func SaveFunctionTests(dst io.Writer, functions []Function, pkg, pbImport string
 package `+pkg+`
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
-    "time"    
-	"os"
-	"bytes"
 	"flag"
+	"fmt"
+	"os"
 	"sync"
 	"testing"
-	"errors"
+    "time"    
 
 	"github.com/go-logfmt/logfmt"
 
@@ -268,6 +268,10 @@ func TestCalls(t *testing.T) {
 	funNames := make([]string, 0, len(functions))
 	for _, f := range functions {
 		structName := CamelCase(f.getStructName(false, false))
+		if f.HasCursorOut() {
+			// No test for streams yet
+			continue
+		}
 		fn := FN(f)
 
 		fmt.Fprintf(w, `
