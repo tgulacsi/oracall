@@ -19,7 +19,6 @@ import (
 	"unsafe"
 
 	"github.com/godror/godror"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type SQLExecer interface {
@@ -289,6 +288,35 @@ func AsInt64(v interface{}) int64 {
 	}
 	return 0
 }
+func AsTimestamp(v interface{}) *Timestamp {
+	if v == nil {
+		return nil
+	}
+	switch d := v.(type) {
+	case *Timestamp:
+		return d
+	case time.Time:
+		return NewTimestamp(d)
+	case *time.Time:
+		if !d.IsZero() {
+			return NewTimestamp(*d)
+		}
+	case DateTime:
+		return NewTimestamp(d.Time)
+	case *DateTime:
+		if !d.IsZero() {
+			return NewTimestamp(d.Time)
+		}
+	case string:
+		var t time.Time
+		_ = ParseTime(&t, d)
+		return NewTimestamp(t)
+	default:
+		log.Printf("WARN: unknown Date type %T", v)
+	}
+
+	return &Timestamp{}
+}
 func AsDate(v interface{}) *DateTime {
 	//log.Printf("AsDate(%[1]v %[1]T)", v)
 	if v == nil {
@@ -305,6 +333,11 @@ func AsDate(v interface{}) *DateTime {
 			return new(DateTime)
 		}
 		return d
+    case *Timestamp:
+        if d == nil {
+            return new(DateTime)
+        }
+        return &DateTime{Time: d.AsTime()}
 	}
 	d := new(DateTime)
 	switch x := v.(type) {
@@ -331,12 +364,3 @@ func AsTime(v interface{}) time.Time {
 	return AsDate(v).Time
 }
 
-func AsTimestamp(v interface{}) *timestamppb.Timestamp {
-	if v == nil {
-		return nil
-	}
-	if t, ok := v.(time.Time); ok {
-		return timestamppb.New(t)
-	}
-	return AsDate(v).Timestamp()
-}
