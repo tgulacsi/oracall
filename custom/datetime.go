@@ -18,6 +18,7 @@ import (
 	"unsafe"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -28,6 +29,7 @@ var (
 	_ = encoding.TextUnmarshaler((*DateTime)(nil))
 	_ = xml.Marshaler((*DateTime)(nil))
 	_ = xml.Unmarshaler((*DateTime)(nil))
+	_ = proto.Message((*DateTime)(nil))
 )
 
 type DateTime struct {
@@ -40,8 +42,16 @@ func getWriter(enc *xml.Encoder) *bufio.Writer {
 	return *(**bufio.Writer)(unsafe.Pointer(rP.Elem().FieldByName("Writer").UnsafeAddr()))
 }
 
-func (dt DateTime) Format(layout string) string { return dt.Time.Format(layout) }
-func (dt DateTime) AppendFormat(b []byte, layout string) []byte {
+func (dt *DateTime) Format(layout string) string {
+	if dt == nil {
+		return ""
+	}
+	return dt.Time.Format(layout)
+}
+func (dt *DateTime) AppendFormat(b []byte, layout string) []byte {
+	if dt == nil {
+		return nil
+	}
 	return dt.Time.AppendFormat(b, layout)
 }
 func (dt *DateTime) Scan(src interface{}) error {
@@ -56,34 +66,37 @@ func (dt *DateTime) Scan(src interface{}) error {
 	dt.Time = t
 	return nil
 }
-func (dt DateTime) Value() (driver.Value, error) {
+func (dt *DateTime) Value() (driver.Value, error) {
+	if dt == nil {
+		return nil, nil
+	}
 	return dt.Time, nil
 }
 
-func (dt DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
-	if dt.IsZero() {
-		start.Attr = append(start.Attr,
-			xml.Attr{Name: xml.Name{Space: "http://www.w3.org/2001/XMLSchema-instance", Local: "nil"}, Value: "true"})
-
-		bw := getWriter(enc)
-		bw.Flush()
-		old := *bw
-		var buf bytes.Buffer
-		*bw = *bufio.NewWriter(&buf)
-		if err := enc.EncodeElement("", start); err != nil {
-			return err
-		}
-		b := bytes.ReplaceAll(bytes.ReplaceAll(bytes.ReplaceAll(bytes.ReplaceAll(
-			buf.Bytes(),
-			[]byte("_XMLSchema-instance:"), []byte("xsi:")),
-			[]byte("xmlns:_XMLSchema-instance="), []byte("xmlns:xsi=")),
-			[]byte("XMLSchema-instance:"), []byte("xsi:")),
-			[]byte("xmlns:XMLSchema-instance="), []byte("xmlns:xsi="))
-		*bw = old
-		bw.Write(b)
-		return bw.Flush()
+func (dt *DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
+	if dt != nil && !dt.IsZero() {
+		return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339), start)
 	}
-	return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339), start)
+	start.Attr = append(start.Attr,
+		xml.Attr{Name: xml.Name{Space: "http://www.w3.org/2001/XMLSchema-instance", Local: "nil"}, Value: "true"})
+
+	bw := getWriter(enc)
+	bw.Flush()
+	old := *bw
+	var buf bytes.Buffer
+	*bw = *bufio.NewWriter(&buf)
+	if err := enc.EncodeElement("", start); err != nil {
+		return err
+	}
+	b := bytes.ReplaceAll(bytes.ReplaceAll(bytes.ReplaceAll(bytes.ReplaceAll(
+		buf.Bytes(),
+		[]byte("_XMLSchema-instance:"), []byte("xsi:")),
+		[]byte("xmlns:_XMLSchema-instance="), []byte("xmlns:xsi=")),
+		[]byte("XMLSchema-instance:"), []byte("xsi:")),
+		[]byte("xmlns:XMLSchema-instance="), []byte("xmlns:xsi="))
+	*bw = old
+	bw.Write(b)
+	return bw.Flush()
 }
 func (dt *DateTime) UnmarshalXML(dec *xml.Decoder, st xml.StartElement) error {
 	var s string
@@ -105,8 +118,8 @@ func (dt *DateTime) IsZero() (zero bool) {
 	}()
 	return dt.Time.IsZero()
 }
-func (dt DateTime) MarshalJSON() ([]byte, error) {
-	if dt.IsZero() {
+func (dt *DateTime) MarshalJSON() ([]byte, error) {
+	if dt == nil || dt.IsZero() {
 		return []byte(`""`), nil
 	}
 	return dt.Time.In(time.Local).MarshalJSON()
@@ -123,8 +136,8 @@ func (dt *DateTime) UnmarshalJSON(data []byte) error {
 
 // MarshalText implements the encoding.TextMarshaler interface.
 // The time is formatted in RFC 3339 format, with sub-second precision added if present.
-func (dt DateTime) MarshalText() ([]byte, error) {
-	if dt.IsZero() {
+func (dt *DateTime) MarshalText() ([]byte, error) {
+	if dt == nil || dt.IsZero() {
 		return nil, nil
 	}
 	return dt.Time.In(time.Local).MarshalText()
@@ -234,4 +247,8 @@ func (dt *DateTime) Unmarshal(dAtA []byte) error {
 		dt.Time = ts.AsTime()
 	}
 	return nil
+}
+
+func (dt *DateTime) ProtoReflect() protoreflect.Message {
+	return dt.Timestamp().ProtoReflect()
 }

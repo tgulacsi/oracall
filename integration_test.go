@@ -141,9 +141,7 @@ func TestGenRec(t *testing.T) {
 		todo := todo
 		t.Run(todo[0], func(t *testing.T) {
 			got := runTest(t, outFn, "-connect="+*flagConnect, todo[0], todo[1])
-			if strings.Contains(todo[2], "{{NOW}}") {
-				todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
-			}
+			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
 			if diff := jsonEqual(strings.TrimSpace(got), todo[2]); diff != "" {
 				t.Errorf("%d. awaited\n\t%s\ngot\n\t%s\ndiff\n\t%s", i, todo[2], got, diff)
 			}

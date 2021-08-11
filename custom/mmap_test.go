@@ -35,5 +35,5 @@ func TestReadAll(t *testing.T) {
 	runtime.GC()
 	time.Sleep(100 * time.Millisecond)
 	runtime.GC()
-	t.Log("GC didn't panic")
+	t.Log("GC didn't panic", b)
 }

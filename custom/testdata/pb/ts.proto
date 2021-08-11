@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package pb;
+option go_package = "github.com/tgulacsi/oracall/custom/testdata/pb";
+
+message Ts {
+    google.protobuf.Timestamp ts = 1;
+    repeated google.protobuf.Timestamp tss = 2;
+}
