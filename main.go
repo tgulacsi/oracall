@@ -87,6 +87,7 @@ func Main(args []string) error {
 	if pattern == "" {
 		pattern = "%"
 	}
+	Log("generator", *flagGenerator)
 	oracall.Gogo = *flagGenerator != "go"
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -246,26 +247,38 @@ func Main(args []string) error {
 			return fmt.Errorf("SaveProtobuf: %w", err)
 		}
 
-		plugin := "--go-grpc_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types:"
-		if *flagGenerator != "go" {
-			plugin = "--" + *flagGenerator + "_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"
+		args := make([]string, 0, 4)
+		if *flagGenerator == "go" {
+			args = append(args,
+				"--"+*flagGenerator+"_out=:"+*flagBaseDir,
+				"--go-grpc_out=:"+*flagBaseDir)
+		} else {
+			args = append(args,
+				"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
 		}
 		cmd := exec.CommandContext(ctx,
 			"protoc",
-			"--proto_path="+*flagBaseDir+":.",
-			plugin+*flagBaseDir,
-			pbFn,
+			append(args, "--proto_path="+*flagBaseDir+":.",
+				pbFn)...,
 		)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		err = cmd.Run()
+		Log("msg", "protoc", "args", cmd.Args, "error", err)
+		if err != nil {
 			return fmt.Errorf("%q: %w", cmd.Args, err)
 		}
 		if *flagGenerator == "go" {
-			return exec.CommandContext(ctx, "sed", "-i", "-e",
+			fn := strings.TrimSuffix(pbFn, ".proto") + ".pb.go"
+			cmd = exec.CommandContext(ctx, "sed", "-i", "-e",
 				`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,custom "github.com/tgulacsi/oracall/custom",; /timestamp\.Timestamp/ s/timestamp\.Timestamp/custom.Timestamp/g`,
-				pbFn,
-			).Run()
+				fn,
+			)
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+			err = cmd.Run()
+			Log("msg", "replace timestamppb", "file", fn, "args", cmd.Args, "error", err)
+			if err != nil {
+				return fmt.Errorf("%q: %w", cmd.Args, err)
+			}
 		}
 		return nil
 	})
