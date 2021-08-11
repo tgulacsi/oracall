@@ -227,14 +227,14 @@ func Main(args []string) error {
 	}
 
 	grp.Go(func() error {
-		fn := "oracall.proto"
+		pbFn := "oracall.proto"
 		if pbPkg != "main" {
-			fn = pbPkg + ".proto"
+			pbFn = pbPkg + ".proto"
 		}
-		fn = filepath.Join(*flagBaseDir, pbPath, fn)
-		os.MkdirAll(filepath.Dir(fn), 0775)
-		Log("msg", "Writing Protocol Buffers", "file", fn)
-		fh, err := os.Create(fn)
+		pbFn = filepath.Join(*flagBaseDir, pbPath, pbFn)
+		os.MkdirAll(filepath.Dir(pbFn), 0775)
+		Log("msg", "Writing Protocol Buffers", "file", pbFn)
+		fh, err := os.Create(pbFn)
 		if err != nil {
 			return fmt.Errorf("create proto: %w", err)
 		}
@@ -250,16 +250,22 @@ func Main(args []string) error {
 		if *flagGenerator != "go" {
 			plugin = "--" + *flagGenerator + "_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"
 		}
-		cmd := exec.Command(
+		cmd := exec.CommandContext(ctx,
 			"protoc",
 			"--proto_path="+*flagBaseDir+":.",
 			plugin+*flagBaseDir,
-			fn,
+			pbFn,
 		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("%q: %w", cmd.Args, err)
+		}
+		if *flagGenerator == "go" {
+			return exec.CommandContext(ctx, "sed", "-i", "-e",
+				`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,custom "github.com/tgulacsi/oracall/custom",; /timestamp\.Timestamp/ s/timestamp\.Timestamp/custom.Timestamp/g`,
+				pbFn,
+			).Run()
 		}
 		return nil
 	})
