@@ -62,7 +62,7 @@ import (
 	"unsafe"
 
     godror "github.com/godror/godror" // Oracle
-	"github.com/tgulacsi/oracall/custom"	// custom.AsDate
+	"github.com/tgulacsi/oracall/custom"	// custom.AsDate/AsTimestamp
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 	`+pbImport+`
 )
@@ -75,7 +75,7 @@ const LastDDL = "`+lastDDL.Format(time.RFC3339)+`"
 var _ json.Marshaler
 var _ = io.EOF
 var _ context.Context
-var _ = custom.AsDate
+var _ = custom.AsTimestamp
 var _ strconv.NumError
 var _ time.Time
 var _ strings.Reader

@@ -333,11 +333,11 @@ func AsDate(v interface{}) *DateTime {
 			return new(DateTime)
 		}
 		return d
-    case *Timestamp:
-        if d == nil {
-            return new(DateTime)
-        }
-        return &DateTime{Time: d.AsTime()}
+	case *Timestamp:
+		if d == nil {
+			return new(DateTime)
+		}
+		return &DateTime{Time: d.AsTime()}
 	}
 	d := new(DateTime)
 	switch x := v.(type) {
@@ -358,9 +358,14 @@ func AsTime(v interface{}) time.Time {
 	if v == nil {
 		return time.Time{}
 	}
-	if t, ok := v.(time.Time); ok {
-		return t
+	switch x := v.(type) {
+	case time.Time:
+		return x
+	case sql.NullTime:
+		return x.Time
+	case *Timestamp:
+		return x.AsTime()
+	default:
+		return AsDate(v).Time
 	}
-	return AsDate(v).Time
 }
-

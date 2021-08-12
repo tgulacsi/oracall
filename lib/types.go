@@ -67,16 +67,15 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 }
 
 func (arg PlsType) GetOra(src, varName string) string {
-	if Gogo {
-		switch arg.ora {
-		case "DATE":
-			if varName != "" {
-				return fmt.Sprintf("%s.Format(time.RFC3339)", varName)
-			}
+	switch arg.ora {
+	case "DATE":
+		if varName != "" {
+			return fmt.Sprintf("%s.Format(time.RFC3339)", varName)
+		}
+		if Gogo {
 			return fmt.Sprintf("custom.AsDate(%s)", src)
 		}
-	}
-	switch arg.ora {
+		return fmt.Sprintf("custom.AsTimestamp(%s)", src)
 	case "NUMBER":
 		if varName != "" {
 			//return fmt.Sprintf("string(%s.(godror.Number))", varName)
@@ -95,10 +94,13 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 	if dir.IsInput() {
 		inTrue = ",In:true"
 	}
-	if Gogo {
-		switch arg.ora {
-		case "DATE":
-			np := strings.TrimPrefix(src, "&")
+	if arg.ora == "NUMBER" && arg.Precision != 0 && arg.Precision < 10 && arg.Scale == 0 {
+		arg.ora = "PLS_INTEGER"
+	}
+	switch arg.ora {
+	case "DATE":
+		np := strings.TrimPrefix(src, "&")
+		if Gogo {
 			if dir.IsOutput() {
 				if !strings.HasPrefix(dst, "params[") {
 					return fmt.Sprintf(`%s = %s.Time`, dst, np), ""
@@ -112,11 +114,19 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 			}
 			return fmt.Sprintf(`%s = custom.AsDate(%s).Time // toOra D`, dst, np), ""
 		}
-	}
-	if arg.ora == "NUMBER" && arg.Precision != 0 && arg.Precision < 10 && arg.Scale == 0 {
-		arg.ora = "PLS_INTEGER"
-	}
-	switch arg.ora {
+		if dir.IsOutput() {
+			if !strings.HasPrefix(dst, "params[") {
+				return fmt.Sprintf(`%s = %s.AsTime()`, dst, np), ""
+			}
+			return fmt.Sprintf(`if %s == nil { %s = new(custom.Timestamp) }
+				%s = sql.Out{Dest:&%s.AsTime()%s}`,
+					np, np,
+					dst, strings.TrimPrefix(src, "&"), inTrue,
+				),
+				""
+		}
+		return fmt.Sprintf(`%s = custom.AsTime(%s) // toOra D`, dst, np), ""
+
 	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		if src[0] != '&' {
 			return fmt.Sprintf("var %s sql.NullInt32; if %s != 0 { %s.Int32, %s.Valid = int32(%s), true }; %s = int32(%s.Int32)", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
