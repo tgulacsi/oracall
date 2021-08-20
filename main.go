@@ -87,7 +87,6 @@ func Main(args []string) error {
 	if pattern == "" {
 		pattern = "%"
 	}
-	Log("generator", *flagGenerator)
 	oracall.Gogo = *flagGenerator != "go"
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
