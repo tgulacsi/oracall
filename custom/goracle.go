@@ -223,7 +223,11 @@ func AsInt32(v interface{}) int32 {
 	switch x := v.(type) {
 	case int32:
 		return x
+	case uint32:
+		return int32(x)
 	case int64:
+		return int32(x)
+	case uint64:
 		return int32(x)
 	case float64:
 		return int32(x)
@@ -259,7 +263,11 @@ func AsInt64(v interface{}) int64 {
 	switch x := v.(type) {
 	case int64:
 		return x
+	case uint64:
+		return int64(x)
 	case int32:
+		return int64(x)
+	case uint32:
 		return int64(x)
 	case float64:
 		return int64(x)
@@ -288,6 +296,47 @@ func AsInt64(v interface{}) int64 {
 	}
 	return 0
 }
+func AsUint64(v interface{}) uint64 {
+	if v == nil {
+		return 0
+	}
+	switch x := v.(type) {
+	case uint64:
+		return x
+	case int64:
+		return uint64(x)
+	case uint32:
+		return uint64(x)
+	case int32:
+		return uint64(x)
+	case float64:
+		return uint64(x)
+	case float32:
+		return uint64(x)
+	case sql.NullInt64:
+		return uint64(x.Int64)
+	case string, godror.Number:
+		var s string
+		switch x := x.(type) {
+		case string:
+			s = x
+		case godror.Number:
+			s = string(x)
+		}
+		if s == "" {
+			return 0
+		}
+		i, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			log.Printf("ERROR parsing %q as Uint64: %v", s, err)
+		}
+		return i
+	default:
+		log.Printf("WARN: unknown Uint64 type %T", v)
+	}
+	return 0
+}
+
 func AsTimestamp(v interface{}) *Timestamp {
 	if v == nil {
 		return nil
