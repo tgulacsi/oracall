@@ -138,6 +138,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
 	var tx *sql.Tx
+    txCommit := func() error { return tx.Commit() }
 `)
 	if fun.tranIDArgIdx >= 0 {
 		fmt.Fprintf(callBuf, `
@@ -147,6 +148,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 			return 
 		}
 		defer s.txs.Put(tranID, tx)
+		txCommit = func() error { return nil }
 	} else {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -207,12 +209,12 @@ if DebugLevel > 0 {
 		io.WriteString(callBuf, line+"\n")
 	}
 	if !hasCursorOut {
-		fmt.Fprintf(callBuf, "\nerr = tx.Commit()\nreturn\n")
+		fmt.Fprintf(callBuf, "\nerr = txCommit()\nreturn\n")
 	} else {
 		fmt.Fprintf(callBuf, `
 		if len(iterators) == 0 {
 			if err = stream.Send(output); err == nil {
-				err = tx.Commit()
+				err = txCommit()
 			}
 			return
 		}

@@ -23,11 +23,11 @@ import (
 // - TranBegin will create an *sql.Tx with Begin()
 // - TranClose(success bool) will COMMIT/ROLLBACK the transaction.
 type TxPool struct {
-	mu     sync.RWMutex
-	ctx    context.Context // for cancel all transactions
-	cancel context.CancelFunc
-	max    int
-	m      map[uint64]transaction
+	mu         sync.RWMutex
+	ctx        context.Context // for cancel all transactions
+	cancel     context.CancelFunc
+	m          map[uint64]transaction
+	count, max uint32
 }
 type transaction struct {
 	lastacc time.Time
@@ -37,7 +37,7 @@ type transaction struct {
 func (p *TxPool) Close() error {
 	p.mu.Lock()
 	cancel, m := p.cancel, p.m
-	p.ctx, p.cancel, p.m = nil, nil, nil
+	p.count, p.ctx, p.cancel, p.m = 0, nil, nil, nil
 	p.mu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -48,9 +48,16 @@ func (p *TxPool) Close() error {
 	return nil
 }
 
+const DefaultMaxTran = 16
+
+// NewTxPool creates a new TxPool for over-function-call transaction handling.
+// The maximum number of open transactions is max, or DefaultMaxTran if max <= 0.
 func NewTxPool(ctx context.Context, max int) *TxPool {
+	if max <= 0 {
+		max = DefaultMaxTran
+	}
 	ctx, cancel := context.WithCancel(ctx)
-	return &TxPool{max: max, m: make(map[uint64]transaction), ctx: ctx, cancel: cancel}
+	return &TxPool{max: uint32(max), m: make(map[uint64]transaction), ctx: ctx, cancel: cancel}
 }
 
 // Get the transaction identified by tranID from the pool.
@@ -74,18 +81,25 @@ func (p *TxPool) Put(tranID uint64, tx *sql.Tx) {
 func (p *TxPool) Begin(conn interface {
 	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
 }) (*sql.Tx, uint64, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.count >= p.max {
+		return nil, 0, fmt.Errorf("%w: %d", ErrTranTooMany, p.count)
+	}
 	tx, err := conn.BeginTx(p.ctx, nil)
 	if err != nil {
 		return nil, 0, err
 	}
 	tranID := uint64(uintptr(unsafe.Pointer(tx)))
-	p.Put(tranID, tx)
+	t := transaction{Tx: tx, lastacc: time.Now()}
+	p.m[tranID] = t
 	return tx, tranID, nil
 }
 func (p *TxPool) End(tranID uint64, commit bool) error {
 	p.mu.Lock()
 	tx := p.m[tranID]
 	delete(p.m, tranID)
+	p.count--
 	p.mu.Unlock()
 	if tx.Tx == nil {
 		return fmt.Errorf("%d: %w", tranID, ErrTranNotExist)
@@ -110,6 +124,7 @@ func (p *TxPool) Evict(limit time.Duration) {
 
 var (
 	ErrTranNotExist = errors.New("transaction does not exist")
+	ErrTranTooMany  = errors.New("too many open transaction")
 )
 
 type PlsType struct {
