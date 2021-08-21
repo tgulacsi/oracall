@@ -30,7 +30,7 @@ func TestQuery078(t *testing.T) {
 		t.Log(buf.String())
 		return nil
 	}
-	functions, err := ParseCsv(strings.NewReader(query078Csv), nil)
+	functions, err := ParseCsv(strings.NewReader(query078Csv), nil, "")
 	if err != nil {
 		t.Errorf("error parsing csv: %v", err)
 		t.FailNow()
@@ -56,7 +56,7 @@ func TestQuery078(t *testing.T) {
 	t.Log(buf.String())
 
 	buf.Reset()
-	err = SaveFunctions(&buf, functions[:1], "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true)
+	err = SaveFunctions(&buf, functions[:1], "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true, 0)
 	t.Log(buf.String())
 	if err != nil {
 		t.Error(err)

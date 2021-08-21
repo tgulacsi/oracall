@@ -58,23 +58,23 @@ type UserArgument struct {
      FROM user_arguments
      ORDER BY object_id, subprogram_id, SEQUENCE;
 */
-func ParseCsvFile(filename string, filter func(string) bool) (functions []Function, err error) {
+func ParseCsvFile(filename string, filter func(string) bool, tranIDName string) (functions []Function, err error) {
 	fh, err := OpenCsv(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer fh.Close()
-	return ParseCsv(fh, filter)
+	return ParseCsv(fh, filter, tranIDName)
 }
 
 // ParseCsv parses the csv
-func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err error) {
+func ParseCsv(r io.Reader, filter func(string) bool, tranIDName string) (functions []Function, err error) {
 	userArgs := make(chan UserArgument, 16)
 	var grp errgroup.Group
 	grp.Go(func() error { return ReadCsv(userArgs, r) })
 	filteredArgs := make(chan []UserArgument, 16)
 	grp.Go(func() error { FilterAndGroup(filteredArgs, userArgs, filter); return nil })
-	functions = ParseArguments(filteredArgs, filter)
+	functions = ParseArguments(filteredArgs, filter, tranIDName)
 	return functions, grp.Wait()
 }
 
@@ -210,10 +210,10 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	return err
 }
 
-func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []Function {
+func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool, tranIDName string) []Function {
 	// Split args by functions
 	names := make([]string, 0, len(userArgs)/4)
-	functions := make([]Function, cap(names))
+	functions := make([]Function, 0, cap(names))
 	var row int
 	for uas := range userArgs {
 		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
@@ -221,14 +221,14 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []
 			continue
 		}
 
-		var fun Function
+		fun := Function{tranIDArgIdx: -1}
 		lastArgs := make(map[int8]*Argument, 8)
 		lastArgs[-1] = &Argument{Flavor: FLAVOR_RECORD}
 		var level int8
 		for i, ua := range uas {
 			row++
 			if i == 0 {
-				fun = Function{Package: ua.PackageName, name: ua.ObjectName, LastDDL: ua.LastDDL}
+				fun = Function{Package: ua.PackageName, name: ua.ObjectName, LastDDL: ua.LastDDL, tranIDArgIdx: -1}
 			}
 
 			level = int8(ua.DataLevel)
@@ -276,6 +276,10 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []
 		//Log("args", lastArgs[-1].RecordOf)
 		for i, na := range lastArgs[-1].RecordOf {
 			fun.Args[i] = *na.Argument
+			if tranIDName != "" && strings.EqualFold(na.Argument.Name, tranIDName) {
+				fun.tranIDArgIdx = i
+				tranIDName = ""
+			}
 		}
 		//Log("args", fun.Args)
 		functions = append(functions, fun)

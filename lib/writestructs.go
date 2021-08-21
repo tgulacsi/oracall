@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,7 +23,17 @@ import (
 var ErrMissingTableOf = errors.New("missing TableOf info")
 var ErrInvalidArgument = errors.New("invalid argument")
 
-func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool) error {
+func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool, txPoolSize int) error {
+	var declTxPool, mkTxPool string
+	if txPoolSize > 0 {
+		for _, f := range functions {
+			if f.tranIDArgIdx >= 0 {
+				declTxPool = `txs *oracall.TxPool`
+				mkTxPool = `, txs: oracall.NewTxPool(context.Background(), ` + strconv.Itoa(txPoolSize) + `)`
+				break
+			}
+		}
+	}
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
@@ -99,6 +110,7 @@ type oracallServer struct {
 	db *sql.DB
 	Log func(...interface{}) error
 	DBLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error)
+	`+declTxPool+`
 }
 
 func NewServer(
@@ -106,7 +118,7 @@ func NewServer(
 	Log func(...interface{}) error, 
     dbLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error),
 ) *oracallServer {
-	return &oracallServer{db: db, Log: Log, DBLog: dbLog}
+	return &oracallServer{db: db, Log: Log, DBLog: dbLog`+mkTxPool+`}
 }
 
 `)

@@ -5,11 +5,111 @@
 package oracall
 
 import (
+	"context"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"strings"
+	"sync"
+	"time"
+	"unsafe"
+)
+
+// TxPool is for transaction handling.
+// Transaction handling over function calls
+// - TranBegin will create an *sql.Tx with Begin()
+// - TranClose(success bool) will COMMIT/ROLLBACK the transaction.
+type TxPool struct {
+	mu     sync.RWMutex
+	ctx    context.Context // for cancel all transactions
+	cancel context.CancelFunc
+	max    int
+	m      map[uint64]transaction
+}
+type transaction struct {
+	lastacc time.Time
+	*sql.Tx
+}
+
+func (p *TxPool) Close() error {
+	p.mu.Lock()
+	cancel, m := p.cancel, p.m
+	p.ctx, p.cancel, p.m = nil, nil, nil
+	p.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	for _, tx := range m {
+		tx.Rollback()
+	}
+	return nil
+}
+
+func NewTxPool(ctx context.Context, max int) *TxPool {
+	ctx, cancel := context.WithCancel(ctx)
+	return &TxPool{max: max, m: make(map[uint64]transaction), ctx: ctx, cancel: cancel}
+}
+
+// Get the transaction identified by tranID from the pool.
+func (p *TxPool) Get(tranID uint64) (*sql.Tx, error) {
+	p.mu.RLock()
+	tx := p.m[tranID]
+	p.mu.RUnlock()
+	if tx.Tx == nil {
+		return nil, fmt.Errorf("%d: %w", tranID, ErrTranNotExist)
+	}
+	return tx.Tx, nil
+}
+
+// Put back the transaction to the pool.
+func (p *TxPool) Put(tranID uint64, tx *sql.Tx) {
+	t := transaction{Tx: tx, lastacc: time.Now()}
+	p.mu.Lock()
+	p.m[tranID] = t
+	p.mu.Unlock()
+}
+func (p *TxPool) Begin(conn interface {
+	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+}) (*sql.Tx, uint64, error) {
+	tx, err := conn.BeginTx(p.ctx, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	tranID := uint64(uintptr(unsafe.Pointer(tx)))
+	p.Put(tranID, tx)
+	return tx, tranID, nil
+}
+func (p *TxPool) End(tranID uint64, commit bool) error {
+	p.mu.Lock()
+	tx := p.m[tranID]
+	delete(p.m, tranID)
+	p.mu.Unlock()
+	if tx.Tx == nil {
+		return fmt.Errorf("%d: %w", tranID, ErrTranNotExist)
+	}
+	if commit {
+		return tx.Commit()
+	}
+	return tx.Rollback()
+}
+func (p *TxPool) Evict(limit time.Duration) {
+	threshold := time.Now().Add(-limit)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for k, tx := range p.m {
+		if tx.lastacc.After(threshold) {
+			continue
+		}
+		delete(p.m, k)
+		tx.Rollback()
+	}
+}
+
+var (
+	ErrTranNotExist = errors.New("transaction does not exist")
 )
 
 type PlsType struct {

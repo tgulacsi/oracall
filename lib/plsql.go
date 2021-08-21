@@ -137,14 +137,29 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	j := i + strings.Index(call[i:], ")") + 1
 	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
-	const funName = "%s"
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	var tx *sql.Tx
-	if tx, err = s.db.BeginTx(ctx, nil); err != nil {
-		return 
+`)
+	if fun.tranIDArgIdx >= 0 {
+		fmt.Fprintf(callBuf, `
+	if s.txs != nil {
+		tranID := custom.AsUint64(input.%s)
+		if tx, err = s.txs.Get(tranID); err != nil {
+			return 
+		}
+		defer s.txs.Put(tranID, tx)
+	} else {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		if tx, err = s.db.BeginTx(ctx, nil); err != nil {
+			return 
+		}
+		defer tx.Rollback()
 	}
-	defer tx.Rollback()
+`,
+			CamelCase(fun.Args[fun.tranIDArgIdx].Name))
+	}
+	fmt.Fprintf(callBuf, `
+	const funName = "%s"
 	ctx = godror.ContextWithTraceTag(ctx, godror.TraceTag{Module: %q, Action: %q})
 if s.DBLog != nil {
 	var err error
@@ -291,6 +306,7 @@ func demap(plsql, callFun string) (string, string) {
 	}
 	b, fmtErr := format.Source(callBuf.Bytes())
 	if fmtErr != nil {
+		_, _ = os.Stdout.Write(callBuf.Bytes())
 		panic(fmtErr)
 	}
 	callBuf.Reset()

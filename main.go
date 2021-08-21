@@ -69,6 +69,8 @@ func Main(args []string) error {
 	flagExcept := flag.String("except", "", "except these functions")
 	flagReplace := flag.String("replace", "", "funcA=>funcB")
 	flag.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
+	flagTranIDName := flag.String("tran-id-name", "", "transaction ID argument's name")
+	flagTranSize := flag.Int("tran-size", 0, "max number of concurrent transactions")
 
 	flag.Parse()
 	if *flagPbOut == "" {
@@ -125,7 +127,7 @@ func Main(args []string) error {
 				return rPattern.MatchString(s)
 			})
 		}
-		functions, err = oracall.ParseCsvFile("", filter)
+		functions, err = oracall.ParseCsvFile("", filter, *flagTranIDName)
 	} else {
 		var cx *sql.DB
 		P, parseErr := godror.ParseConnString(*flagConnect)
@@ -143,7 +145,7 @@ func Main(args []string) error {
 			return fmt.Errorf("ping %s: %w", *flagConnect, err)
 		}
 
-		functions, annotations, err = parseDB(ctx, cx, pattern, *flagDump, filter)
+		functions, annotations, err = parseDB(ctx, cx, pattern, *flagDump, filter, *flagTranIDName)
 	}
 	if err != nil {
 		return fmt.Errorf("read %s: %w", flag.Arg(0), err)
@@ -205,6 +207,7 @@ func Main(args []string) error {
 		if err := oracall.SaveFunctions(
 			out, functions,
 			dbPkg, pbPath, false,
+			*flagTranSize,
 		); err != nil {
 			return fmt.Errorf("save functions: %w", err)
 		}
@@ -310,7 +313,7 @@ func (t dbType) String() string {
 	return fmt.Sprintf("%s{%s}[%d](%s/%s.%s.%s@%s)", t.Argument, t.Data, t.Level, t.PLS, t.Owner, t.Name, t.Subname, t.Link)
 }
 
-func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, annotations []oracall.Annotation, err error) {
+func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter func(string) bool, tranIDName string) (functions []oracall.Function, annotations []oracall.Annotation, err error) {
 	tbl, objTbl := "user_arguments", "user_objects"
 	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
 		tbl, objTbl = "all_arguments", "all_objects"
@@ -713,7 +716,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 	})
 	filteredArgs := make(chan []oracall.UserArgument, 16)
 	grp.Go(func() error { oracall.FilterAndGroup(filteredArgs, userArgs, filter); return nil })
-	functions = oracall.ParseArguments(filteredArgs, filter)
+	functions = oracall.ParseArguments(filteredArgs, filter, tranIDName)
 	if grpErr := grp.Wait(); grpErr != nil {
 		logger.Log("msg", "ParseArguments", "error", fmt.Sprintf("%+v", grpErr))
 	}

@@ -34,6 +34,7 @@ type Function struct {
 	Args                 []Argument
 	handle               []string
 	maxTableSize         int
+	tranIDArgIdx         int
 	ReplacementIsJSON    bool
 }
 
