@@ -21,7 +21,7 @@ import (
 	"github.com/oklog/ulid"
 
 	"github.com/go-stack/stack"
-	"github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	_ "google.golang.org/grpc/encoding/gzip"
@@ -185,16 +185,14 @@ func StatusError(err error) error {
 	return status.New(code, err.Error()).Err()
 }
 
-type ctxKey string
-
-const reqIDCtxKey = ctxKey("reqID")
-const loggerCtxKey = ctxKey("logger")
+type reqIDCtxKey struct{}
+type loggerCtxKey struct{}
 
 func ContextWithLogger(ctx context.Context, logger log.Logger) context.Context {
-	return context.WithValue(ctx, loggerCtxKey, logger)
+	return context.WithValue(ctx, loggerCtxKey{}, logger)
 }
 func ContextGetLogger(ctx context.Context) log.Logger {
-	if lgr, ok := ctx.Value(loggerCtxKey).(log.Logger); ok {
+	if lgr, ok := ctx.Value(loggerCtxKey{}).(log.Logger); ok {
 		return lgr
 	}
 	return nil
@@ -203,10 +201,10 @@ func ContextWithReqID(ctx context.Context, reqID string) context.Context {
 	if reqID == "" {
 		reqID = NewULID()
 	}
-	return context.WithValue(ctx, reqIDCtxKey, reqID)
+	return context.WithValue(ctx, reqIDCtxKey{}, reqID)
 }
 func ContextGetReqID(ctx context.Context) string {
-	if reqID, ok := ctx.Value(reqIDCtxKey).(string); ok {
+	if reqID, ok := ctx.Value(reqIDCtxKey{}).(string); ok {
 		return reqID
 	}
 	return NewULID()
