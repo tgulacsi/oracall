@@ -80,20 +80,20 @@ func (p *TxPool) Put(tranID uint64, tx *sql.Tx) {
 }
 func (p *TxPool) Begin(conn interface {
 	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
-}) (*sql.Tx, uint64, error) {
+}) (uint64, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.count >= p.max {
-		return nil, 0, fmt.Errorf("%w: %d", ErrTranTooMany, p.count)
+		return 0, fmt.Errorf("%w: %d", ErrTranTooMany, p.count)
 	}
 	tx, err := conn.BeginTx(p.ctx, nil)
 	if err != nil {
-		return nil, 0, err
+		return 0, err
 	}
 	tranID := uint64(uintptr(unsafe.Pointer(tx)))
 	t := transaction{Tx: tx, lastacc: time.Now()}
 	p.m[tranID] = t
-	return tx, tranID, nil
+	return tranID, nil
 }
 func (p *TxPool) End(tranID uint64, commit bool) error {
 	p.mu.Lock()

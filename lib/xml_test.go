@@ -50,13 +50,13 @@ func TestQuery078(t *testing.T) {
 	}
 
 	buf.Reset()
-	if err = SaveProtobuf(&buf, functions, "spl3", "unosoft.hu/ws/aeg/pb/spl3"); err != nil {
+	if err = SaveProtobuf(&buf, functions, "spl3", "unosoft.hu/ws/aeg/pb/spl3", ""); err != nil {
 		t.Fatal(err)
 	}
 	t.Log(buf.String())
 
 	buf.Reset()
-	err = SaveFunctions(&buf, functions[:1], "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true, 0)
+	err = SaveFunctions(&buf, functions[:1], "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true, "")
 	t.Log(buf.String())
 	if err != nil {
 		t.Error(err)

@@ -69,8 +69,7 @@ func Main(args []string) error {
 	flagExcept := flag.String("except", "", "except these functions")
 	flagReplace := flag.String("replace", "", "funcA=>funcB")
 	flag.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
-	flagTranIDName := flag.String("tran-id-name", "", "transaction ID argument's name")
-	flagTranSize := flag.Int("tran-size", 0, "max number of concurrent transactions")
+	flagTranIDName := flag.String("tran-id-name", "p_tran_id", "transaction ID argument's name")
 
 	flag.Parse()
 	if *flagPbOut == "" {
@@ -207,7 +206,7 @@ func Main(args []string) error {
 		if err := oracall.SaveFunctions(
 			out, functions,
 			dbPkg, pbPath, false,
-			*flagTranSize,
+			*flagTranIDName,
 		); err != nil {
 			return fmt.Errorf("save functions: %w", err)
 		}
@@ -241,7 +240,7 @@ func Main(args []string) error {
 		if err != nil {
 			return fmt.Errorf("create proto: %w", err)
 		}
-		err = oracall.SaveProtobuf(fh, functions, pbPkg, pbPath)
+		err = oracall.SaveProtobuf(fh, functions, pbPkg, pbPath, *flagTranIDName)
 		if closeErr := fh.Close(); closeErr != nil && err == nil {
 			err = closeErr
 		}

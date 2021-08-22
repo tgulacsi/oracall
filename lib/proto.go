@@ -21,13 +21,13 @@ var Gogo bool
 var NumberAsString bool
 
 //go:generate sh ./download-protoc.sh
-// go:generate go get -u github.com/gogo/protobuf/protoc-gen-gogofast
-//go:generate go get -u google.golang.org/protobuf/protoc-gen-go
-//go:generate go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
+//go:generate go install github.com/gogo/protobuf/protoc-gen-gogofast@latest
+//go:generate go install google.golang.org/protobuf/protoc-gen-go@latest
+//go:generate go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 // build: protoc --go_out=. --go-grpc_out=. my.proto
 
-func SaveProtobuf(dst io.Writer, functions []Function, pkg, path string) error {
+func SaveProtobuf(dst io.Writer, functions []Function, pkg, path, tranIDName string) error {
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
@@ -42,12 +42,16 @@ option go_package = "%s";`, pkg, path)
 	if Gogo {
 		io.WriteString(w, "\nimport \"github.com/gogo/protobuf/gogoproto/gogo.proto\";\n")
 	}
-	seen := make(map[string]struct{}, 16)
 
+	seen := make(map[string]struct{}, 16)
 	services := make([]string, 0, len(functions))
+	var hasTransactions bool
 
 FunLoop:
 	for _, fun := range functions {
+		if !hasTransactions && tranIDName != "" && fun.tranIDArgIdx >= 0 {
+			hasTransactions = true
+		}
 		//b, _ := json.Marshal(struct{Name, Documentation string}{Name:fun.Name(), Documentation:fun.Documentation})
 		//fmt.Println(string(b))
 		fName := fun.name
@@ -83,9 +87,29 @@ FunLoop:
 		)
 	}
 
+	if hasTransactions && tranIDName != "" {
+		fmt.Fprintf(w, `
+message TranBegin_Input {}
+message TranBegin_Output {
+	uint64 %[1]s = 1;
+}
+message TranEnd_Input {
+	uint64 %[1]s = 1;
+	bool commit = 2;
+}
+message TranEnd_Output {}
+`, strings.ToLower(tranIDName))
+	}
+
 	fmt.Fprintf(w, "\nservice %s {\n", CamelCase(pkg))
 	for _, s := range services {
 		fmt.Fprintf(w, "\t%s\n", s)
+	}
+	if hasTransactions && tranIDName != "" {
+		fmt.Fprintf(w, `
+rpc TranBegin (TranBegin_Input) returns (TranBegin_Output) {}
+rpc TranEnd (TranEnd_Input) returns (TranEnd_Output) {}
+`)
 	}
 	w.Write([]byte("}"))
 

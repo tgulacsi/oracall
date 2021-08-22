@@ -22,12 +22,15 @@ import (
 var ErrMissingTableOf = errors.New("missing TableOf info")
 var ErrInvalidArgument = errors.New("invalid argument")
 
-func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool, txPoolSize int) error {
+func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool, tranIDName string) error {
 	var declTxPool, mkTxPool, getTxPool, commentTxPool string
-	if txPoolSize > 0 {
+	var hasTransactions bool
+	if tranIDName != "" {
 		for _, f := range functions {
 			if f.tranIDArgIdx >= 0 {
 				const intf = `interface { 
+	Begin(interface{ BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)}) (uint64, error)
+	End(uint64, bool) error
 	Get(tranID uint64) (*sql.Tx, error) 
 	Put(tranID uint64, tx *sql.Tx) 
 }`
@@ -36,8 +39,12 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 				getTxPool = `txs ` + intf + `,`
 				commentTxPool = `
 // txs handles transactions over function calls. github.com/tgulacsi/oracall/lib.NewTxPool is a compatible implementation.`
+				hasTransactions = true
 				break
 			}
+		}
+		if !hasTransactions {
+			tranIDName = ""
 		}
 	}
 	var err error
@@ -131,6 +138,20 @@ func NewServer(
 }
 
 `)
+
+		if tranIDName != "" {
+			fmt.Fprintf(w, `
+func (s *oracallServer) TranBegin(ctx context.Context, input *pb.TranBegin_Input) (output *pb.TranBegin_Output, err error) {
+	output = new(pb.TranBegin_Output)
+	output.%[1]s, err = s.txs.Begin(s.db)
+	return
+}
+func (s *oracallServer) TranEnd(ctx context.Context, input *pb.TranEnd_Input) (output *pb.TranEnd_Output, err error) {
+	err = s.txs.End(input.%[1]s, input.Commit)
+	return
+}
+`, CamelCase(tranIDName))
+		}
 	}
 	types := make(map[string]string, 16)
 	inits := make([]string, 0, len(functions))
