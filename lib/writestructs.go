@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,12 +23,19 @@ var ErrMissingTableOf = errors.New("missing TableOf info")
 var ErrInvalidArgument = errors.New("invalid argument")
 
 func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool, txPoolSize int) error {
-	var declTxPool, mkTxPool string
+	var declTxPool, mkTxPool, getTxPool, commentTxPool string
 	if txPoolSize > 0 {
 		for _, f := range functions {
 			if f.tranIDArgIdx >= 0 {
-				declTxPool = `txs *oracall.TxPool`
-				mkTxPool = `, txs: oracall.NewTxPool(context.Background(), ` + strconv.Itoa(txPoolSize) + `)`
+				const intf = `interface { 
+	Get(tranID uint64) (*sql.Tx, error) 
+	Put(tranID uint64, tx *sql.Tx) 
+}`
+				declTxPool = `txs ` + intf
+				mkTxPool = `, txs: txs`
+				getTxPool = `txs ` + intf + `,`
+				commentTxPool = `
+// txs handles transactions over function calls. github.com/tgulacsi/oracall/lib.NewTxPool is a compatible implementation.`
 				break
 			}
 		}
@@ -113,10 +119,13 @@ type oracallServer struct {
 	`+declTxPool+`
 }
 
+// NewServer returns a new *oracallServer, using db for database connections,
+// Log for logging, and dbLog for log into database (can be nil).`+commentTxPool+`
 func NewServer(
 	db *sql.DB, 
 	Log func(...interface{}) error, 
     dbLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error),
+	`+getTxPool+`
 ) *oracallServer {
 	return &oracallServer{db: db, Log: Log, DBLog: dbLog`+mkTxPool+`}
 }

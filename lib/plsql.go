@@ -142,20 +142,28 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 `)
 	if fun.tranIDArgIdx >= 0 {
 		fmt.Fprintf(callBuf, `
-	if s.txs != nil {
-		tranID := custom.AsUint64(input.%s)
-		if tx, err = s.txs.Get(tranID); err != nil {
-			return 
-		}
-		defer s.txs.Put(tranID, tx)
-		txCommit = func() error { return nil }
-	} else {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
+	var shouldCommit bool
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if s.txs == nil {
 		if tx, err = s.db.BeginTx(ctx, nil); err != nil {
 			return 
 		}
 		defer tx.Rollback()
+	} else {
+		tranID := custom.AsUint64(input.%s)
+		if tx, err = s.txs.Get(tranID); err != nil {
+			return 
+		}
+		defer func() { if tx != nil && tranID != 0 { s.txs.Put(tranID, tx) } }()
+		txCommit = func() error { 
+		  if !shouldCommit || tx == nil {
+		      return nil
+		  } 
+		  err := tx.Commit()
+		  tx, tranID = nil, 0
+		  return err
+		}
 	}
 `,
 			CamelCase(fun.Args[fun.tranIDArgIdx].Name))
