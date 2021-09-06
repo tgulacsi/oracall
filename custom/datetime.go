@@ -33,7 +33,7 @@ var (
 )
 
 type DateTime struct {
-	Time time.Time
+	time.Time
 }
 
 func getWriter(enc *xml.Encoder) *bufio.Writer {
