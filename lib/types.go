@@ -118,7 +118,7 @@ func (p *TxPool) Evict(limit time.Duration) {
 			continue
 		}
 		delete(p.m, k)
-		tx.Rollback()
+		_ = tx.Rollback()
 	}
 }
 
