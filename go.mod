@@ -8,7 +8,7 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/go-kit/kit v0.10.0
 	github.com/go-stack/stack v1.8.0
-	github.com/godror/godror v0.25.6
+	github.com/godror/godror v0.26.0
 	github.com/google/go-cmp v0.5.5
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.0
 	github.com/kylelemons/godebug v1.1.0
