@@ -175,12 +175,16 @@ if DebugLevel > 0 {
 			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
 		}
 		if err != nil {
-			err = oracall.NewQueryError(qry, fmt.Errorf("%v: %w", params, err))
+			qe := oracall.NewQueryError(qry, fmt.Errorf("%v: %w", params, err))
+			err = qe
 			if s.DBLog != nil {
 				var logErr error
 				if _, logErr = s.DBLog(ctx, tx, funName, err); logErr != nil {
 					Log("msg", "dbLog", "fun", funName, "logErr", logErr, "error", err)
 				}
+			}
+			if qe.Code() == 6502 {  // Numeric or Value Error
+				err = fmt.Errorf("%+v: %w", qe, oracall.ErrInvalidArgument)
 			}
 			return
 		}
