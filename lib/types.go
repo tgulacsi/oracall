@@ -6,6 +6,7 @@ package oracall
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
