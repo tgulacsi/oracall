@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -212,6 +213,82 @@ func goNumType(precision, scale uint8) string {
 		return "int32"
 	}
 	return "int64"
+}
+
+// QueryError holds a query with a (hopefully parsed) error with line info.
+type QueryError struct {
+	query, line  string
+	err          error
+	code, lineNo int
+}
+
+func (qe *QueryError) Error() string {
+	if qe == nil {
+		return ""
+	}
+	if qe.lineNo != 0 {
+		return fmt.Sprintf("ORA-%05d: %s: %+v\nline[%d]: %s", qe.code, qe.query, qe.err, qe.lineNo, qe.line)
+	}
+	return fmt.Sprintf("ORA-%05d: %s: %+v", qe.code, qe.query, qe.err)
+}
+func (qe *QueryError) Unwrap() error {
+	if qe == nil {
+		return nil
+	}
+	return qe.err
+}
+func (qe *QueryError) Code() int {
+	if qe == nil {
+		return 0
+	}
+	return qe.code
+}
+func (qe *QueryError) LineNo() int {
+	if qe == nil {
+		return 0
+	}
+	return qe.lineNo
+}
+func (qe *QueryError) Line() string {
+	if qe == nil {
+		return ""
+	}
+	return qe.line
+}
+
+// NewQueryError wraps the error, parsing the error line number if possible.
+func NewQueryError(qry string, err error) *QueryError {
+	if err == nil {
+		return nil
+	}
+	qe := QueryError{query: qry, err: err}
+	var ec interface {
+		Code() int
+		error
+	}
+	var errS string
+	if errors.As(err, &ec) {
+		qe.code = ec.Code()
+		errS = ec.Error()
+	} else {
+		errS = err.Error()
+	}
+	var lines []string
+	parts := strings.Split(errS, ".")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if j := strings.LastIndexByte(parts[i], ' '); j >= 0 {
+			if line, err := strconv.Atoi(parts[i][j+1:]); err == nil {
+				if lines == nil {
+					lines = strings.Split(qry, "\n")
+				}
+				if line < len(lines) {
+					qe.lineNo, qe.line = line, lines[line-1]
+					break
+				}
+			}
+		}
+	}
+	return &qe
 }
 
 // vim: set fileencoding=utf-8 noet:
