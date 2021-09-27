@@ -200,7 +200,7 @@ if DebugLevel > 0 {
 			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
 		}
 		if err != nil {
-			err = fmt.Errorf("%q %+v: %w", qry, params, err)
+			err = oracall.NewQueryError(qry, fmt.Errorf("%v: %w", params, err))
 			if s.DBLog != nil {
 				var logErr error
 				if _, logErr = s.DBLog(ctx, tx, funName, err); logErr != nil {
