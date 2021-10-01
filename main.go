@@ -137,7 +137,7 @@ func Main(args []string) error {
 		defer cx.Close()
 		cx.SetMaxIdleConns(0)
 		if *flagVerbose {
-			godror.Log = log.With(logger, "lib", "godror").Log
+			godror.SetLogger(log.With(logger, "lib", "godror"))
 		}
 		if err = cx.Ping(); err != nil {
 			return fmt.Errorf("ping %s: %w", *flagConnect, err)

@@ -161,7 +161,8 @@ if DebugLevel > 0 {
 		fun.Name(),
 		fun.Package, fun.name,
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
-		fun.getPlsqlConstName())
+		fun.getPlsqlConstName(),
+	)
 	callBuf.WriteString(`
 	stmt, stmtErr := tx.PrepareContext(ctx, qry)
 	if stmtErr != nil {
@@ -169,7 +170,12 @@ if DebugLevel > 0 {
 		return
 	}
 	defer stmt.Close()
-	if _, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...); err != nil {
+	stmtP := fmt.Sprintf("%p", stmt)
+	dl, _ := ctx.Deadline()
+	Log("msg", "calling", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
+	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
+	Log("msg", "finished", funName, "stmt", stmtP, "error", err)
+	if err != nil {
 		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
 			// "existing state of packages has been discarded"
 			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)

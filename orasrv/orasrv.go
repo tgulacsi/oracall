@@ -56,8 +56,8 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 			_, verbose = erroredMethods[fullMethod]
 			erroredMethodsMu.RUnlock()
 			wasThere = verbose
-		}
-		if verbose {
+		} else {
+			godror.SetLogger(log.With(logger, "lib", "godror"))
 			ctx = godror.ContextWithLog(ctx, log.With(lgr, "lib", "godror").Log)
 		}
 		commit := func(err error) {
