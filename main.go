@@ -89,7 +89,7 @@ func Main(args []string) error {
 	}
 	oracall.Gogo = *flagGenerator != "go"
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	var functions []oracall.Function
@@ -339,7 +339,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
      ) A
       ORDER BY 1, 2, 3`
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	objTimeQry := `SELECT last_ddl_time FROM ` + objTbl + ` WHERE object_name = :1 AND object_type <> 'PACKAGE BODY'`
@@ -651,7 +651,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 						bb = rAnnotation.ReplaceAll(bb, nil)
 					}
 					replMu.Unlock()
-					subCtx, subCancel := context.WithTimeout(ctx, 1*time.Second)
+					subCtx, subCancel := context.WithTimeout(ctx, 1*time.Minute)
 					funDocs, docsErr := parseDocs(subCtx, string(bb))
 					subCancel()
 					Log("msg", "parseDocs", "docs", len(funDocs), "error", docsErr)

@@ -281,7 +281,7 @@ func test%s(t *testing.T, jsonText []byte) {
 	if err := json.Unmarshal(jsonText, &input); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	output, err := srv.%s(ctx, &input)
 	t.Log(output)
