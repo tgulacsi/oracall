@@ -27,8 +27,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/go-kit/kit/log"
-	"github.com/tgulacsi/go/loghlp/kitloghlp"
+	"github.com/UNO-SOFT/ulog"
+	"github.com/go-kit/log"
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
@@ -40,7 +40,7 @@ import (
 // Should install protobuf-compiler to use it, like
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
-var logger = kitloghlp.New(os.Stderr)
+var logger = ulog.New()
 
 var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
 
