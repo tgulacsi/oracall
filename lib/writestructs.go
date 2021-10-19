@@ -41,7 +41,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 		}
 		var implement string
 		if !Gogo {
-			implement = "pb.Unimplemented"+CamelCase(pkg)+"Server"
+			implement = "pb.Unimplemented" + CamelCase(pkg) + "Server"
 		}
 		io.WriteString(w,
 			// https://github.com/golang/go/issues/13560#issuecomment-288457920
@@ -67,6 +67,7 @@ import (
 
 	"github.com/tgulacsi/oracall/custom"	// custom.AsDate/AsTimestamp
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
+	"github.com/godror/godror"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 

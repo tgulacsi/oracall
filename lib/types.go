@@ -78,13 +78,12 @@ func (arg PlsType) GetOra(src, varName string) string {
 				return fmt.Sprintf("%s.Format(time.RFC3339)", varName)
 			}
 			return fmt.Sprintf("custom.AsDate(%s)", src)
-		} else {
-			if varName != "" {
-				return fmt.Sprintf("%s.Format(time.RFC3339)", varName)
-			}
-			return fmt.Sprintf("custom.AsTimestamp(%s)", src)
+		}
+		if varName != "" {
+			return fmt.Sprintf("%s.Format(time.RFC3339)", varName)
 		}
 		return fmt.Sprintf("custom.AsTimestamp(%s)", src)
+
 	case "NUMBER":
 		if varName != "" {
 			//return fmt.Sprintf("string(%s.(godror.Number))", varName)
@@ -121,22 +120,6 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 						dst, strings.TrimPrefix(src, "&"), inTrue,
 					),
 					""
-			}
-			return fmt.Sprintf(`%s = custom.AsDate(%s).Time // toOra D`, dst, np), ""
-		} else {
-			if dir.IsOutput() {
-				if !strings.HasPrefix(dst, "params[") {
-					return fmt.Sprintf(`%s = %s.AsTime()`, dst, np), ""
-				}
-				return fmt.Sprintf(`if %s == nil { %s = new(timestamppb.Timestamp) }
-					%s := custom.DateTime{Time: %s.AsTime()}
-
-					%s = sql.Out{Dest:&%s.Time%s}`,
-						np, np,
-						dstVar, strings.TrimPrefix(src, "&"),
-						dst, dstVar, inTrue,
-					),
-					dstVar
 			}
 			return fmt.Sprintf(`%s = custom.AsDate(%s).Time // toOra D`, dst, np), ""
 		}

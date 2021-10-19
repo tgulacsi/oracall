@@ -246,36 +246,38 @@ func Main(args []string) error {
 			return fmt.Errorf("SaveProtobuf: %w", err)
 		}
 
-		args := append(make([]string, 0, 5),
-			"--proto_path="+*flagBaseDir+":.")
-		if oracall.Gogo {
-			args = append(args,
-				"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
-		} else {
-			args = append(args, "--go-grpc_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types:"+*flagBaseDir)
-			if *flagGenerator == "go-vtproto" {
+		if true {
+			args := append(make([]string, 0, 5),
+				"--proto_path="+*flagBaseDir+":.")
+			if oracall.Gogo {
 				args = append(args,
-					"--"+*flagGenerator+"_out=:"+*flagBaseDir)
+					"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
+			} else {
+				args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
+				if *flagGenerator == "go-vtproto" {
+					args = append(args,
+						"--"+*flagGenerator+"_out=:"+*flagBaseDir)
+				}
 			}
-		}
-		cmd := exec.Command("protoc", append(args, pbFn)...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		Log("msg", "calling", "protoc", cmd.Args)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%q: %w", cmd.Args, err)
-		}
-		if *flagGenerator == "go" {
-			fn := strings.TrimSuffix(pbFn, ".proto") + ".pb.go"
-			cmd = exec.CommandContext(ctx, "sed", "-i", "-e",
-				`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,custom "github.com/tgulacsi/oracall/custom",; /timestamp\.Timestamp/ s/timestamp\.Timestamp/custom.Timestamp/g`,
-				fn,
-			)
-			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-			err = cmd.Run()
-			Log("msg", "replace timestamppb", "file", fn, "args", cmd.Args, "error", err)
-			if err != nil {
+			cmd := exec.Command("protoc", append(args, pbFn)...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			Log("msg", "calling", "protoc", cmd.Args)
+			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("%q: %w", cmd.Args, err)
+			}
+			if *flagGenerator == "go" {
+				fn := strings.TrimSuffix(pbFn, ".proto") + ".pb.go"
+				cmd = exec.CommandContext(ctx, "sed", "-i", "-e",
+					`/timestamp\(\|pb\) "\(github.com\/protobuf\/ptypes\/timestamp\|google.golang.org\/protobuf\/types\/known\/timestamppb\)"/ s,timestamp\(\|pb\).*$,timestamp\1 "github.com/tgulacsi/oracall/custom",`,
+					fn,
+				)
+				cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+				err = cmd.Run()
+				Log("msg", "replace timestamppb", "file", fn, "args", cmd.Args, "error", err)
+				if err != nil {
+					return fmt.Errorf("%q: %w", cmd.Args, err)
+				}
 			}
 		}
 		return nil
