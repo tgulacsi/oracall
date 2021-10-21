@@ -51,7 +51,10 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		}
 		return fmt.Sprintf("%s = godror.Lob{IsClob:true, Reader: strings.NewReader(%s)}", dst, src)
 	case "DATE", "TIMESTAMP":
-		return fmt.Sprintf("%s = custom.DateTime{Time:%s}", dst, src)
+		if Gogo {
+			return fmt.Sprintf("%s = custom.DateTime{Time:%s}", dst, src)
+		}
+		return fmt.Sprintf("%s = custom.NewTimestamp(%s)", dst, src)
 	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		return fmt.Sprintf("%s = int32(%s)", dst, src)
 	case "NUMBER":
@@ -127,8 +130,8 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 			if !strings.HasPrefix(dst, "params[") {
 				return fmt.Sprintf(`%s = %s.AsTime()`, dst, np), ""
 			}
-			return fmt.Sprintf(`if %s == nil { %s = new(custom.Timestamp) }
-				%s = sql.Out{Dest:&%s.AsTime()%s}`,
+			return fmt.Sprintf(`if %s == nil { %s = (*timestamppb.Timestamp)(new(custom.Timestamp)) }
+				%s = sql.Out{Dest:&%s%s}`,
 					np, np,
 					dst, strings.TrimPrefix(src, "&"), inTrue,
 				),
