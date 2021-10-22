@@ -21,7 +21,7 @@ require (
 )
 
 require (
-	github.com/UNO-SOFT/knownpb v0.0.0-20211022140325-fa21456cfdbc // indirect
+	github.com/UNO-SOFT/knownpb v0.0.0-20211022142207-ff5074a467cd // indirect
 	github.com/UNO-SOFT/ulog v1.3.1 // indirect
 	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect

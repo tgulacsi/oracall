@@ -346,21 +346,21 @@ func AsTimestamp(v interface{}) *timestamppb.Timestamp {
 	case *timestamppb.Timestamp:
 		return d
 	case time.Time:
-		return timestamppb.NewTimestamp(d)
+		return timestamppb.New(d)
 	case *time.Time:
 		if !d.IsZero() {
-			return timestamppb.NewTimestamp(*d)
+			return timestamppb.New(*d)
 		}
 	case DateTime:
-		return timestamppb.NewTimestamp(d.Time)
+		return timestamppb.New(d.Time)
 	case *DateTime:
 		if !d.IsZero() {
-			return timestamppb.NewTimestamp(d.Time)
+			return timestamppb.New(d.Time)
 		}
 	case string:
 		var t time.Time
 		_ = ParseTime(&t, d)
-		return timestamppb.NewTimestamp(t)
+		return timestamppb.New(t)
 	default:
 		log.Printf("WARN: unknown Date type %T", v)
 	}
