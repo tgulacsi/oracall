@@ -259,10 +259,19 @@ func Main(args []string) error {
 						"--"+*flagGenerator+"_out=:"+*flagBaseDir)
 				}
 			}
-			cmd := exec.Command("protoc", append(args, pbFn)...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
+			cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 			Log("msg", "calling", "protoc", cmd.Args)
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("%q: %w", cmd.Args, err)
+			}
+			cmd = exec.CommandContext(ctx,
+				"sed", "-i", "-e",
+				(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/UNO-SOFT/knownpb/timestamppb",}; ` +
+					`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/UNO-SOFT/knownpb/timestamppb",}; `),
+				strings.TrimSuffix(pbFn, ".proto")+".pb.go",
+			)
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("%q: %w", cmd.Args, err)
 			}

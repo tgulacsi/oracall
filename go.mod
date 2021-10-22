@@ -8,7 +8,7 @@ require (
 	github.com/go-kit/kit v0.12.0
 	github.com/go-stack/stack v1.8.0
 	github.com/godror/godror v0.28.0
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.2
 	github.com/kylelemons/godebug v1.1.0
 	github.com/oklog/ulid v1.3.1
@@ -21,6 +21,7 @@ require (
 )
 
 require (
+	github.com/UNO-SOFT/knownpb v0.0.0-20211022140325-fa21456cfdbc // indirect
 	github.com/UNO-SOFT/ulog v1.3.1 // indirect
 	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect

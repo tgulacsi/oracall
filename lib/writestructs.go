@@ -66,10 +66,9 @@ import (
 	"unsafe"
 
 	"github.com/tgulacsi/oracall/custom"	// custom.AsDate/AsTimestamp
+	"github.com/UNO-SOFT/knownpb/timestamppb"
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 	"github.com/godror/godror"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	`+pbImport+`
 )

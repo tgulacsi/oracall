@@ -54,7 +54,7 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 		if Gogo {
 			return fmt.Sprintf("%s = custom.DateTime{Time:%s}", dst, src)
 		}
-		return fmt.Sprintf("%s = custom.NewTimestamp(%s)", dst, src)
+		return fmt.Sprintf("%s = timestamppb.New(%s)", dst, src)
 	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		return fmt.Sprintf("%s = int32(%s)", dst, src)
 	case "NUMBER":
@@ -85,7 +85,7 @@ func (arg PlsType) GetOra(src, varName string) string {
 		if varName != "" {
 			return fmt.Sprintf("%s.Format(time.RFC3339)", varName)
 		}
-		return fmt.Sprintf("(*timestamppb.Timestamp)(custom.AsTimestamp(%s))", src)
+		return fmt.Sprintf("custom.AsTimestamp(%s)", src)
 
 	case "NUMBER":
 		if varName != "" {
@@ -130,7 +130,7 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 			if !strings.HasPrefix(dst, "params[") {
 				return fmt.Sprintf(`%s = %s.AsTime()`, dst, np), ""
 			}
-			return fmt.Sprintf(`if %s == nil { %s = (*timestamppb.Timestamp)(new(custom.Timestamp)) }
+			return fmt.Sprintf(`if %s == nil { %s = &timestamppb.Timestamp{} }
 				%s = sql.Out{Dest:&%s%s}`,
 					np, np,
 					dst, strings.TrimPrefix(src, "&"), inTrue,
