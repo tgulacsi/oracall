@@ -176,6 +176,9 @@ if DebugLevel > 0 {
 	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
 	Log("msg", "finished", funName, "stmt", stmtP, "error", err)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
 			// "existing state of packages has been discarded"
 			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
