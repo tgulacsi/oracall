@@ -27,8 +27,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/go-kit/kit/log"
-	"github.com/tgulacsi/go/loghlp/kitloghlp"
+	"github.com/UNO-SOFT/ulog"
+	"github.com/go-kit/log"
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
@@ -40,7 +40,7 @@ import (
 // Should install protobuf-compiler to use it, like
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
-var logger = kitloghlp.New(os.Stderr)
+var logger = ulog.New()
 
 var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
 
@@ -62,7 +62,7 @@ func Main(args []string) error {
 	flagBaseDir := flag.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
-	flagGenerator := flag.String("protoc-gen", "gogofast", "use protoc-gen-<generator>")
+	flagGenerator := flag.String("protoc-gen", "go", "use protoc-gen-<generator>")
 	flag.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
 	flag.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
 	flagVerbose := flag.Bool("v", false, "verbose logging")
@@ -87,7 +87,7 @@ func Main(args []string) error {
 	if pattern == "" {
 		pattern = "%"
 	}
-	oracall.Gogo = *flagGenerator != "go"
+	oracall.Gogo = strings.HasPrefix(*flagGenerator, "gogo")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -246,36 +246,33 @@ func Main(args []string) error {
 			return fmt.Errorf("SaveProtobuf: %w", err)
 		}
 
-		args := make([]string, 0, 4)
-		if *flagGenerator == "go" {
-			args = append(args,
-				"--"+*flagGenerator+"_out=:"+*flagBaseDir,
-				"--go-grpc_out=:"+*flagBaseDir)
-		} else {
-			args = append(args,
-				"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
-		}
-		cmd := exec.CommandContext(ctx,
-			"protoc",
-			append(args, "--proto_path="+*flagBaseDir+":.",
-				pbFn)...,
-		)
-		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-		err = cmd.Run()
-		Log("msg", "protoc", "args", cmd.Args, "error", err)
-		if err != nil {
-			return fmt.Errorf("%q: %w", cmd.Args, err)
-		}
-		if *flagGenerator == "go" {
-			fn := strings.TrimSuffix(pbFn, ".proto") + ".pb.go"
-			cmd = exec.CommandContext(ctx, "sed", "-i", "-e",
-				`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,custom "github.com/tgulacsi/oracall/custom",; /timestamp\.Timestamp/ s/timestamp\.Timestamp/custom.Timestamp/g`,
-				fn,
+		if true {
+			args := append(make([]string, 0, 5),
+				"--proto_path="+*flagBaseDir+":.")
+			if oracall.Gogo {
+				args = append(args,
+					"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
+			} else {
+				args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
+				if *flagGenerator == "go-vtproto" {
+					args = append(args,
+						"--"+*flagGenerator+"_out=:"+*flagBaseDir)
+				}
+			}
+			cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+			Log("msg", "calling", "protoc", cmd.Args)
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("%q: %w", cmd.Args, err)
+			}
+			cmd = exec.CommandContext(ctx,
+				"sed", "-i", "-e",
+				(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/UNO-SOFT/knownpb/timestamppb",}; ` +
+					`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/UNO-SOFT/knownpb/timestamppb",}; `),
+				strings.TrimSuffix(pbFn, ".proto")+".pb.go",
 			)
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-			err = cmd.Run()
-			Log("msg", "replace timestamppb", "file", fn, "args", cmd.Args, "error", err)
-			if err != nil {
+			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("%q: %w", cmd.Args, err)
 			}
 		}

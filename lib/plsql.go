@@ -740,7 +740,7 @@ func (arg Argument) getConvSimple(
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s  // gcs3`, name, name))
 		}
 		if got == "time.Time" {
-			convOut = append(convOut, fmt.Sprintf("if output.%s != nil && output.%s.IsZero() { output.%s = nil }", name, name, name))
+			convOut = append(convOut, fmt.Sprintf("if output.%s != nil && output.%s.IsValid() { output.%s = nil }", name, name, name))
 		}
 		src := "output." + name
 		in, varName := arg.ToOra(paramName, "&"+src, arg.Direction)
@@ -996,7 +996,7 @@ func (arg Argument) getConvRec(
 		convIn = append(convIn, too+" // gcr2 var="+varName)
 		if varName != "" {
 			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest:&%s} // gcr2out", paramName, varName))
-			//convOut = append(convOut, arg.FromOra("output."+name, varName, varName)+" // gcr2out")
+			convOut = append(convOut, arg.FromOra("output."+name, varName, varName)+" // gcr2out")
 		}
 	} else if arg.IsInput() {
 		parts := strings.Split(name, ".")
@@ -1063,6 +1063,11 @@ func (arg Argument) getConvTableRec(
 		if err != nil {
 			panic(err)
 		}
+		convert := arg.FromOra(fmt.Sprintf("output.%s[i].%s", name[0], name[1]), "v", "v") 
+		if !Gogo && oraTyp == "time.Time" {
+			convert = fmt.Sprintf("output.%s[i].%s = timestamppb.New(v)", name[0], name[1])
+		}
+
 		convOut = append(convOut,
 			fmt.Sprintf(`if m := len(%s)-cap(output.%s); m > 0 { // gctr3
 			output.%s = append(output.%s, make([]%s, m)...)
@@ -1080,11 +1085,8 @@ func (arg Argument) getConvTableRec(
 				absName,
 				name[0],
 				name[0], withPb(CamelCase(got[1:])),
-				arg.FromOra(
-					fmt.Sprintf("output.%s[i].%s", name[0], name[1]),
-					"v",
-					"v",
-				)))
+				convert,
+			))
 	}
 	return convIn, convOut
 }

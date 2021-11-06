@@ -18,6 +18,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/UNO-SOFT/knownpb/timestamppb"
 	"github.com/godror/godror"
 )
 
@@ -337,34 +338,34 @@ func AsUint64(v interface{}) uint64 {
 	return 0
 }
 
-func AsTimestamp(v interface{}) *Timestamp {
+func AsTimestamp(v interface{}) *timestamppb.Timestamp {
 	if v == nil {
 		return nil
 	}
 	switch d := v.(type) {
-	case *Timestamp:
+	case *timestamppb.Timestamp:
 		return d
 	case time.Time:
-		return NewTimestamp(d)
+		return timestamppb.New(d)
 	case *time.Time:
 		if !d.IsZero() {
-			return NewTimestamp(*d)
+			return timestamppb.New(*d)
 		}
 	case DateTime:
-		return NewTimestamp(d.Time)
+		return timestamppb.New(d.Time)
 	case *DateTime:
 		if !d.IsZero() {
-			return NewTimestamp(d.Time)
+			return timestamppb.New(d.Time)
 		}
 	case string:
 		var t time.Time
 		_ = ParseTime(&t, d)
-		return NewTimestamp(t)
+		return timestamppb.New(t)
 	default:
 		log.Printf("WARN: unknown Date type %T", v)
 	}
 
-	return &Timestamp{}
+	return nil
 }
 func AsDate(v interface{}) *DateTime {
 	//log.Printf("AsDate(%[1]v %[1]T)", v)
@@ -382,7 +383,7 @@ func AsDate(v interface{}) *DateTime {
 			return new(DateTime)
 		}
 		return d
-	case *Timestamp:
+	case *timestamppb.Timestamp:
 		if d == nil {
 			return new(DateTime)
 		}
@@ -412,7 +413,7 @@ func AsTime(v interface{}) time.Time {
 		return x
 	case sql.NullTime:
 		return x.Time
-	case *Timestamp:
+	case *timestamppb.Timestamp:
 		return x.AsTime()
 	default:
 		return AsDate(v).Time
