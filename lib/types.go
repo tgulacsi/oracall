@@ -131,7 +131,7 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 				return fmt.Sprintf(`%s = %s.AsTime()`, dst, np), ""
 			}
 			return fmt.Sprintf(`if %s == nil { %s = &timestamppb.Timestamp{} }
-				%s = sql.Out{Dest:&%s%s}`,
+				%s = sql.Out{Dest:%s%s}`,
 					np, np,
 					dst, strings.TrimPrefix(src, "&"), inTrue,
 				),
