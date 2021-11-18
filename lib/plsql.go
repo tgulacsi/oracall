@@ -740,7 +740,7 @@ func (arg Argument) getConvSimple(
 			convIn = append(convIn, fmt.Sprintf(`output.%s = input.%s  // gcs3`, name, name))
 		}
 		if got == "time.Time" {
-			convOut = append(convOut, fmt.Sprintf("if output.%s != nil && output.%s.IsValid() { output.%s = nil }", name, name, name))
+			convOut = append(convOut, fmt.Sprintf("if output.%s != nil && !output.%s.IsValid() { output.%s = nil }", name, name, name))
 		}
 		src := "output." + name
 		in, varName := arg.ToOra(paramName, "&"+src, arg.Direction)
