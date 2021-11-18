@@ -267,8 +267,8 @@ func Main(args []string) error {
 			}
 			cmd = exec.CommandContext(ctx,
 				"sed", "-i", "-e",
-				(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/UNO-SOFT/knownpb/timestamppb",}; ` +
-					`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/UNO-SOFT/knownpb/timestamppb",}; `),
+				(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",}; ` +
+					`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",}; `),
 				strings.TrimSuffix(pbFn, ".proto")+".pb.go",
 			)
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr

@@ -18,7 +18,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/UNO-SOFT/knownpb/timestamppb"
+	"github.com/godror/knownpb/timestamppb"
 	"github.com/godror/godror"
 )
 

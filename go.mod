@@ -21,10 +21,10 @@ require (
 )
 
 require (
-	github.com/UNO-SOFT/knownpb v0.0.0-20211022142207-ff5074a467cd
 	github.com/UNO-SOFT/ulog v1.3.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-kit/log v0.2.0
+	github.com/godror/knownpb v0.1.0
 	github.com/pkg/errors v0.9.1
 )
 
