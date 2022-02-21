@@ -819,7 +819,7 @@ func (arg Argument) getConvSimpleTable(
 				fmt.Sprintf(`if cap(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
 				fmt.Sprintf(`%s = sql.Out{Dest: custom.NumbersFromStrings(&output.%s)}  // gcst1`, paramName, name))
 		} else {
-			convIn = append(convIn, fmt.Sprintf(`%s = output.%s // gcst1`, paramName, name))
+			convIn = append(convIn, fmt.Sprintf(`%s = sql.Out{Dest: &output.%s} // gcst1`, paramName, name))
 		}
 	} else {
 		in, varName := arg.ToOra(
@@ -1063,7 +1063,7 @@ func (arg Argument) getConvTableRec(
 		if err != nil {
 			panic(err)
 		}
-		convert := arg.FromOra(fmt.Sprintf("output.%s[i].%s", name[0], name[1]), "v", "v") 
+		convert := arg.FromOra(fmt.Sprintf("output.%s[i].%s", name[0], name[1]), "v", "v")
 		if !Gogo && oraTyp == "time.Time" {
 			convert = fmt.Sprintf("output.%s[i].%s = timestamppb.New(v)", name[0], name[1])
 		}
