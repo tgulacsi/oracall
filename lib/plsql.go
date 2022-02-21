@@ -817,9 +817,9 @@ func (arg Argument) getConvSimpleTable(
 		if got == "[]godror.Number" { // don't copy, hack
 			convIn = append(convIn,
 				fmt.Sprintf(`if cap(output.%s) == 0 { output.%s = make([]string, 0, %d) }`, name, name, tableSize),
-				fmt.Sprintf(`%s = sql.Out{Dest: custom.NumbersFromStrings(&output.%s)}  // gcst1`, paramName, name))
+				fmt.Sprintf(`%s = sql.Out{Dest: custom.NumbersFromStrings(&output.%s), In:%t}  // gcst1`, paramName, name, arg.IsInput()))
 		} else {
-			convIn = append(convIn, fmt.Sprintf(`%s = sql.Out{Dest: &output.%s} // gcst1`, paramName, name))
+			convIn = append(convIn, fmt.Sprintf(`%s = sql.Out{Dest: &output.%s, In:%t} // gcst1`, paramName, name, arg.IsInput()))
 		}
 	} else {
 		in, varName := arg.ToOra(
@@ -995,7 +995,7 @@ func (arg Argument) getConvRec(
 
 		convIn = append(convIn, too+" // gcr2 var="+varName)
 		if varName != "" {
-			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest:&%s} // gcr2out", paramName, varName))
+			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest:&%s, In:%t} // gcr2out", paramName, varName, arg.IsInput()))
 			convOut = append(convOut, arg.FromOra("output."+name, varName, varName)+" // gcr2out")
 		}
 	} else if arg.IsInput() {
