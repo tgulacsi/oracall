@@ -123,7 +123,7 @@ func OpenCsv(filename string) (*os.File, error) {
 func MustOpenCsv(filename string) *os.File {
 	fh, err := OpenCsv(filename)
 	if err != nil {
-		Log("msg", "MustOpenCsv", "file", filename, "error", err)
+		logger.Error(err, "MustOpenCsv", "file", filename)
 		panic(fmt.Errorf("%s: %w", filename, err))
 	}
 	return fh
@@ -168,11 +168,10 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			csvFields[h] = i
 		}
 	}
-	Log("msg", "field order", "fields", csvFields)
+	logger.Info("field order", "fields", csvFields)
 
 	for {
 		rec, err = csvr.Read()
-		//Log("rec", rec, "err", err)
 		if err != nil {
 			if err == io.EOF {
 				err = nil
@@ -247,7 +246,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []
 				ua.DataScale,
 				ua.CharLength,
 			)
-			//Log("level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
+			logger.V(1).Info("ParseArgument", "level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
 			// Possibilities:
 			// 1. SIMPLE
 			// 2. RECORD at level 0
@@ -263,7 +262,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []
 			}
 			parent := lastArgs[level-1]
 			if parent == nil {
-				Log("level", level, "lastArgs", lastArgs, "fun", fun)
+				logger.Info("parent is nil", "level", level, "lastArgs", lastArgs, "fun", fun)
 				panic(fmt.Sprintf("parent is nil, at level=%d, lastArgs=%v, fun=%v", level, lastArgs, fun))
 			}
 			if parent.Flavor == FLAVOR_TABLE {
@@ -273,15 +272,13 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []
 			}
 		}
 		fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
-		//Log("args", lastArgs[-1].RecordOf)
 		for i, na := range lastArgs[-1].RecordOf {
 			fun.Args[i] = *na.Argument
 		}
-		//Log("args", fun.Args)
 		functions = append(functions, fun)
 		names = append(names, fun.Name())
 	}
-	Log("functions", names)
+	logger.Info("found", "functions", names)
 	return functions
 }
 
@@ -363,24 +360,24 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 		switch a.Type {
 		case "private":
 			nm := L(a.FullName())
-			Log("private", nm)
+			logger.Info("directive", "private", nm)
 			delete(funcs, nm)
 		case "rename":
 			nm := L(a.FullName())
 			if f := funcs[nm]; f != nil {
 				delete(funcs, nm)
 				funcs[L(a.FullOther())] = f
-				Log("rename", nm, "to", a.Other)
+				logger.Info("directive", "rename", nm, "to", a.Other)
 				f.alias = a.Other
 			}
 		case "replace", "replace_json":
 			k, v := L(a.FullName()), L(a.FullOther())
 			if f := funcs[k]; f != nil {
-				Log("replace", k, "with", v)
+				logger.Info("directive", "replace", k, "with", v)
 				f.Replacement = funcs[v]
 				f.ReplacementIsJSON = a.Type == "replace_json"
 				delete(funcs, v)
-				Log("delete", v, "add", f.Name())
+				logger.Info("directive", "delete", v, "add", f.Name())
 				funcs[L(f.Name())] = f
 			}
 
@@ -389,16 +386,13 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 			exc := strings.ToUpper(a.Name)
 			for _, f := range funcs {
 				if strings.EqualFold(f.Package, a.Package) {
-					//Log("HANDLE", nm, "of", f.Name(), "pkg", f.Package)
 					f.handle = append(f.handle, exc)
-					//} else {
-					//Log("SKIP", f.Name(), "pkg", f.Package, "a", a.Package, "nm", nm)
 				}
 			}
 
 		case "max-table-size":
 			nm := L(a.FullName())
-			Log("max-table-size", nm, "size", a.Size)
+			logger.Info("directive", "max-table-size", nm, "size", a.Size)
 			if f := funcs[nm]; f != nil && a.Size >= f.maxTableSize {
 				f.maxTableSize = a.Size
 			}

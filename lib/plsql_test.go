@@ -7,12 +7,12 @@ package oracall
 import (
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	"github.com/kylelemons/godebug/diff"
-	"github.com/tgulacsi/go/loghlp/kitloghlp"
 )
 
 func TestOne(t *testing.T) {
-	Log = kitloghlp.NewTestLogger(t).Log
+	logger = testr.New(t)
 	for i, tc := range testCases {
 		functions := tc.ParseCsv(t, i)
 		got, _ := functions[0].PlsqlBlock("")

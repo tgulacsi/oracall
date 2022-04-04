@@ -1,4 +1,4 @@
-// Copyright 2013, 2021 Tamás Gulácsi
+// Copyright 2013, 2022 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -26,7 +26,7 @@ const batchSize = 1024
 func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
-		Log("msg", "error preparing", "function", fun, "error", err)
+		logger.Error(err, "error preparing", "function", fun)
 		panic(fmt.Errorf("%s: %w", fun.Name(), err))
 	}
 	fn := fun.name
@@ -55,7 +55,6 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		plsBuf.WriteString("  BEGIN\n  ")
 	}
 	fmt.Fprintf(plsBuf, "  %s;\n", call)
-	//Log("handle", fun.handle, "fun", fun.Name())
 	if len(fun.handle) != 0 {
 		fmt.Fprintf(plsBuf, "  EXCEPTION WHEN %s THEN NULL;\n  END;\n",
 			strings.Join(fun.handle, " OR "))
@@ -104,9 +103,10 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		)
 	}
 	fmt.Fprintf(callBuf, `
-	Log := Log
-	if s.Log != nil { Log = s.Log }
-	if Log == nil { Log = func(...interface{}) error { return nil } }
+	logger := s.Logger
+	if lgr, err := logr.FromContext(ctx); err == nil {
+		logger = lgr
+	}
 	if err = ctx.Err(); err != nil { return }
 	`)
 	for _, line := range convIn {
@@ -132,10 +132,9 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 
 	i := strings.Index(call, fun.RealName())
 	if i < 0 {
-		Log("msg", "not found", "name", fun.RealName(), "in", call)
+		logger.Info("not found", "name", fun.RealName(), "in", call)
 	}
 	j := i + strings.Index(call[i:], ")") + 1
-	//Log("msg","PlsqlBlock", "i", i, "j", j, "call", call)
 	fmt.Fprintf(callBuf, `
 	const funName = "%s"
 	ctx, cancel := context.WithCancel(ctx)
@@ -149,12 +148,12 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 if s.DBLog != nil {
 	var err error
 	if ctx, err = s.DBLog(ctx, tx, funName, input); err != nil {
-		Log("msg", "dbLog", "fun", funName, "error", err)
+		logger.Error(err, "dbLog", "fun", funName)
 	}
 }
 const callText = `+"`%s`"+`
 if DebugLevel > 0 {
-	Log("msg", "calling", "qry", callText, "stmt", `+"`%s`"+`)
+	logger.Info("calling", "qry", callText, "stmt", `+"`%s`"+`)
 }
 	qry := %s
 `,
@@ -172,9 +171,9 @@ if DebugLevel > 0 {
 	defer stmt.Close()
 	stmtP := fmt.Sprintf("%p", stmt)
 	dl, _ := ctx.Deadline()
-	Log("msg", "calling", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
+	logger.Info( "calling", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
 	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
-	Log("msg", "finished", funName, "stmt", stmtP, "error", err)
+	logger.Info( "finished", funName, "stmt", stmtP, "error", err)
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return
@@ -189,7 +188,7 @@ if DebugLevel > 0 {
 			if s.DBLog != nil {
 				var logErr error
 				if _, logErr = s.DBLog(ctx, tx, funName, err); logErr != nil {
-					Log("msg", "dbLog", "fun", funName, "logErr", logErr, "error", err)
+					logger.Error(logErr, "dbLog", "fun", funName, "error", err)
 				}
 			}
 			if qe.Code() == 6502 {  // Numeric or Value Error
@@ -200,7 +199,7 @@ if DebugLevel > 0 {
 	}
     `)
 
-	callBuf.WriteString("\nif DebugLevel > 0 { Log(`result params`, params, `output`, output) }\n")
+	callBuf.WriteString("\nif DebugLevel > 0 { logger.Info(`result params`, params, `output`, output) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -228,7 +227,7 @@ if DebugLevel > 0 {
 					continue
 				}
 				if !errors.Is(err, io.EOF) {
-					Log("msg", "iterate", "error", err)
+					logger.Error(err,  "iterate")
 					return
 				}
 			}
@@ -284,7 +283,7 @@ func demap(plsql, callFun string) (string, string) {
 					}
 					arr := paramsMap[key]
 					if len(arr) == 0 {
-						Log("msg", "paramsIdx", "key", key, "val", arr, "map", paramsMap)
+						logger.Info("paramsIdx", "key", key, "val", arr, "map", paramsMap)
 					}
 					i = arr[0]
 					if len(arr) > 1 {
@@ -316,7 +315,6 @@ func demap(plsql, callFun string) (string, string) {
 				line = line[:i]
 			}
 			prev[idx] = string(bytes.TrimSpace(line))
-			//Log("idx", idx, "line", prev[idx])
 		}
 	}
 	callBuf.Write(b)
@@ -349,7 +347,7 @@ func demap(plsql, callFun string) (string, string) {
 		old := prev[idx]
 		if old == "" {
 			fmt.Fprintf(callBuf, "params[%d] = params[%d]  // %s\n", v.New, v.Old, v.Name)
-			Log("err", fmt.Errorf("cannot find %q in %+v", idx, prev))
+			logger.Error(fmt.Errorf("cannot find %q in %+v", idx, prev), "plusIdx", v)
 		} else {
 			if !strings.HasPrefix(old, "sql.Out{") {
 				if old[0] != '&' {
@@ -535,7 +533,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
-					Log("msg", "cannot use IN cursor variables", "arg", arg)
+					logger.Info("cannot use IN cursor variables", "arg", arg)
 					panic(fmt.Sprintf("cannot use IN cursor variables (%v)", arg))
 				}
 				name := (CamelCase(arg.Name))
@@ -688,12 +686,12 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						}
 					}
 				default:
-					Log("msg", "Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
+					logger.Info("Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
 					panic(fmt.Errorf("only table of simple or record types are allowed (no table of table!) - %s(%v)", fun.Name(), arg.Name))
 				}
 			}
 		default:
-			Log("msg", "unkown flavor", "flavor", arg.Flavor)
+			logger.Info("unkown flavor", "flavor", arg.Flavor)
 			panic(fmt.Errorf("unknown flavor %s(%v)", fun.Name(), arg.Name))
 		}
 	}
@@ -703,7 +701,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
 	}
-	//Log("msg","prepareCall", "callArgs", callArgs)
 	callb.WriteString(fun.RealName() + "(")
 	for i, arg := range fun.Args {
 		if i > 0 {
@@ -949,7 +946,6 @@ func getOutConvTSwitch(name, pTyp string) string {
 				case float32: y = `+pTyp+`(xi)
 				case float64: y = `+pTyp+`(xi)
 				case string:
-					//Log("converting", %q,  "to", `+pTyp+`", "xi", xi)
 					z, e := strconv.`+parse+`
 					y, err = `+pTyp+`(z), e
 				default:

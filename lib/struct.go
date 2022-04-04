@@ -9,10 +9,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-logr/logr"
 )
 
 // Log is discarded by default.
-var Log = func(...interface{}) error { return nil }
+var logger = logr.Discard()
+
+func SetLogger(lgr logr.Logger) { logger = lgr }
 
 const (
 	MarkNull = "\u2400" // 0x2400 = nul

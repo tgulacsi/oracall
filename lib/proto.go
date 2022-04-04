@@ -59,7 +59,7 @@ FunLoop:
 		if err := fun.SaveProtobuf(w, seen); err != nil {
 			if SkipMissingTableOf && (errors.Is(err, ErrMissingTableOf) ||
 				errors.Is(err, ErrUnknownSimpleType)) {
-				Log("msg", "SKIP function, missing TableOf info", "function", fName)
+				logger.Info("SKIP function, missing TableOf info", "function", fName)
 				continue FunLoop
 			}
 			return fmt.Errorf("%s: %w", fun.name, err)
@@ -137,7 +137,6 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			return fmt.Errorf("no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf)
 		}
 	}
-	//Log("msg", "protoWriteMessageTyp", "msg", msgName, "args", args)
 
 	var err error
 	w := &errWriter{Writer: dst, err: &err}
@@ -198,7 +197,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 				}
 			}
 			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, subArgs...); err != nil {
-				Log("msg", "protoWriteMessageTyp", "error", err)
+				logger.Error(err, "protoWriteMessageTyp")
 				return err
 			}
 		}

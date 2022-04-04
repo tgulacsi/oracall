@@ -15,13 +15,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/tgulacsi/go/loghlp/kitloghlp"
+	"github.com/go-logr/logr/testr"
 )
 
 var flagKeep = flag.Bool("keep", false, "keep temp files")
 
 func TestWriteStruct(t *testing.T) {
-	Log = kitloghlp.NewTestLogger(t).Log
+	logger = testr.New(t)
 	var (
 		dn, fn string
 		keep   = *flagKeep

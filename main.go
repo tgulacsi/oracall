@@ -1,4 +1,4 @@
-// Copyright 2017, 2021 Tamás Gulácsi
+// Copyright 2017, 2022 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -27,10 +27,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/UNO-SOFT/ulog"
-	"github.com/go-kit/log"
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
+
+	"github.com/go-logr/zerologr"
+	"github.com/rs/zerolog"
 
 	// for Oracle-specific drivers
 	"github.com/godror/godror"
@@ -40,14 +41,15 @@ import (
 // Should install protobuf-compiler to use it, like
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
-var logger = ulog.New()
+var zl = zerolog.New(os.Stderr)
+var logger = zerologr.New(&zl)
 
 var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
 
 func main() {
-	oracall.Log = log.With(logger, "lib", "oracall").Log
+	oracall.SetLogger(logger.WithName("oracall"))
 	if err := Main(os.Args); err != nil {
-		logger.Log("error", fmt.Sprintf("%+v", err))
+		logger.Error(err, "ERROR")
 		os.Exit(1)
 	}
 }
@@ -82,7 +84,6 @@ func Main(args []string) error {
 	pbPath, pbPkg := parsePkgFlag(*flagPbOut)
 	dbPath, dbPkg := parsePkgFlag(*flagDbOut)
 
-	Log := logger.Log
 	pattern := flag.Arg(0)
 	if pattern == "" {
 		pattern = "%"
@@ -106,7 +107,7 @@ func Main(args []string) error {
 	}
 	if *flagExcept != "" {
 		except := strings.FieldsFunc(*flagExcept, func(r rune) bool { return r == ',' || unicode.IsSpace(r) })
-		Log("except", except)
+		logger.Info("found", "except", except)
 		filters = append(filters, func(s string) bool {
 			for _, e := range except {
 				if strings.EqualFold(e, s) {
@@ -137,7 +138,7 @@ func Main(args []string) error {
 		defer cx.Close()
 		cx.SetMaxIdleConns(0)
 		if *flagVerbose {
-			godror.SetLogger(log.With(logger, "lib", "godror"))
+			godror.SetLogger(logger.WithName("godror"))
 		}
 		if err = cx.Ping(); err != nil {
 			return fmt.Errorf("ping %s: %w", *flagConnect, err)
@@ -158,7 +159,7 @@ func Main(args []string) error {
 			fn = dbPkg + ".go"
 		}
 		fn = filepath.Join(*flagBaseDir, dbPath, fn)
-		Log("msg", "Writing generated functions", "file", fn)
+		logger.Info("Writing generated functions", "file", fn)
 		os.MkdirAll(filepath.Dir(fn), 0775)
 		if out, err = os.Create(fn); err != nil {
 			return fmt.Errorf("create %s: %w", fn, err)
@@ -169,10 +170,10 @@ func Main(args []string) error {
 		}
 		defer func() {
 			if err := out.Close(); err != nil {
-				Log("msg", "close", "file", out.Name(), "error", err)
+				logger.Error(err, "close", "file", out.Name())
 			}
 			if err := testOut.Close(); err != nil {
-				Log("msg", "close", "file", testOut.Name(), "error", err)
+				logger.Error(err, "close", "file", testOut.Name())
 			}
 		}()
 	}
@@ -192,7 +193,7 @@ func Main(args []string) error {
 		}
 		annotations = append(annotations, a)
 	}
-	Log("annotations", annotations)
+	logger.Info("got", "annotations", annotations)
 	functions = oracall.ApplyAnnotations(functions, annotations)
 	sort.Slice(functions, func(i, j int) bool { return functions[i].Name() < functions[j].Name() })
 
@@ -233,7 +234,7 @@ func Main(args []string) error {
 		}
 		pbFn = filepath.Join(*flagBaseDir, pbPath, pbFn)
 		os.MkdirAll(filepath.Dir(pbFn), 0775)
-		Log("msg", "Writing Protocol Buffers", "file", pbFn)
+		logger.Info("Writing Protocol Buffers", "file", pbFn)
 		fh, err := os.Create(pbFn)
 		if err != nil {
 			return fmt.Errorf("create proto: %w", err)
@@ -261,7 +262,7 @@ func Main(args []string) error {
 			}
 			cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-			Log("msg", "calling", "protoc", cmd.Args)
+			logger.Info("calling", "protoc", cmd.Args)
 			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("%q: %w", cmd.Args, err)
 			}
@@ -382,7 +383,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		var resolveTypeShort func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error)
 		var err error
 		if collStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
-			logger.Log("WARN", fmt.Errorf("%s: %w", qry, err))
+			logger.Error(err, "ERROR", "qry", qry)
 		} else {
 			defer collStmt.Close()
 			if rows, err := collStmt.QueryContext(grpCtx,
@@ -409,7 +410,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
                        owner = :owner AND table_name = :pkg
 				 ORDER BY attr_no`
 				if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
-					logger.Log("WARN", fmt.Errorf("%s: %w", qry, err))
+					logger.Error(err, "qry", qry)
 				} else {
 					defer attrStmt.Close()
 					if rows, err := attrStmt.QueryContext(grpCtx,
@@ -431,7 +432,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			qry, pattern, pattern, godror.FetchArraySize(1024), godror.PrefetchCount(1025),
 		)
 		if err != nil {
-			logger.Log("qry", qry, "error", err)
+			logger.Error(err, "qry", qry)
 			return fmt.Errorf("%s: %w", qry, err)
 		}
 		defer rows.Close()
@@ -470,7 +471,6 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 					row.Argument, row.Data, row.Length, row.Prec, row.Scale, row.Charset = p.Argument, p.Data, p.Length, p.Prec, p.Scale, p.Charset
 					row.Owner, row.Name, row.Subname, row.Link = p.Owner, p.Name, p.Subname, p.Link
 					row.Level = p.Level
-					//logger.Log("arg", row.Argument, "row", row.Length, "p", p.Length)
 					select {
 					case <-grpCtx.Done():
 						return grpCtx.Err()
@@ -526,7 +526,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		}
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
-			logger.Log("msg", "create", "dump", dumpFn, "error", err)
+			logger.Error(err, "create", "dump", dumpFn)
 			return functions, annotations, fmt.Errorf("%s: %w", dumpFn, err)
 		}
 		defer func() {
@@ -535,10 +535,10 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			err = fmt.Errorf("csv flush: %w", cw.Error())
 			cwMu.Unlock()
 			if err != nil {
-				logger.Log("msg", "flush", "csv", fh.Name(), "error", err)
+				logger.Error(err, "flush", "csv", fh.Name())
 			}
 			if err = fh.Close(); err != nil {
-				logger.Log("msg", "close", "dump", fh.Name(), "error", err)
+				logger.Error(err, "close", "dump", fh.Name())
 			}
 		}()
 		cwMu.Lock()
@@ -546,7 +546,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		err = cw.Write(colNames)
 		cwMu.Unlock()
 		if err != nil {
-			logger.Log("msg", "write header to csv", "error", err)
+			logger.Error(err, "write header to csv")
 			return functions, annotations, fmt.Errorf("write header: %w", err)
 		}
 	}
@@ -579,9 +579,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 						row.PLS += "@" + row.Link
 					}
 				}
-				//logger.Log("arg", row.Argument, "name", row.Name, "sub", row.Subname, "data", row.Data, "pls", row.PLS)
 			}
-			//logger.Log("row", row)
 			var ua oracall.UserArgument
 			ua.DataType = row.Data
 			ua.InOut = row.InOut.String
@@ -614,9 +612,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 					defer bufPool.Put(buf)
 					buf.Reset()
 
-					Log := log.With(logger, "package", ua.PackageName).Log
+					logger := logger.WithValues("package", ua.PackageName)
 					if srcErr := getSource(ctx, buf, cx, ua.PackageName); srcErr != nil {
-						Log("WARN", "getSource", "error", srcErr)
+						logger.Error(srcErr, "getSource")
 						return nil
 					}
 					replMu.Lock()
@@ -644,14 +642,14 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 					}
 					bb := buf.Bytes()
 					if len(annotations) != 0 {
-						Log("annotations", annotations)
+						logger.Info("found", "annotations", annotations)
 						bb = rAnnotation.ReplaceAll(bb, nil)
 					}
 					replMu.Unlock()
 					subCtx, subCancel := context.WithTimeout(ctx, 1*time.Minute)
 					funDocs, docsErr := parseDocs(subCtx, string(bb))
 					subCancel()
-					Log("msg", "parseDocs", "docs", len(funDocs), "error", docsErr)
+					logger.Info("parseDocs", "docs", len(funDocs), "error", docsErr)
 					docsMu.Lock()
 					pn := oracall.UnoCap(ua.PackageName) + "."
 					for nm, doc := range funDocs {
@@ -712,7 +710,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 	grp.Go(func() error { oracall.FilterAndGroup(filteredArgs, userArgs, filter); return nil })
 	functions = oracall.ParseArguments(filteredArgs, filter)
 	if grpErr := grp.Wait(); grpErr != nil {
-		logger.Log("msg", "ParseArguments", "error", fmt.Sprintf("%+v", grpErr))
+		logger.Error(grpErr, "ParseArguments")
 	}
 	docNames := make([]string, 0, len(docs))
 	for k := range docs {
@@ -723,7 +721,6 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 	for i, f := range functions {
 		if f.Documentation == "" {
 			if f.Documentation = docs[f.Name()]; f.Documentation == "" {
-				//logger.Log("msg", "No documentation", "function", f.Name())
 				any = true
 			} else {
 				functions[i] = f
@@ -731,7 +728,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		}
 	}
 	if any {
-		logger.Log("has", docNames)
+		logger.Info("any", "has", docNames)
 	}
 	return functions, annotations, nil
 }
@@ -846,7 +843,6 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 		); err != nil {
 			return plus, err
 		}
-		//logger.Log("owner", owner, "pkg", pkg, "sub", sub)
 		defer rows.Close()
 		for rows.Next() {
 			var t dbType
@@ -914,19 +910,16 @@ UNIT_ARF     	20	4	NUMBER
 */
 
 func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error)) ([]dbType, error) {
-	//logger.Log("expand", plus)
 	for i := 0; i < len(plus); i++ {
 		p := plus[i]
 		if p.Data == "PL/SQL INDEX TABLE" {
 			p.Data = "PL/SQL TABLE"
 		}
-		//logger.Log("i", i, "arg", p.Argument, "data", p.Data, "owner", p.Owner, "name", p.Name, "sub", p.Subname)
 		if p.Data == "TABLE" || p.Data == "PL/SQL TABLE" || p.Data == "PL/SQL RECORD" || p.Data == "REF CURSOR" {
 			q, err := resolveTypeShort(ctx, p.Data, p.Owner, p.Name, p.Subname)
 			if err != nil {
 				return plus, fmt.Errorf("%+v: %w", p, err)
 			}
-			//logger.Log("q", q)
 			for i, x := range q {
 				if x.Data == "PL/SQL INDEX TABLE" {
 					x.Data = "PL/SQL TABLE"

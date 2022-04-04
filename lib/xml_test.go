@@ -6,30 +6,15 @@ package oracall
 
 import (
 	"encoding/xml"
-	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestQuery078(t *testing.T) {
-	Log = func(keyvals ...interface{}) error {
-		var buf strings.Builder
-		var tmp strings.Builder
-		for i := 0; i < len(keyvals); i += 2 {
-			tmp.Reset()
-			fmt.Fprintf(&tmp, "%+v", keyvals[i+1])
-			v := strings.ReplaceAll(tmp.String(), "\"", "\\\"")
-			if strings.Contains(v, " ") {
-				fmt.Fprintf(&buf, "%s=\"%s\" ", keyvals[i], v)
-			} else {
-				fmt.Fprintf(&buf, "%s=%s ", keyvals[i], v)
-			}
-		}
-		t.Log(buf.String())
-		return nil
-	}
+	logger = testr.New(t)
 	functions, err := ParseCsv(strings.NewReader(query078Csv), nil)
 	if err != nil {
 		t.Errorf("error parsing csv: %v", err)

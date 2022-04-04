@@ -1,4 +1,4 @@
-// Copyright 2017, 2021 Tamas Gulacsi
+// Copyright 2017, 2022 Tamas Gulacsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	bp "github.com/tgulacsi/go/bufpool"
 	oracall "github.com/tgulacsi/oracall/lib"
 
-	"github.com/go-kit/log"
 	"github.com/oklog/ulid"
 
 	"github.com/go-stack/stack"
@@ -36,19 +36,19 @@ const DefaultTimeout = time.Hour
 
 var bufpool = bp.New(4096)
 
-func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
+func GRPCServer(globalCtx context.Context, logger logr.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
 	erroredMethods := make(map[string]struct{})
 	var erroredMethodsMu sync.RWMutex
 
-	getLogger := func(ctx context.Context, fullMethod string) (log.Logger, func(error), context.Context, context.CancelFunc) {
+	getLogger := func(ctx context.Context, fullMethod string) (logr.Logger, func(error), context.Context, context.CancelFunc) {
 		var cancel context.CancelFunc = func() {}
 		if Timeout != 0 {
 			ctx, cancel = context.WithTimeout(ctx, Timeout) //nolint:govet
 		}
 		reqID := ContextGetReqID(ctx)
 		ctx = ContextWithReqID(ctx, reqID)
-		lgr := log.With(logger, "reqID", reqID)
-		ctx = ContextWithLogger(ctx, lgr)
+		lgr := logger.WithValues("reqID", reqID)
+		ctx = logr.NewContext(ctx, lgr)
 		verbose := verbose
 		var wasThere bool
 		if !verbose {
@@ -57,8 +57,9 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 			erroredMethodsMu.RUnlock()
 			wasThere = verbose
 		} else {
-			godror.SetLogger(log.With(logger, "lib", "godror"))
-			ctx = godror.ContextWithLog(ctx, log.With(lgr, "lib", "godror").Log)
+			logger := logger.WithName("godror")
+			godror.SetLogger(logger)
+			ctx = logr.NewContext(ctx, logger)
 		}
 		commit := func(err error) {
 			if wasThere && err == nil {
@@ -83,18 +84,18 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 							trace := stack.Trace().String()
 							var ok bool
 							if err, ok = r.(error); ok {
-								logger.Log("PANIC", err, "trace", trace)
+								logger.Error(err, "PANIC", "trace", trace)
 								return
 							}
 							err = fmt.Errorf("%+v", r)
-							logger.Log("PANIC", fmt.Sprintf("%+v", err), "trace", trace)
+							logger.Error(err, "PANIC", "trace", trace)
 						}
 					}()
 				}
 				lgr, commit, ctx, cancel := getLogger(ss.Context(), info.FullMethod)
 				defer cancel()
 
-				lgr.Log("REQ", info.FullMethod)
+				lgr.Info("checkAuth", "REQ", info.FullMethod)
 				if err = checkAuth(ctx, info.FullMethod); err != nil {
 					return status.Error(codes.Unauthenticated, err.Error())
 				}
@@ -103,7 +104,7 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 				wss.WrappedContext = ctx
 				start := time.Now()
 				err = handler(srv, wss)
-				lgr.Log("RESP", info.FullMethod, "dur", time.Since(start).String(), "error", err)
+				lgr.Info("handler", "RESP", info.FullMethod, "dur", time.Since(start).String(), "error", err)
 				commit(err)
 				return StatusError(err)
 			}),
@@ -116,11 +117,11 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 							trace := stack.Trace().String()
 							var ok bool
 							if err, ok = r.(error); ok {
-								logger.Log("PANIC", err, "trace", trace)
+								logger.Error(err, "PANIC", "trace", trace)
 								return
 							}
 							err = fmt.Errorf("%+v", r)
-							logger.Log("PANIC", fmt.Sprintf("%+v", err), "trace", trace)
+							logger.Error(err, "PANIC", "trace", trace)
 						}
 					}()
 				}
@@ -135,13 +136,13 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 				defer bufpool.Put(buf)
 				jenc := json.NewEncoder(buf)
 				if err = jenc.Encode(req); err != nil {
-					logger.Log("marshal error", err, "req", req)
+					logger.Error(err, "marshal", "req", req)
 				}
-				logger.Log("REQ", info.FullMethod, "req", buf.String())
+				logger.Info("marshaled", "REQ", info.FullMethod, "req", buf.String())
 
 				// Fill PArgsHidden
 				if r := reflect.ValueOf(req).Elem(); r.Kind() != reflect.Struct {
-					logger.Log("error", "not struct", "req", fmt.Sprintf("%T %#v", req, req))
+					logger.Info("not struct", "req", fmt.Sprintf("%T %#v", req, req))
 				} else {
 					if f := r.FieldByName("PArgsHidden"); f.IsValid() {
 						f.Set(reflect.ValueOf(buf.String()))
@@ -151,14 +152,14 @@ func GRPCServer(globalCtx context.Context, logger log.Logger, verbose bool, chec
 				start := time.Now()
 				res, err := handler(ctx, req)
 
-				logger.Log("RESP", info.FullMethod, "dur", time.Since(start).String(), "error", err)
+				logger.Info("handled", "RESP", info.FullMethod, "dur", time.Since(start).String(), "error", err)
 				commit(err)
 
 				buf.Reset()
 				if jErr := jenc.Encode(res); err != nil {
-					logger.Log("marshal error", jErr, "res", res)
+					logger.Error(err, "marshal", jErr, "res", res)
 				}
-				logger.Log("RESP", res, "error", err)
+				logger.Info("encoded", "RESP", res, "error", err)
 
 				return res, StatusError(err)
 			}),
@@ -186,17 +187,7 @@ func StatusError(err error) error {
 }
 
 type reqIDCtxKey struct{}
-type loggerCtxKey struct{}
 
-func ContextWithLogger(ctx context.Context, logger log.Logger) context.Context {
-	return context.WithValue(ctx, loggerCtxKey{}, logger)
-}
-func ContextGetLogger(ctx context.Context) log.Logger {
-	if lgr, ok := ctx.Value(loggerCtxKey{}).(log.Logger); ok {
-		return lgr
-	}
-	return nil
-}
 func ContextWithReqID(ctx context.Context, reqID string) context.Context {
 	if reqID == "" {
 		reqID = NewULID()

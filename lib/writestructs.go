@@ -1,4 +1,4 @@
-// Copyright 2013, 2021 Tamás Gulácsi
+// Copyright 2013, 2022 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -70,6 +70,8 @@ import (
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 	"github.com/godror/godror"
 
+	"github.com/go-logr/logr"
+
 	`+pbImport+`
 )
 
@@ -87,7 +89,7 @@ var _ time.Time
 var _ timestamppb.Timestamp
 var _ strings.Reader
 var _ xml.Name
-var Log = func(keyvals ...interface{}) error { return nil } // logger.Log of github.com/go-kit/kit/log
+var _ lgr.Logger
 var _ = errors.New
 var _ = fmt.Printf
 var _ godror.Lob
@@ -134,7 +136,7 @@ FunLoop:
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(structW, dir); err != nil {
 				if SkipMissingTableOf && (errors.Is(err, ErrMissingTableOf) || errors.Is(err, ErrUnknownSimpleType)) {
-					Log("msg", "SKIP function, missing TableOf info", "function", fun.Name(), "error", err)
+					logger.Error(err, "SKIP function, missing TableOf info", "function", fun.Name())
 					continue FunLoop
 				}
 				return err
@@ -145,7 +147,7 @@ FunLoop:
 		io.WriteString(w, plsBlock)
 		io.WriteString(w, "`\n\n")
 		if b, err = format.Source([]byte(callFun)); err != nil {
-			Log("msg", "saving function", "function", fun.Name(), "error", err)
+			logger.Error(err, "saving function", "function", fun.Name())
 			os.Stderr.WriteString("\n\n---------------------8<--------------------\n")
 			os.Stderr.WriteString(callFun)
 			os.Stderr.WriteString("\n--------------------->8--------------------\n\n")
@@ -378,7 +380,6 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		`, f.Name(), dirname, structName, strings.ToLower(structName[:1])+structName[1:],
 	)
 
-	//Log("msg","SaveStruct", "function", fmt.Sprintf("%#v", f) )
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			return fmt.Errorf("no table of data for %s.%s (%v): %w", f.Name(), arg, arg, ErrMissingTableOf)
@@ -401,7 +402,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 		fmt.Fprintf(w, `func (s *%s) FromJSON(data []byte) error {
 			err := json.Unmarshal(data, &s)
 			if DebugLevel > 0 {
-				Log("msg", "unmarshal", "data", data, "into", s, "error", err)
+				logger.Info("unmarshal", "data", data, "into", s, "error", err)
 			}
 			return err
 }`, structName)
@@ -563,7 +564,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 			checks = append(checks, "}")
 		}
 	default:
-		Log("msg", "unknown flavor", "flavor", arg.Flavor)
+		logger.Info("unknown flavor", "flavor", arg.Flavor)
 		panic(fmt.Errorf("unknown flavor %v", arg.Flavor))
 	}
 	return checks
@@ -660,7 +661,6 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 	typName = capitalize(typName)
 
 	if arg.Flavor == FLAVOR_TABLE {
-		//Log("msg", "TABLE", "arg", arg, "tableOf", arg.TableOf)
 		targ := *arg.TableOf
 		targ.Direction = DIR_IN
 		tn, err := targ.goType(true)
@@ -683,7 +683,7 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 
 	// FLAVOR_RECORD
 	if false && arg.TypeName == "" {
-		Log("msg", "arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
+		logger.Info("arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
 	return "*" + typName, nil
