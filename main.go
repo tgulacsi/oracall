@@ -41,7 +41,7 @@ import (
 // Should install protobuf-compiler to use it, like
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
-var zl = zerolog.New(os.Stderr)
+var zl = zerolog.New(os.Stderr).Level(zerolog.InfoLevel)
 var logger = zerologr.New(&zl)
 
 var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
@@ -138,6 +138,8 @@ func Main(args []string) error {
 		defer cx.Close()
 		cx.SetMaxIdleConns(0)
 		if *flagVerbose {
+			zl = zl.Level(zerolog.TraceLevel)
+			logger = logger.WithSink(zerologr.NewLogSink(&zl))
 			godror.SetLogger(logger.WithName("godror"))
 		}
 		if err = cx.Ping(); err != nil {
