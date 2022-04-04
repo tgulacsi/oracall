@@ -7,7 +7,7 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/go-stack/stack v1.8.0
-	github.com/godror/godror v0.30.0
+	github.com/godror/godror v0.32.1
 	github.com/google/go-cmp v0.5.6
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.2
 	github.com/kylelemons/godebug v1.1.0
@@ -17,11 +17,11 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/genproto v0.0.0-20210917145530-b395a37504d4 // indirect
 	google.golang.org/grpc v1.40.0
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.28.0
 )
 
 require (
-	github.com/UNO-SOFT/ulog v1.3.1
+	github.com/UNO-SOFT/ulog v1.4.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-kit/log v0.2.0
 	github.com/godror/knownpb v0.1.0
@@ -30,7 +30,7 @@ require (
 
 require (
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
-	github.com/goccy/go-json v0.7.9 // indirect
+	github.com/goccy/go-json v0.9.6 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	golang.org/x/sys v0.0.0-20210917161153-d61c044b1678 // indirect
 	golang.org/x/text v0.3.7 // indirect
