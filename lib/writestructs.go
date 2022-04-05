@@ -89,7 +89,7 @@ var _ time.Time
 var _ timestamppb.Timestamp
 var _ strings.Reader
 var _ xml.Name
-var _ lgr.Logger
+var _ logr.Logger
 var _ = errors.New
 var _ = fmt.Printf
 var _ godror.Lob
@@ -105,8 +105,8 @@ type iterator struct {
 }
 
 type oracallServer struct {
+	logr.Logger
 	db *sql.DB
-	Log func(...interface{}) error
 	DBLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error)
 
 	`+implement+`
@@ -114,10 +114,10 @@ type oracallServer struct {
 
 func NewServer(
 	db *sql.DB, 
-	Log func(...interface{}) error, 
+	logger logr.Logger, 
     dbLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error),
 ) *oracallServer {
-	return &oracallServer{db: db, Log: Log, DBLog: dbLog}
+	return &oracallServer{db: db, Logger: logger, DBLog: dbLog}
 }
 
 `)
@@ -219,7 +219,7 @@ func testSetup(t *testing.T) *oracallServer {
 		if testDB, err = sql.Open("godror", *flagConnect); err != nil {
 			panic(fmt.Errorf("%s: %s", *flagConnect, err))
 		}
-		testServer = NewServer(testDB, nil, nil)
+		testServer = NewServer(testDB, testr.New(t), nil)
 	})
 	return testServer
 }

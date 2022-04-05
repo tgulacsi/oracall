@@ -30,6 +30,7 @@ import (
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
+	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
 	"github.com/rs/zerolog"
 
@@ -47,7 +48,8 @@ var logger = zerologr.New(&zl)
 var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
 
 func main() {
-	oracall.SetLogger(logger.WithName("oracall"))
+	godror.SetLogger(logr.Discard())
+	oracall.SetLogger(logger.WithName("oracall").V(1))
 	if err := Main(os.Args); err != nil {
 		logger.Error(err, "ERROR")
 		os.Exit(1)
@@ -140,7 +142,8 @@ func Main(args []string) error {
 		if *flagVerbose {
 			zl = zl.Level(zerolog.TraceLevel)
 			logger = logger.WithSink(zerologr.NewLogSink(&zl))
-			godror.SetLogger(logger.WithName("godror"))
+			godror.SetLogger(logger.WithName("godror").V(0))
+			oracall.SetLogger(logger.WithName("oracall").V(0))
 		}
 		if err = cx.Ping(); err != nil {
 			return fmt.Errorf("ping %s: %w", *flagConnect, err)
