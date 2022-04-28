@@ -27,6 +27,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/google/renameio/v2"
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
@@ -166,18 +167,24 @@ func Main(args []string) error {
 		fn = filepath.Join(*flagBaseDir, dbPath, fn)
 		logger.Info("Writing generated functions", "file", fn)
 		os.MkdirAll(filepath.Dir(fn), 0775)
-		if out, err = os.Create(fn); err != nil {
+		outP, err := renameio.NewPendingFile(fn)
+		if err != nil {
 			return fmt.Errorf("create %s: %w", fn, err)
 		}
+		defer outP.Cleanup()
+		out = outP.File
 		testFn := fn[:len(fn)-3] + "_test.go"
-		if testOut, err = os.Create(testFn); err != nil {
+		testOutP, err := renameio.NewPendingFile(testFn)
+		if err != nil {
 			return fmt.Errorf("create %s: %w", testFn, err)
 		}
+		defer testOutP.Cleanup()
+		testOut = testOutP.File
 		defer func() {
-			if err := out.Close(); err != nil {
+			if err := outP.CloseAtomicallyReplace(); err != nil {
 				logger.Error(err, "close", "file", out.Name())
 			}
-			if err := testOut.Close(); err != nil {
+			if err := testOutP.CloseAtomicallyReplace(); err != nil {
 				logger.Error(err, "close", "file", testOut.Name())
 			}
 		}()

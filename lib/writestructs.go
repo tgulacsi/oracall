@@ -200,6 +200,7 @@ import (
     "time"    
 
 	"github.com/go-logfmt/logfmt"
+	"github.com/go-logr/logr/testr"
 
 	_ "github.com/godror/godror" // Oracle
 	`+pbImport+`
