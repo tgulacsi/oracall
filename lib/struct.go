@@ -36,7 +36,7 @@ type Function struct {
 	Package, name, alias string
 	Documentation        string
 	Args                 []Argument
-	handle               []string
+	Tag, handle          []string
 	maxTableSize         int
 	ReplacementIsJSON    bool
 }

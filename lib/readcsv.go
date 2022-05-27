@@ -396,6 +396,13 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 			if f := funcs[nm]; f != nil && a.Size >= f.maxTableSize {
 				f.maxTableSize = a.Size
 			}
+
+		case "tag":
+			nm := L(a.FullName())
+			logger.Info("directive", "f", nm, "tag", a.Other)
+			if f := funcs[nm]; f != nil {
+				f.Tag = append(f.Tag, a.Other)
+			}
 		}
 	}
 	functions = functions[:0]
