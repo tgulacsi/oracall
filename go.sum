@@ -162,6 +162,8 @@ github.com/go-stack/stack v1.8.1/go.mod h1:dcoOX6HbPZSZptuspn9bctJ+N/CnF5gGygcUP
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/godror/godror v0.33.1 h1:DyYJiM3ln0GjilShiLsT3WTWjo10DDHQFS0ybEhXrbk=
 github.com/godror/godror v0.33.1/go.mod h1:PjdKw92mE1ZcFoi+ORWG5ItDPQvcN4rJsRCMeIVOrnk=
+github.com/godror/godror v0.33.2 h1:7UBlS8sAfEQlV5CbkLOJQc90QM+kMthlyLbaAWhawHk=
+github.com/godror/godror v0.33.2/go.mod h1:FbrZ7po7LyS3gUTdW/K1+kIoePvP/E044HpwptL4vqw=
 github.com/godror/knownpb v0.1.0 h1:dJPK8s/I3PQzGGaGcUStL2zIaaICNzKKAK8BzP1uLio=
 github.com/godror/knownpb v0.1.0/go.mod h1:4nRFbQo1dDuwKnblRXDxrfCFYeT4hjg3GjMqef58eRE=
 github.com/gogo/googleapis v1.1.0/go.mod h1:gf4bu3Q80BeJ6H1S1vYPm8/ELATdvryBaNFGgqEef3s=
