@@ -11,13 +11,14 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/godror/godror"
 )
 
-// MaxTableSize is the maximum size of the array elements
+// MaxTableSize is the default size of the array elements
 var MaxTableSize = 128
 
 const batchSize = 1024
@@ -162,6 +163,15 @@ if DebugLevel > 0 {
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
 		fun.getPlsqlConstName(),
 	)
+	aS := "1024"
+	if fun.maxTableSize > 0 {
+		if fun.maxTableSize < 1<<16 {
+			aS = strconv.Itoa(fun.maxTableSize)
+		} else {
+			aS = "65536"
+		}
+	}
+
 	callBuf.WriteString(`
 	stmt, stmtErr := tx.PrepareContext(ctx, qry)
 	if stmtErr != nil {
@@ -172,7 +182,7 @@ if DebugLevel > 0 {
 	stmtP := fmt.Sprintf("%p", stmt)
 	dl, _ := ctx.Deadline()
 	logger.Info( "calling", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
-	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
+	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(` + aS + `))...)
 	logger.Info( "finished", funName, "stmt", stmtP, "error", err)
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -180,7 +190,7 @@ if DebugLevel > 0 {
 		}
 		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
 			// "existing state of packages has been discarded"
-			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays)...)
+			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(` + aS + `))...)
 		}
 		if err != nil {
 			qe := oracall.NewQueryError(qry, fmt.Errorf("%v: %w", params, err))
