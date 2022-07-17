@@ -7,7 +7,6 @@ package custom
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"unsafe"
 )
@@ -23,7 +22,7 @@ func ReadAll(r io.Reader, threshold int) ([]byte, error) {
 	if err != nil || buf.Len() <= threshold {
 		return buf.Bytes(), err
 	}
-	fh, err := ioutil.TempFile("", "oracall-custom-readall-")
+	fh, err := os.CreateTemp("", "oracall-custom-readall-")
 	if err != nil {
 		return buf.Bytes(), err
 	}

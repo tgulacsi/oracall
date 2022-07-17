@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -527,7 +526,7 @@ func generateAndBuild(t *testing.T, prefix string) (outFn string) {
 			" TST_ORACALL."+strings.ToUpper(prefix)+"%"+
 			" >./testdata/integration_test/generated_functions.go")
 
-	if outFh, err := ioutil.TempFile("", "oracall-integration_test"); err != nil {
+	if outFh, err := os.CreateTemp("", "oracall-integration_test"); err != nil {
 		t.Errorf("cannot create temp file: %v", err)
 		t.FailNow()
 	} else {
@@ -571,8 +570,8 @@ func runTest(t *testing.T, prog string, args ...string) string {
 	return string(out)
 }
 
-//var dsn = flag.String("connect", "", "Oracle DSN (user/passw@sid)")
-//var dbg = flag.Bool("debug", false, "print debug messages?")
+// var dsn = flag.String("connect", "", "Oracle DSN (user/passw@sid)")
+// var dbg = flag.Bool("debug", false, "print debug messages?")
 var buildOnce sync.Once
 
 func init() {

@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,7 +30,7 @@ func TestWriteStruct(t *testing.T) {
 		functions := tc.ParseCsv(t, i)
 
 		if dn == "" {
-			if dn, err = ioutil.TempDir("", "structs-"); err != nil {
+			if dn, err = os.MkdirTemp("", "structs-"); err != nil {
 				t.Skipf("cannot create temp dir: %v", err)
 				return
 			}

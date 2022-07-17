@@ -9,7 +9,7 @@ package custom
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"os"
 	"runtime"
 	"syscall"
@@ -32,7 +32,7 @@ func Mmap(f *os.File) ([]byte, error) {
 		syscall.PROT_READ,
 		syscall.MAP_PRIVATE|syscall.MAP_DENYWRITE|syscall.MAP_POPULATE)
 	if err != nil {
-		p, _ = ioutil.ReadAll(f)
+		p, _ = io.ReadAll(f)
 		return p, err
 	}
 

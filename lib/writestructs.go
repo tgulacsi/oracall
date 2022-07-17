@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"go/format"
 	"io"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -155,7 +154,7 @@ FunLoop:
 	for _, fun := range functions {
 		structW := io.Writer(w)
 		if !saveStructs {
-			structW = ioutil.Discard
+			structW = io.Discard
 		}
 		var checkName string
 		for _, dir := range []bool{false, true} {

@@ -21,7 +21,7 @@ import (
 
 	// use the original golang/protobuf package we can continue serializing
 	// messages from our dependencies, particularly from etcd
-    "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"google.golang.org/grpc/encoding"
 	_ "google.golang.org/grpc/encoding/proto"

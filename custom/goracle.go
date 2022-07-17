@@ -10,7 +10,6 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"strconv"
@@ -18,8 +17,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/godror/knownpb/timestamppb"
 	"github.com/godror/godror"
+	"github.com/godror/knownpb/timestamppb"
 )
 
 type SQLExecer interface {
@@ -106,7 +105,7 @@ func (L *Lob) read() error {
 		return L.err
 	}
 	if L.data == nil {
-		L.data, L.err = ioutil.ReadAll(L.Lob)
+		L.data, L.err = io.ReadAll(L.Lob)
 	}
 	return L.err
 }
@@ -143,11 +142,11 @@ func (L *Lob) Value() (driver.Value, error) {
 func (L *Lob) Scan(src interface{}) error {
 	switch x := src.(type) {
 	case Lob:
-		L.data, L.err = ioutil.ReadAll(L.Lob)
+		L.data, L.err = io.ReadAll(L.Lob)
 	case *Lob:
-		L.data, L.err = ioutil.ReadAll(L.Lob)
+		L.data, L.err = io.ReadAll(L.Lob)
 	case io.Reader:
-		L.data, L.err = ioutil.ReadAll(x)
+		L.data, L.err = io.ReadAll(x)
 	case []byte:
 		L.data = x
 	case string:

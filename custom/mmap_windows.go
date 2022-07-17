@@ -8,8 +8,8 @@
 package custom
 
 import (
+	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 )
 

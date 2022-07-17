@@ -7,11 +7,12 @@
 package pb
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	custom "github.com/tgulacsi/oracall/custom"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -109,7 +110,7 @@ func file_testdata_pb_ts_proto_rawDescGZIP() []byte {
 
 var file_testdata_pb_ts_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_testdata_pb_ts_proto_goTypes = []interface{}{
-	(*Ts)(nil),                  // 0: pb.Ts
+	(*Ts)(nil),               // 0: pb.Ts
 	(*custom.Timestamp)(nil), // 1: google.protobuf.Timestamp
 }
 var file_testdata_pb_ts_proto_depIdxs = []int32{

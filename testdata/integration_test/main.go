@@ -5,10 +5,10 @@
 /*
 Package main for minimal is a minimal example for oracall usage
 
-    oracall <one.csv >examples/minimal/generated_functions.go \
-    && go fmt ./examples/minimal/ \
-    && (cd examples/minimal/ && go build) \
-    && ./examples/minimal/minimal DB_web.sendpreoffer_31101
+	oracall <one.csv >examples/minimal/generated_functions.go \
+	&& go fmt ./examples/minimal/ \
+	&& (cd examples/minimal/ && go build) \
+	&& ./examples/minimal/minimal DB_web.sendpreoffer_31101
 */
 package main
 
@@ -16,7 +16,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"reflect"
@@ -63,7 +63,7 @@ func main() {
 	// parse stdin as json into the proper input struct
 	var input []byte
 	if flag.NArg() < 2 {
-		if input, err = ioutil.ReadAll(os.Stdin); err != nil {
+		if input, err = io.ReadAll(os.Stdin); err != nil {
 			log.Fatalf("error reading from stdin: %s", err)
 		}
 	} else {
