@@ -169,7 +169,7 @@ func GRPCServer(globalCtx context.Context, logger logr.Logger, verbose bool, che
 
 func StatusError(err error) error {
 	if err == nil {
-		return err
+		return nil
 	}
 	var code codes.Code
 	var sc interface {

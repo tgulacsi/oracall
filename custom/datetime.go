@@ -1,4 +1,4 @@
-// Copyright 2019, 2021 Tamás Gulácsi
+// Copyright 2019, 2022 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
