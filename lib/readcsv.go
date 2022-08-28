@@ -297,12 +297,9 @@ func mustBeUint8(text string) uint8 {
 	if text == "" {
 		return 0
 	}
-	u, e := strconv.Atoi(text)
-	if e != nil {
-		panic(e)
-	}
-	if u < 0 || u > 255 {
-		panic(fmt.Sprintf("%d out of range (not uint8)", u))
+	u, err := strconv.ParseUint(text, 10, 8)
+	if err != nil {
+		panic(err)
 	}
 	return uint8(u)
 }

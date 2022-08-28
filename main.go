@@ -166,7 +166,8 @@ func Main(args []string) error {
 		}
 		fn = filepath.Join(*flagBaseDir, dbPath, fn)
 		logger.Info("Writing generated functions", "file", fn)
-		os.MkdirAll(filepath.Dir(fn), 0775)
+		// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
+		_ = os.MkdirAll(filepath.Dir(fn), 0775)
 		outP, err := renameio.NewPendingFile(fn)
 		if err != nil {
 			return fmt.Errorf("create %s: %w", fn, err)
@@ -245,7 +246,8 @@ func Main(args []string) error {
 			pbFn = pbPkg + ".proto"
 		}
 		pbFn = filepath.Join(*flagBaseDir, pbPath, pbFn)
-		os.MkdirAll(filepath.Dir(pbFn), 0775)
+		// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
+		_ = os.MkdirAll(filepath.Dir(pbFn), 0775)
 		logger.Info("Writing Protocol Buffers", "file", pbFn)
 		fh, err := os.Create(pbFn)
 		if err != nil {
@@ -259,35 +261,33 @@ func Main(args []string) error {
 			return fmt.Errorf("SaveProtobuf: %w", err)
 		}
 
-		if true {
-			args := append(make([]string, 0, 5),
-				"--proto_path="+*flagBaseDir+":.")
-			if oracall.Gogo {
+		args := append(make([]string, 0, 5),
+			"--proto_path="+*flagBaseDir+":.")
+		if oracall.Gogo {
+			args = append(args,
+				"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
+		} else {
+			args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
+			if *flagGenerator == "go-vtproto" {
 				args = append(args,
-					"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
-			} else {
-				args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
-				if *flagGenerator == "go-vtproto" {
-					args = append(args,
-						"--"+*flagGenerator+"_out=:"+*flagBaseDir)
-				}
+					"--"+*flagGenerator+"_out=:"+*flagBaseDir)
 			}
-			cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
-			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-			logger.Info("calling", "protoc", cmd.Args)
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("%q: %w", cmd.Args, err)
-			}
-			cmd = exec.CommandContext(ctx,
-				"sed", "-i", "-e",
-				(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",}; ` +
-					`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",}; `),
-				strings.TrimSuffix(pbFn, ".proto")+".pb.go",
-			)
-			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("%q: %w", cmd.Args, err)
-			}
+		}
+		cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		logger.Info("calling", "protoc", cmd.Args)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("%q: %w", cmd.Args, err)
+		}
+		cmd = exec.CommandContext(ctx,
+			"sed", "-i", "-e",
+			(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",}; ` +
+				`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",}; `),
+			strings.TrimSuffix(pbFn, ".proto")+".pb.go",
+		)
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("%q: %w", cmd.Args, err)
 		}
 		return nil
 	})
@@ -643,9 +643,11 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 								a.Name = string(bytes.TrimSpace(b))
 							} else {
 								a.Name = string(bytes.TrimSpace(b[:i]))
-								if a.Size, err = strconv.Atoi(string(bytes.TrimSpace(b[i+1:]))); err != nil {
+								size, err := strconv.Atoi(string(bytes.TrimSpace(b[i+1:])))
+								if err != nil {
 									return err
 								}
+								a.Size = size
 							}
 						} else {
 							a.Name, a.Other = string(bytes.TrimSpace(b[:i])), string(bytes.TrimSpace(b[i+2:]))

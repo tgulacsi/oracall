@@ -1,4 +1,4 @@
-// Copyright 2017, 2021 Tamás Gulácsi
+// Copyright 2017, 2022 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -46,8 +46,10 @@ func main() {
 	srv := NewServer(db)
 	funName := flag.Arg(0)
 	rs := reflect.ValueOf(srv)
+	// nosemgrep: go.lang.security.audit.unsafe-reflect-by-name.unsafe-reflect-by-name
 	rf := rs.MethodByName(funName)
 	if !rf.IsValid() {
+		// nosemgrep: go.lang.security.audit.unsafe-reflect-by-name.unsafe-reflect-by-name
 		rf = rs.MethodByName(oracall.CamelCase(funName))
 	}
 	if !rf.IsValid() {

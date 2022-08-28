@@ -30,11 +30,17 @@ import (
 	godror "github.com/godror/godror"
 )
 
-var Timeout = DefaultTimeout
+var (
+	Timeout = DefaultTimeout
 
-const DefaultTimeout = time.Hour
+	bufpool = bp.New(4096)
+)
 
-var bufpool = bp.New(4096)
+const (
+	DefaultTimeout = time.Hour
+
+	catchPanic = false
+)
 
 func GRPCServer(globalCtx context.Context, logger logr.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
 	erroredMethods := make(map[string]struct{})
@@ -78,7 +84,7 @@ func GRPCServer(globalCtx context.Context, logger logr.Logger, verbose bool, che
 	opts := []grpc.ServerOption{
 		grpc.StreamInterceptor(
 			func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
-				if false {
+				if catchPanic {
 					defer func() {
 						if r := recover(); r != nil {
 							trace := stack.Trace().String()
@@ -111,7 +117,7 @@ func GRPCServer(globalCtx context.Context, logger logr.Logger, verbose bool, che
 
 		grpc.UnaryInterceptor(
 			func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ interface{}, err error) {
-				if false {
+				if catchPanic {
 					defer func() {
 						if r := recover(); r != nil {
 							trace := stack.Trace().String()
@@ -164,6 +170,8 @@ func GRPCServer(globalCtx context.Context, logger logr.Logger, verbose bool, che
 				return res, StatusError(err)
 			}),
 	}
+	// it should be implemented in checkAuth
+	// nosemgrep: go.grpc.security.grpc-server-insecure-connection.grpc-server-insecure-connection
 	return grpc.NewServer(append(opts, options...)...)
 }
 

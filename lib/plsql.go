@@ -4,6 +4,8 @@
 
 package oracall
 
+// text/template is used for go code, not html.
+// nosemgrep: go.lang.security.audit.xss.import-text-template.import-text-template
 import (
 	"bytes"
 	"fmt"
@@ -776,11 +778,6 @@ func (arg Argument) getConvSimpleTable(
 		}
 		if strings.HasPrefix(got, "*[]") { // FIXME(tgulacsi): just a hack, ProtoBuf never generates a pointer to a slice
 			got = got[1:]
-		}
-		if false {
-			if got == "*[]string" {
-				got = "[]string"
-			}
 		}
 		if got[0] == '*' {
 			convIn = append(convIn, fmt.Sprintf(`

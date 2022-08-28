@@ -118,6 +118,8 @@ func (dt *DateTime) IsZero() (zero bool) {
 	}()
 	return dt.Time.IsZero()
 }
+
+// nosemgrep: dgryski.semgrep-go.marshaljson.marshal-json-pointer-receiver
 func (dt *DateTime) MarshalJSON() ([]byte, error) {
 	if dt == nil || dt.IsZero() {
 		return []byte(`""`), nil
@@ -180,13 +182,13 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 			}
 		}
 	}
-	var err error
 	// Fractional seconds are handled implicitly by Parse.
-	dt.Time, err = time.ParseInLocation(layout, string(data), time.Local)
+	t, err := time.ParseInLocation(layout, string(data), time.Local)
 	//log.Printf("s=%q time=%v err=%+v", data, dt.Time, err)
 	if err != nil {
 		return fmt.Errorf("ParseInLocation(%q, %q): %w", layout, string(data), err)
 	}
+	dt.Time = t
 	return nil
 }
 
