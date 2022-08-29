@@ -731,6 +731,7 @@ var digitUnder = strings.NewReplacer(
 	"_9", "__9",
 )
 
+// CamelCase converts f_kotveny_szam to FKotvenySzam
 func CamelCase(text string) string {
 	text = replHidden(text)
 	if text == "" {
@@ -758,6 +759,26 @@ func CamelCase(text string) string {
 	},
 		text,
 	)
+}
+
+// SnakeCase converts FKotvenySzam to f_kotveny_szam
+func SnakeCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	var buf strings.Builder
+	buf.Grow(len(s) * 2)
+	for i, r := range s {
+		if 'A' <= r && r <= 'Z' {
+			if i != 0 {
+				buf.WriteByte('_')
+			}
+			buf.WriteRune(r - 'A' + 'a')
+		} else {
+			buf.WriteRune(r)
+		}
+	}
+	return buf.String()
 }
 
 type errWriter struct {
