@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-logr/logr/testr"
@@ -89,6 +90,33 @@ func TestGoName(t *testing.T) {
 	} {
 		if got := CamelCase(elt[0]); got != elt[1] {
 			t.Errorf("%d. %q => got %q, awaited %q.", eltNum, elt[0], got, elt[1])
+		}
+	}
+}
+
+func TestSnakeCase(t *testing.T) {
+	for _, tC := range []struct {
+		In, Out string
+	}{
+		{"a", "a"},
+		{"a_", "a_"},
+		{"_", "_"},
+		{"_x0", "_x0"},
+		{"A", "a"},
+		{"ABC", "a_b_c"},
+		{"FKotvenySzam", "f_kotveny_szam"},
+	} {
+		got := SnakeCase(tC.In)
+		if got != tC.Out {
+			t.Errorf("%q: got %q, wanted %q", tC.In, got, tC.Out)
+		}
+		cc := CamelCase(got)
+		if cc != tC.In {
+			if len(strings.Trim(tC.In, "_")) < 3 {
+				t.Logf("%q -> %q -> %q", tC.In, got, cc)
+			} else {
+				t.Errorf("%q -> %q -> %q", tC.In, got, cc)
+			}
 		}
 	}
 }
