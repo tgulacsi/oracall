@@ -53,16 +53,16 @@ var (
 func main() {
 	godror.SetLogger(logr.Discard())
 	oracall.SetLogger(logger.WithName("oracall").V(1))
-	if err := Main(os.Args); err != nil {
+	if err := Main(); err != nil {
 		logger.Error(err, "ERROR")
 		os.Exit(1)
 	}
 }
 
-func Main(args []string) error {
+func Main() error {
 	gopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
 
-	fs := flag.NewFlagSet("oracall", flag.ContinueOnError)
+	fs := flag.NewFlagSet("call", flag.ContinueOnError)
 	fs.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", true, "skip functions with missing TableOf info")
 	flagDump := fs.String("dump", "", "dump to this csv")
 	flagBaseDir := fs.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
@@ -78,7 +78,7 @@ func Main(args []string) error {
 
 	var db *sql.DB
 
-	oracallCmd := ffcli.Command{Name: "oracall", FlagSet: fs,
+	callCmd := ffcli.Command{Name: "call", FlagSet: fs,
 		Exec: func(ctx context.Context, args []string) error {
 			if *flagPbOut == "" {
 				if *flagDbOut == "" {
@@ -91,7 +91,10 @@ func Main(args []string) error {
 			pbPath, pbPkg := parsePkgFlag(*flagPbOut)
 			dbPath, dbPkg := parsePkgFlag(*flagDbOut)
 
-			pattern := flag.Arg(0)
+			var pattern string
+			if len(args) != 0 {
+				pattern = args[0]
+			}
 			if pattern == "" {
 				pattern = "%"
 			}
@@ -278,21 +281,39 @@ func Main(args []string) error {
 		},
 	}
 
-	genModelCmd := ffcli.Command{Name: "model",
+	fs = flag.NewFlagSet("model", flag.ContinueOnError)
+	flagModelOut := fs.String("o", "-", "output file")
+flagModelPkg := fs.String("pkg", "main", "package name to generate - when empty, no package or import is generated")
+	genModelCmd := ffcli.Command{Name: "model", FlagSet: fs,
 		Exec: func(ctx context.Context, args []string) error {
 			tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 			if err != nil {
 				return err
 			}
-			return generateModel(ctx, tx, args)
+			w := io.WriteCloser(os.Stdout)
+			closeOk := w.Close
+			if *flagModelOut == "" || *flagModelOut == "-" {
+				defer w.Close()
+			} else {
+				fh, err := renameio.NewPendingFile(*flagModelOut)
+				if err != nil {
+					return err
+				}
+				defer fh.Cleanup()
+w = fh
+				closeOk = fh.CloseAtomicallyReplace
+			}
+			if err := generateModel(ctx, w, tx, args, *flagModelPkg); err != nil {
+				return err
+			}
+			return closeOk()
 		},
 	}
 
-	fs = flag.NewFlagSet("app", flag.ContinueOnError)
+	fs = flag.NewFlagSet("oracall", flag.ContinueOnError)
 	fs.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
 	app := ffcli.Command{Name: "oracall", FlagSet: fs,
-		Subcommands: []*ffcli.Command{&oracallCmd, &genModelCmd},
-		Exec:        oracallCmd.Exec,
+		Subcommands: []*ffcli.Command{&callCmd, &genModelCmd},
 	}
 
 	if err := app.Parse(os.Args[1:]); err != nil {
