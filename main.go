@@ -15,6 +15,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -27,12 +28,13 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/UNO-SOFT/zlog"
 	"github.com/google/renameio/v2"
+	"github.com/peterbourgon/ff/v3/ffcli"
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/zerologr"
 	"github.com/rs/zerolog"
 
 	// for Oracle-specific drivers
@@ -43,10 +45,10 @@ import (
 // Should install protobuf-compiler to use it, like
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
-var zl = zerolog.New(os.Stderr).Level(zerolog.InfoLevel)
-var logger = zerologr.New(&zl)
-
-var flagConnect = flag.String("connect", "", "connect to DB for retrieving function arguments")
+var (
+	dsn    string
+	logger = zlog.New(zlog.MaybeConsoleWriter(os.Stderr))
+)
 
 func main() {
 	godror.SetLogger(logr.Discard())
@@ -58,244 +60,270 @@ func main() {
 }
 
 func Main(args []string) error {
-	os.Args = args
-
 	gopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
 
-	flag.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", true, "skip functions with missing TableOf info")
-	flagDump := flag.String("dump", "", "dump to this csv")
-	flagBaseDir := flag.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
-	flagPbOut := flag.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
-	flagDbOut := flag.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
-	flagGenerator := flag.String("protoc-gen", "go", "use protoc-gen-<generator>")
-	flag.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
-	flag.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
-	flagVerbose := flag.Bool("v", false, "verbose logging")
-	flagExcept := flag.String("except", "", "except these functions")
-	flagReplace := flag.String("replace", "", "funcA=>funcB")
-	flag.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
+	fs := flag.NewFlagSet("oracall", flag.ContinueOnError)
+	fs.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", true, "skip functions with missing TableOf info")
+	flagDump := fs.String("dump", "", "dump to this csv")
+	flagBaseDir := fs.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
+	flagPbOut := fs.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
+	flagDbOut := fs.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
+	flagGenerator := fs.String("protoc-gen", "go", "use protoc-gen-<generator>")
+	fs.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
+	fs.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
+	flagVerbose := fs.Bool("v", false, "verbose logging")
+	flagExcept := fs.String("except", "", "except these functions")
+	flagReplace := fs.String("replace", "", "funcA=>funcB")
+	fs.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
 
-	flag.Parse()
-	if *flagPbOut == "" {
-		if *flagDbOut == "" {
-			return errors.New("-pb-out or -db-out is required")
-		}
-		*flagPbOut = *flagDbOut
-	} else if *flagDbOut == "" {
-		*flagDbOut = *flagPbOut
-	}
-	pbPath, pbPkg := parsePkgFlag(*flagPbOut)
-	dbPath, dbPkg := parsePkgFlag(*flagDbOut)
+	var db *sql.DB
 
-	pattern := flag.Arg(0)
-	if pattern == "" {
-		pattern = "%"
-	}
-	oracall.Gogo = strings.HasPrefix(*flagGenerator, "gogo")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-
-	var functions []oracall.Function
-	var err error
-
-	filters := [](func(string) bool){func(string) bool { return true }}
-	filter := func(s string) bool {
-		for _, f := range filters {
-			if !f(s) {
-				return false
-			}
-		}
-		return true
-	}
-	if *flagExcept != "" {
-		except := strings.FieldsFunc(*flagExcept, func(r rune) bool { return r == ',' || unicode.IsSpace(r) })
-		logger.Info("found", "except", except)
-		filters = append(filters, func(s string) bool {
-			for _, e := range except {
-				if strings.EqualFold(e, s) {
-					return false
+	oracallCmd := ffcli.Command{Name: "oracall", FlagSet: fs,
+		Exec: func(ctx context.Context, args []string) error {
+			if *flagPbOut == "" {
+				if *flagDbOut == "" {
+					return errors.New("-pb-out or -db-out is required")
 				}
+				*flagPbOut = *flagDbOut
+			} else if *flagDbOut == "" {
+				*flagDbOut = *flagPbOut
 			}
-			return true
-		})
+			pbPath, pbPkg := parsePkgFlag(*flagPbOut)
+			dbPath, dbPkg := parsePkgFlag(*flagDbOut)
+
+			pattern := flag.Arg(0)
+			if pattern == "" {
+				pattern = "%"
+			}
+			oracall.Gogo = strings.HasPrefix(*flagGenerator, "gogo")
+
+			var functions []oracall.Function
+			var err error
+
+			filters := [](func(string) bool){func(string) bool { return true }}
+			filter := func(s string) bool {
+				for _, f := range filters {
+					if !f(s) {
+						return false
+					}
+				}
+				return true
+			}
+			if *flagExcept != "" {
+				except := strings.FieldsFunc(*flagExcept, func(r rune) bool { return r == ',' || unicode.IsSpace(r) })
+				logger.Info("found", "except", except)
+				filters = append(filters, func(s string) bool {
+					for _, e := range except {
+						if strings.EqualFold(e, s) {
+							return false
+						}
+					}
+					return true
+				})
+			}
+
+			var annotations []oracall.Annotation
+			if db == nil {
+				if pattern != "%" {
+					rPattern := regexp.MustCompile("(?i)" + strings.Replace(strings.Replace(pattern, ".", "[.]", -1), "%", ".*", -1))
+					filters = append(filters, func(s string) bool {
+						return rPattern.MatchString(s)
+					})
+				}
+				functions, err = oracall.ParseCsvFile("", filter)
+			} else {
+				functions, annotations, err = parseDB(ctx, db, pattern, *flagDump, filter)
+			}
+			if err != nil {
+				return fmt.Errorf("read %s: %w", flag.Arg(0), err)
+			}
+
+			defer os.Stdout.Sync()
+			out := os.Stdout
+			var testOut *os.File
+			if dbPath != "" && dbPath != "-" {
+				fn := "oracall.go"
+				if dbPkg != "main" {
+					fn = dbPkg + ".go"
+				}
+				fn = filepath.Join(*flagBaseDir, dbPath, fn)
+				logger.Info("Writing generated functions", "file", fn)
+				// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
+				_ = os.MkdirAll(filepath.Dir(fn), 0775)
+				outP, err := renameio.NewPendingFile(fn)
+				if err != nil {
+					return fmt.Errorf("create %s: %w", fn, err)
+				}
+				defer outP.Cleanup()
+				out = outP.File
+				testFn := fn[:len(fn)-3] + "_test.go"
+				testOutP, err := renameio.NewPendingFile(testFn)
+				if err != nil {
+					return fmt.Errorf("create %s: %w", testFn, err)
+				}
+				defer testOutP.Cleanup()
+				testOut = testOutP.File
+				defer func() {
+					if err := outP.CloseAtomicallyReplace(); err != nil {
+						logger.Error(err, "close", "file", out.Name())
+					}
+					if err := testOutP.CloseAtomicallyReplace(); err != nil {
+						logger.Error(err, "close", "file", testOut.Name())
+					}
+				}()
+			}
+
+			*flagReplace = strings.TrimSpace(*flagReplace)
+			for _, elt := range strings.FieldsFunc(
+				rReplace.ReplaceAllLiteralString(*flagReplace, "=>"),
+				func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
+				i := strings.Index(elt, "=>")
+				if i < 0 {
+					continue
+				}
+				a := oracall.Annotation{Type: "replace", Name: elt[:i], Other: elt[i+2:]}
+				if i = strings.IndexByte(a.Name, '.'); i >= 0 {
+					a.Package, a.Name = a.Name[:i], a.Name[i+1:]
+					a.Other = strings.TrimPrefix(a.Other, a.Package)
+				}
+				annotations = append(annotations, a)
+			}
+			logger.Info("got", "annotations", annotations)
+			functions = oracall.ApplyAnnotations(functions, annotations)
+			sort.Slice(functions, func(i, j int) bool { return functions[i].Name() < functions[j].Name() })
+
+			var grp errgroup.Group
+			grp.Go(func() error {
+				pbPath := pbPath
+				if pbPath == dbPath {
+					pbPath = ""
+				}
+				if err := oracall.SaveFunctions(
+					out, functions,
+					dbPkg, pbPath, false,
+				); err != nil {
+					return fmt.Errorf("save functions: %w", err)
+				}
+				return nil
+			})
+			if testOut != nil {
+				grp.Go(func() error {
+					pbPath := pbPath
+					if pbPath == dbPath {
+						pbPath = ""
+					}
+					if err := oracall.SaveFunctionTests(
+						testOut, functions,
+						dbPkg, pbPath, false,
+					); err != nil {
+						return fmt.Errorf("save function tests: %w", err)
+					}
+					return nil
+				})
+			}
+
+			grp.Go(func() error {
+				pbFn := "oracall.proto"
+				if pbPkg != "main" {
+					pbFn = pbPkg + ".proto"
+				}
+				pbFn = filepath.Join(*flagBaseDir, pbPath, pbFn)
+				// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
+				_ = os.MkdirAll(filepath.Dir(pbFn), 0775)
+				logger.Info("Writing Protocol Buffers", "file", pbFn)
+				fh, err := os.Create(pbFn)
+				if err != nil {
+					return fmt.Errorf("create proto: %w", err)
+				}
+				err = oracall.SaveProtobuf(fh, functions, pbPkg, pbPath)
+				if closeErr := fh.Close(); closeErr != nil && err == nil {
+					err = closeErr
+				}
+				if err != nil {
+					return fmt.Errorf("SaveProtobuf: %w", err)
+				}
+
+				args := append(make([]string, 0, 5),
+					"--proto_path="+*flagBaseDir+":.")
+				if oracall.Gogo {
+					args = append(args,
+						"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
+				} else {
+					args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
+					if *flagGenerator == "go-vtproto" {
+						args = append(args,
+							"--"+*flagGenerator+"_out=:"+*flagBaseDir)
+					}
+				}
+				cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
+				cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+				logger.Info("calling", "protoc", cmd.Args)
+				if err := cmd.Run(); err != nil {
+					return fmt.Errorf("%q: %w", cmd.Args, err)
+				}
+				cmd = exec.CommandContext(ctx,
+					"sed", "-i", "-e",
+					(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",}; ` +
+						`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",}; `),
+					strings.TrimSuffix(pbFn, ".proto")+".pb.go",
+				)
+				cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+				if err := cmd.Run(); err != nil {
+					return fmt.Errorf("%q: %w", cmd.Args, err)
+				}
+				return nil
+			})
+
+			return grp.Wait()
+		},
 	}
 
-	var annotations []oracall.Annotation
-	if *flagConnect == "" {
-		if pattern != "%" {
-			rPattern := regexp.MustCompile("(?i)" + strings.Replace(strings.Replace(pattern, ".", "[.]", -1), "%", ".*", -1))
-			filters = append(filters, func(s string) bool {
-				return rPattern.MatchString(s)
-			})
-		}
-		functions, err = oracall.ParseCsvFile("", filter)
-	} else {
-		var cx *sql.DB
-		P, parseErr := godror.ParseConnString(*flagConnect)
+	genModelCmd := ffcli.Command{Name: "model",
+		Exec: func(ctx context.Context, args []string) error {
+			tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+			if err != nil {
+				return err
+			}
+			return generateModel(ctx, tx, args)
+		},
+	}
+
+	fs = flag.NewFlagSet("app", flag.ContinueOnError)
+	fs.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
+	app := ffcli.Command{Name: "oracall", FlagSet: fs,
+		Subcommands: []*ffcli.Command{&oracallCmd, &genModelCmd},
+		Exec:        oracallCmd.Exec,
+	}
+
+	if err := app.Parse(os.Args[1:]); err != nil {
+		return err
+	}
+
+	if dsn != "" {
+		P, parseErr := godror.ParseConnString(dsn)
 		if parseErr != nil {
-			return fmt.Errorf("%s: %w", *flagConnect, parseErr)
+			return fmt.Errorf("%s: %w", dsn, parseErr)
 		}
 		P.StandaloneConnection = false
-		cx = sql.OpenDB(godror.NewConnector(P))
-		defer cx.Close()
-		cx.SetMaxIdleConns(0)
+		db = sql.OpenDB(godror.NewConnector(P))
+		defer db.Close()
+		db.SetMaxIdleConns(0)
 		if *flagVerbose {
-			zl = zl.Level(zerolog.TraceLevel)
-			logger = logger.WithSink(zerologr.NewLogSink(&zl))
+			zlog.SetLevel(logger, zerolog.TraceLevel)
 			godror.SetLogger(logger.WithName("godror").V(0))
 			oracall.SetLogger(logger.WithName("oracall").V(0))
 		}
-		if err = cx.Ping(); err != nil {
-			return fmt.Errorf("ping %s: %w", *flagConnect, err)
+		if err := db.Ping(); err != nil {
+			return fmt.Errorf("ping %s: %w", dsn, err)
 		}
-
-		functions, annotations, err = parseDB(ctx, cx, pattern, *flagDump, filter)
-	}
-	if err != nil {
-		return fmt.Errorf("read %s: %w", flag.Arg(0), err)
 	}
 
-	defer os.Stdout.Sync()
-	out := os.Stdout
-	var testOut *os.File
-	if dbPath != "" && dbPath != "-" {
-		fn := "oracall.go"
-		if dbPkg != "main" {
-			fn = dbPkg + ".go"
-		}
-		fn = filepath.Join(*flagBaseDir, dbPath, fn)
-		logger.Info("Writing generated functions", "file", fn)
-		// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
-		_ = os.MkdirAll(filepath.Dir(fn), 0775)
-		outP, err := renameio.NewPendingFile(fn)
-		if err != nil {
-			return fmt.Errorf("create %s: %w", fn, err)
-		}
-		defer outP.Cleanup()
-		out = outP.File
-		testFn := fn[:len(fn)-3] + "_test.go"
-		testOutP, err := renameio.NewPendingFile(testFn)
-		if err != nil {
-			return fmt.Errorf("create %s: %w", testFn, err)
-		}
-		defer testOutP.Cleanup()
-		testOut = testOutP.File
-		defer func() {
-			if err := outP.CloseAtomicallyReplace(); err != nil {
-				logger.Error(err, "close", "file", out.Name())
-			}
-			if err := testOutP.CloseAtomicallyReplace(); err != nil {
-				logger.Error(err, "close", "file", testOut.Name())
-			}
-		}()
-	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
 
-	*flagReplace = strings.TrimSpace(*flagReplace)
-	for _, elt := range strings.FieldsFunc(
-		rReplace.ReplaceAllLiteralString(*flagReplace, "=>"),
-		func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
-		i := strings.Index(elt, "=>")
-		if i < 0 {
-			continue
-		}
-		a := oracall.Annotation{Type: "replace", Name: elt[:i], Other: elt[i+2:]}
-		if i = strings.IndexByte(a.Name, '.'); i >= 0 {
-			a.Package, a.Name = a.Name[:i], a.Name[i+1:]
-			a.Other = strings.TrimPrefix(a.Other, a.Package)
-		}
-		annotations = append(annotations, a)
-	}
-	logger.Info("got", "annotations", annotations)
-	functions = oracall.ApplyAnnotations(functions, annotations)
-	sort.Slice(functions, func(i, j int) bool { return functions[i].Name() < functions[j].Name() })
-
-	var grp errgroup.Group
-	grp.Go(func() error {
-		pbPath := pbPath
-		if pbPath == dbPath {
-			pbPath = ""
-		}
-		if err := oracall.SaveFunctions(
-			out, functions,
-			dbPkg, pbPath, false,
-		); err != nil {
-			return fmt.Errorf("save functions: %w", err)
-		}
-		return nil
-	})
-	if testOut != nil {
-		grp.Go(func() error {
-			pbPath := pbPath
-			if pbPath == dbPath {
-				pbPath = ""
-			}
-			if err := oracall.SaveFunctionTests(
-				testOut, functions,
-				dbPkg, pbPath, false,
-			); err != nil {
-				return fmt.Errorf("save function tests: %w", err)
-			}
-			return nil
-		})
-	}
-
-	grp.Go(func() error {
-		pbFn := "oracall.proto"
-		if pbPkg != "main" {
-			pbFn = pbPkg + ".proto"
-		}
-		pbFn = filepath.Join(*flagBaseDir, pbPath, pbFn)
-		// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
-		_ = os.MkdirAll(filepath.Dir(pbFn), 0775)
-		logger.Info("Writing Protocol Buffers", "file", pbFn)
-		fh, err := os.Create(pbFn)
-		if err != nil {
-			return fmt.Errorf("create proto: %w", err)
-		}
-		err = oracall.SaveProtobuf(fh, functions, pbPkg, pbPath)
-		if closeErr := fh.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-		if err != nil {
-			return fmt.Errorf("SaveProtobuf: %w", err)
-		}
-
-		args := append(make([]string, 0, 5),
-			"--proto_path="+*flagBaseDir+":.")
-		if oracall.Gogo {
-			args = append(args,
-				"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
-		} else {
-			args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
-			if *flagGenerator == "go-vtproto" {
-				args = append(args,
-					"--"+*flagGenerator+"_out=:"+*flagBaseDir)
-			}
-		}
-		cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
-		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-		logger.Info("calling", "protoc", cmd.Args)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%q: %w", cmd.Args, err)
-		}
-		cmd = exec.CommandContext(ctx,
-			"sed", "-i", "-e",
-			(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",}; ` +
-				`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",}; `),
-			strings.TrimSuffix(pbFn, ".proto")+".pb.go",
-		)
-		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%q: %w", cmd.Args, err)
-		}
-		return nil
-	})
-
-	if err := grp.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return app.Run(ctx)
 }
 
 type dbRow struct {

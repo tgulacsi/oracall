@@ -90,7 +90,7 @@ func TestGenSimple(t *testing.T) {
 	} {
 		todo := todo
 		t.Run(todo.Name, func(t *testing.T) {
-			got := runTest(t, outFn, "-connect="+*flagConnect, oracall.CamelCase(todo.Name), todo.In)
+			got := runTest(t, outFn, "-connect="+dsn, oracall.CamelCase(todo.Name), todo.In)
 			todo.Await = strings.TrimSpace(todo.Await)
 			if strings.Contains(todo.Await, "{{NOW}}") {
 				todo.Await = strings.Replace(todo.Await,
@@ -139,7 +139,7 @@ func TestGenRec(t *testing.T) {
 	} {
 		todo := todo
 		t.Run(todo[0], func(t *testing.T) {
-			got := runTest(t, outFn, "-connect="+*flagConnect, todo[0], todo[1])
+			got := runTest(t, outFn, "-connect="+dsn, todo[0], todo[1])
 			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
 			if diff := jsonEqual(strings.TrimSpace(got), todo[2]); diff != "" {
 				t.Errorf("%d. awaited\n\t%s\ngot\n\t%s\ndiff\n\t%s", i, todo[2], got, diff)
@@ -522,7 +522,7 @@ func build(t *testing.T) {
 
 func generateAndBuild(t *testing.T, prefix string) (outFn string) {
 	runCommand(t, "sh", "-c",
-		"oracall -connect='"+*flagConnect+"' -pb-out=github.com/tgulacsi/oracall/testdata/integration_test/pb:pb"+
+		"oracall -connect='"+dsn+"' -pb-out=github.com/tgulacsi/oracall/testdata/integration_test/pb:pb"+
 			" TST_ORACALL."+strings.ToUpper(prefix)+"%"+
 			" >./testdata/integration_test/generated_functions.go")
 
@@ -585,14 +585,14 @@ func getConnection(t *testing.T) *sql.DB {
 		return db
 	}
 
-	if !(flagConnect != nil && *flagConnect != "") {
+	if dsn == "" {
 		t.Logf("cannot test connection without dsn!")
 		t.FailNow()
 	}
 	var err error
-	db, err = sql.Open("godror", *flagConnect)
+	db, err = sql.Open("godror", dsn)
 	if err != nil {
-		log.Panicf("error creating connection to %s: %s", *flagConnect, err)
+		log.Panicf("error creating connection to %s: %s", dsn, err)
 	}
 	return db
 }
