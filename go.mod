@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	github.com/UNO-SOFT/zlog v0.0.1
+	github.com/UNO-SOFT/zlog v0.1.2
 	github.com/go-logr/logr v1.2.3
 	github.com/godror/knownpb v0.1.0
 	github.com/google/renameio/v2 v2.0.0
@@ -34,7 +34,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	golang.org/x/sys v0.0.0-20220702020025-31831981b65f // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/term v0.0.0-20220919170432-7a66f970e087 // indirect
 	golang.org/x/text v0.3.7 // indirect
 )
