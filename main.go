@@ -1,4 +1,4 @@
-// Copyright 2017, 2022 Tamás Gulácsi
+// Copyright 2017, 2023 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -28,14 +28,13 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/UNO-SOFT/zlog"
+	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/renameio/v2"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
 	"github.com/go-logr/logr"
-	"github.com/rs/zerolog"
 
 	// for Oracle-specific drivers
 	"github.com/godror/godror"
@@ -47,12 +46,12 @@ import (
 
 var (
 	dsn    string
-	logger = zlog.New(zlog.MaybeConsoleWriter(os.Stderr))
+	logger = zlog.New(os.Stderr)
 )
 
 func main() {
 	godror.SetLogger(logr.Discard())
-	oracall.SetLogger(logger.WithName("oracall").V(1))
+	oracall.SetLogger(logger.WithGroup("oracall").AsLogr().V(1))
 	if err := Main(); err != nil {
 		logger.Error(err, "ERROR")
 		os.Exit(1)
@@ -283,7 +282,7 @@ func Main() error {
 
 	fs = flag.NewFlagSet("model", flag.ContinueOnError)
 	flagModelOut := fs.String("o", "-", "output file")
-flagModelPkg := fs.String("pkg", "main", "package name to generate - when empty, no package or import is generated")
+	flagModelPkg := fs.String("pkg", "main", "package name to generate - when empty, no package or import is generated")
 	genModelCmd := ffcli.Command{Name: "model", FlagSet: fs,
 		Exec: func(ctx context.Context, args []string) error {
 			tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
@@ -300,7 +299,7 @@ flagModelPkg := fs.String("pkg", "main", "package name to generate - when empty,
 					return err
 				}
 				defer fh.Cleanup()
-w = fh
+				w = fh
 				closeOk = fh.CloseAtomicallyReplace
 			}
 			if err := generateModel(ctx, w, tx, args, *flagModelPkg); err != nil {
@@ -330,9 +329,9 @@ w = fh
 		defer db.Close()
 		db.SetMaxIdleConns(0)
 		if *flagVerbose {
-			zlog.SetLevel(logger, zerolog.TraceLevel)
-			godror.SetLogger(logger.WithName("godror").V(0))
-			oracall.SetLogger(logger.WithName("oracall").V(0))
+			zlog.SetLevel(logger, zlog.TraceLevel)
+			godror.SetLogger(logger.WithGroup("godror").AsLogr().V(0))
+			oracall.SetLogger(logger.WithGroup("oracall").AsLogr().V(0))
 		}
 		if err := db.Ping(); err != nil {
 			return fmt.Errorf("ping %s: %w", dsn, err)
