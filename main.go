@@ -51,7 +51,7 @@ var (
 
 func main() {
 	godror.SetLogger(logr.Discard())
-	oracall.SetLogger(logger.WithGroup("oracall").AsLogr().V(1))
+	oracall.SetLogger(logger.WithGroup("oracall").Logr().V(1))
 	if err := Main(); err != nil {
 		logger.Error(err, "ERROR")
 		os.Exit(1)
@@ -330,8 +330,8 @@ func Main() error {
 		db.SetMaxIdleConns(0)
 		if *flagVerbose {
 			zlog.SetLevel(logger, zlog.TraceLevel)
-			godror.SetLogger(logger.WithGroup("godror").AsLogr().V(0))
-			oracall.SetLogger(logger.WithGroup("oracall").AsLogr().V(0))
+			godror.SetLogger(logger.WithGroup("godror").Logr().V(0))
+			oracall.SetLogger(logger.WithGroup("oracall").Logr().V(0))
 		}
 		if err := db.Ping(); err != nil {
 			return fmt.Errorf("ping %s: %w", dsn, err)
