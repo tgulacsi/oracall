@@ -228,8 +228,8 @@ func goNumType(precision, scale uint8) string {
 
 // QueryError holds a query with a (hopefully parsed) error with line info.
 type QueryError struct {
-	query, line  string
 	err          error
+	query, line  string
 	code, lineNo int
 }
 
