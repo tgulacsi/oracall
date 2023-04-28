@@ -110,7 +110,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	}
 	fmt.Fprintf(callBuf, `
 	logger := s.Logger
-	if lgr, err := oracall.FromContext(ctx); err == nil {
+	if lgr := oracall.FromContext(ctx); lgr != nil {
 		logger = lgr
 	}
 	if err = ctx.Err(); err != nil { return }
@@ -154,12 +154,12 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 if s.DBLog != nil {
 	var err error
 	if ctx, err = s.DBLog(ctx, tx, funName, input); err != nil {
-		logger.Error(err, "dbLog", "fun", funName)
+		logger.Error("dbLog", "fun", funName, "error", err)
 	}
 }
 const callText = `+"`%s`"+`
 if DebugLevel > 0 {
-	logger.Info("calling", "qry", callText, "stmt", `+"`%s`"+`)
+	logger.Debug("calling", "qry", callText, "stmt", `+"`%s`"+`)
 }
 	qry := %s
 `,
@@ -186,7 +186,7 @@ if DebugLevel > 0 {
 	defer stmt.Close()
 	stmtP := fmt.Sprintf("%p", stmt)
 	dl, _ := ctx.Deadline()
-	logger.Info( "calling", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
+	logger.Debug( "calling", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
 	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(` + aS + `))...)
 	logger.Info( "finished", funName, "stmt", stmtP, "error", err)
 	if err != nil {
@@ -203,7 +203,7 @@ if DebugLevel > 0 {
 			if s.DBLog != nil {
 				var logErr error
 				if _, logErr = s.DBLog(ctx, tx, funName, err); logErr != nil {
-					logger.Error(logErr, "dbLog", "fun", funName, "error", err)
+					logger.Error("dbLog", "fun", funName, "error", logErr)
 				}
 			}
 			if qe.Code() == 6502 {  // Numeric or Value Error
@@ -214,7 +214,7 @@ if DebugLevel > 0 {
 	}
     `)
 
-	callBuf.WriteString("\nif DebugLevel > 0 { logger.Info(`result params`, params, `output`, output) }\n")
+	callBuf.WriteString("\nif DebugLevel > 0 { logger.Debug(`result params`, params, `output`, output) }\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -242,7 +242,7 @@ if DebugLevel > 0 {
 					continue
 				}
 				if !errors.Is(err, io.EOF) {
-					logger.Error(err,  "iterate")
+					logger.Error("iterate", "error", err)
 					return
 				}
 			}
