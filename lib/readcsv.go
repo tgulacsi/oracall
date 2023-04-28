@@ -123,7 +123,7 @@ func OpenCsv(filename string) (*os.File, error) {
 func MustOpenCsv(filename string) *os.File {
 	fh, err := OpenCsv(filename)
 	if err != nil {
-		logger.Error(err, "MustOpenCsv", "file", filename)
+		logger.Error("MustOpenCsv", "file", filename, "error", err)
 		panic(fmt.Errorf("%s: %w", filename, err))
 	}
 	return fh
@@ -246,7 +246,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []
 				ua.DataScale,
 				ua.CharLength,
 			)
-			logger.V(1).Info("ParseArgument", "level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
+			logger.Debug("ParseArgument", "level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
 			// Possibilities:
 			// 1. SIMPLE
 			// 2. RECORD at level 0

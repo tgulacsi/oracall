@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-logr/logr/testr"
+	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestQuery078(t *testing.T) {
-	logger = testr.New(t)
+	logger = zlog.NewT(t).SLog()
 	functions, err := ParseCsv(strings.NewReader(query078Csv), nil)
 	if err != nil {
 		t.Errorf("error parsing csv: %v", err)

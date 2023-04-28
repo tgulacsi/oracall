@@ -197,7 +197,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 				}
 			}
 			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, subArgs...); err != nil {
-				logger.Error(err, "protoWriteMessageTyp")
+				logger.Error("protoWriteMessageTyp", "error", err)
 				return err
 			}
 		}

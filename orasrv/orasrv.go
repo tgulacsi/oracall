@@ -1,4 +1,4 @@
-// Copyright 2017, 2022 Tamas Gulacsi
+// Copyright 2017, 2023 Tamas Gulacsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/UNO-SOFT/zlog/v2"
@@ -43,6 +44,12 @@ const (
 
 	catchPanic = false
 )
+
+func FromContext(ctx context.Context) *slog.Logger { return oracall.FromContext(ctx) }
+func WithContext(ctx context.Context, logger *slog.Logger) context.Context {
+	return oracall.WithContext(ctx, logger)
+}
+func NewT(t *testing.T) *slog.Logger { return zlog.NewT(t).SLog() }
 
 func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, checkAuth func(ctx context.Context, path string) error, options ...grpc.ServerOption) *grpc.Server {
 	erroredMethods := make(map[string]struct{})

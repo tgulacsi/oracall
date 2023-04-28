@@ -34,8 +34,6 @@ import (
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 
-	"github.com/go-logr/logr"
-
 	// for Oracle-specific drivers
 	"github.com/godror/godror"
 )
@@ -45,15 +43,16 @@ import (
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
 var (
-	dsn    string
-	logger = zlog.New(os.Stderr)
+	dsn     string
+	verbose zlog.VerboseVar
+	logger  = zlog.NewLogger(zlog.MaybeConsoleHandler(&verbose, os.Stderr)).SLog()
 )
 
 func main() {
-	godror.SetLogger(logr.Discard())
-	oracall.SetLogger(logger.WithGroup("oracall").Logr().V(1))
+	godror.SetLogger(zlog.NewLogger(logger.Handler()).Logr())
+	oracall.SetLogger(logger.WithGroup("oracall"))
 	if err := Main(); err != nil {
-		logger.Error(err, "ERROR")
+		logger.Error("ERROR", "error", err)
 		os.Exit(1)
 	}
 }
@@ -70,7 +69,7 @@ func Main() error {
 	flagGenerator := fs.String("protoc-gen", "go", "use protoc-gen-<generator>")
 	fs.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
 	fs.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
-	flagVerbose := fs.Bool("v", false, "verbose logging")
+	fs.Var(&verbose, "v", "verbose logging")
 	flagExcept := fs.String("except", "", "except these functions")
 	flagReplace := fs.String("replace", "", "funcA=>funcB")
 	fs.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
@@ -167,10 +166,10 @@ func Main() error {
 				testOut = testOutP.File
 				defer func() {
 					if err := outP.CloseAtomicallyReplace(); err != nil {
-						logger.Error(err, "close", "file", out.Name())
+						logger.Error("close", "file", out.Name(), "error", err)
 					}
 					if err := testOutP.CloseAtomicallyReplace(); err != nil {
-						logger.Error(err, "close", "file", testOut.Name())
+						logger.Error("close", "file", testOut.Name(), "error", err)
 					}
 				}()
 			}
@@ -328,11 +327,6 @@ func Main() error {
 		db = sql.OpenDB(godror.NewConnector(P))
 		defer db.Close()
 		db.SetMaxIdleConns(0)
-		if *flagVerbose {
-			zlog.SetLevel(logger, zlog.TraceLevel)
-			godror.SetLogger(logger.WithGroup("godror").Logr().V(0))
-			oracall.SetLogger(logger.WithGroup("oracall").Logr().V(0))
-		}
 		if err := db.Ping(); err != nil {
 			return fmt.Errorf("ping %s: %w", dsn, err)
 		}
@@ -443,7 +437,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		var resolveTypeShort func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error)
 		var err error
 		if collStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
-			logger.Error(err, "ERROR", "qry", qry)
+			logger.Error("ERROR", "qry", qry, "error", err)
 		} else {
 			defer collStmt.Close()
 			if rows, err := collStmt.QueryContext(grpCtx,
@@ -470,7 +464,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
                        owner = :owner AND table_name = :pkg
 				 ORDER BY attr_no`
 				if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
-					logger.Error(err, "qry", qry)
+					logger.Error("qry", qry, "error", err)
 				} else {
 					defer attrStmt.Close()
 					if rows, err := attrStmt.QueryContext(grpCtx,
@@ -492,7 +486,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			qry, pattern, pattern, godror.FetchArraySize(1024), godror.PrefetchCount(1025),
 		)
 		if err != nil {
-			logger.Error(err, "qry", qry)
+			logger.Error("qry", qry, "error", err)
 			return fmt.Errorf("%s: %w", qry, err)
 		}
 		defer rows.Close()
@@ -586,7 +580,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		}
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
-			logger.Error(err, "create", "dump", dumpFn)
+			logger.Error("create", "dump", dumpFn, "error", err)
 			return functions, annotations, fmt.Errorf("%s: %w", dumpFn, err)
 		}
 		defer func() {
@@ -595,10 +589,10 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			err = fmt.Errorf("csv flush: %w", cw.Error())
 			cwMu.Unlock()
 			if err != nil {
-				logger.Error(err, "flush", "csv", fh.Name())
+				logger.Error("flush", "csv", fh.Name(), "error", err)
 			}
 			if err = fh.Close(); err != nil {
-				logger.Error(err, "close", "dump", fh.Name())
+				logger.Error("close", "dump", fh.Name(), "error", err)
 			}
 		}()
 		cwMu.Lock()
@@ -606,7 +600,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		err = cw.Write(colNames)
 		cwMu.Unlock()
 		if err != nil {
-			logger.Error(err, "write header to csv")
+			logger.Error("write header to csv", "error", err)
 			return functions, annotations, fmt.Errorf("write header: %w", err)
 		}
 	}
@@ -672,9 +666,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 					defer bufPool.Put(buf)
 					buf.Reset()
 
-					logger := logger.WithValues("package", ua.PackageName)
+					logger := logger.With("package", ua.PackageName)
 					if srcErr := getSource(ctx, buf, cx, ua.PackageName); srcErr != nil {
-						logger.Error(srcErr, "getSource")
+						logger.Error("getSource", "error", srcErr)
 						return nil
 					}
 					replMu.Lock()
@@ -772,7 +766,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 	grp.Go(func() error { oracall.FilterAndGroup(filteredArgs, userArgs, filter); return nil })
 	functions = oracall.ParseArguments(filteredArgs, filter)
 	if grpErr := grp.Wait(); grpErr != nil {
-		logger.Error(grpErr, "ParseArguments")
+		logger.Error("ParseArguments", "error", grpErr)
 	}
 	docNames := make([]string, 0, len(docs))
 	for k := range docs {

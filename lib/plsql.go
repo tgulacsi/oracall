@@ -8,6 +8,7 @@ package oracall
 // nosemgrep: go.lang.security.audit.xss.import-text-template.import-text-template
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"go/format"
 	"io"
@@ -16,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+
+	"golang.org/x/exp/slog"
 
 	"github.com/godror/godror"
 )
@@ -29,7 +32,7 @@ const batchSize = 1024
 func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
-		logger.Error(err, "error preparing", "function", fun)
+		logger.Error("error preparing", "function", fun, "error", err)
 		panic(fmt.Errorf("%s: %w", fun.Name(), err))
 	}
 	fn := fun.name
@@ -107,7 +110,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	}
 	fmt.Fprintf(callBuf, `
 	logger := s.Logger
-	if lgr, err := logr.FromContext(ctx); err == nil {
+	if lgr, err := oracall.FromContext(ctx); err == nil {
 		logger = lgr
 	}
 	if err = ctx.Err(); err != nil { return }
@@ -359,7 +362,7 @@ func demap(plsql, callFun string) (string, string) {
 		old := prev[idx]
 		if old == "" {
 			fmt.Fprintf(callBuf, "params[%d] = params[%d]  // %s\n", v.New, v.Old, v.Name)
-			logger.Error(fmt.Errorf("cannot find %q in %+v", idx, prev), "plusIdx", v)
+			logger.Error("plusIdx", "v", v, "error", fmt.Errorf("cannot find %q in %+v", idx, prev))
 		} else {
 			if !strings.HasPrefix(old, "sql.Out{") {
 				if old[0] != '&' {
@@ -1146,5 +1149,15 @@ type byNewRemap []idxRemap
 func (s byNewRemap) Len() int           { return len(s) }
 func (s byNewRemap) Less(i, j int) bool { return s[i].Old < s[j].Old }
 func (s byNewRemap) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+type ctxLogger struct{}
+
+func WithContext(ctx context.Context, logger *slog.Logger) context.Context {
+	return context.WithValue(ctx, ctxLogger{}, logger)
+}
+func FromContext(ctx context.Context) *slog.Logger {
+	logger, _ := ctx.Value(ctxLogger{}).(*slog.Logger)
+	return logger
+}
 
 // vim: se noet fileencoding=utf-8:

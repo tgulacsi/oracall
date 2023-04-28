@@ -89,8 +89,6 @@ import (
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 	"github.com/godror/godror"
 
-	"github.com/go-logr/logr"
-
 	`+pbImport+`
 )
 
@@ -108,7 +106,6 @@ var _ time.Time
 var _ timestamppb.Timestamp
 var _ strings.Reader
 var _ xml.Name
-var _ logr.Logger
 var _ = errors.New
 var _ = fmt.Printf
 var _ godror.Lob
@@ -124,7 +121,7 @@ type iterator struct {
 }
 
 type oracallServer struct {
-	logr.Logger
+	*slog.Logger
 	db *sql.DB
 	tags map[string][]string
 	DBLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error)
@@ -134,7 +131,7 @@ type oracallServer struct {
 
 func NewServer(
 	db *sql.DB, 
-	logger logr.Logger, 
+	logger *slog.Logger, 
     dbLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error),
 ) *oracallServer {
 	return &oracallServer{
@@ -160,7 +157,7 @@ FunLoop:
 		for _, dir := range []bool{false, true} {
 			if err = fun.SaveStruct(structW, dir); err != nil {
 				if SkipMissingTableOf && (errors.Is(err, ErrMissingTableOf) || errors.Is(err, ErrUnknownSimpleType)) {
-					logger.Error(err, "SKIP function, missing TableOf info", "function", fun.Name())
+					logger.Error("SKIP function, missing TableOf info", "function", fun.Name(), "error", err)
 					continue FunLoop
 				}
 				return err
@@ -171,7 +168,7 @@ FunLoop:
 		io.WriteString(w, plsBlock)
 		io.WriteString(w, "`\n\n")
 		if b, err = format.Source([]byte(callFun)); err != nil {
-			logger.Error(err, "saving function", "function", fun.Name())
+			logger.Error("saving function", "function", fun.Name(), "error", err)
 			os.Stderr.WriteString("\n\n---------------------8<--------------------\n")
 			os.Stderr.WriteString(callFun)
 			os.Stderr.WriteString("\n--------------------->8--------------------\n\n")
@@ -227,7 +224,6 @@ import (
     "time"    
 
 	"github.com/go-logfmt/logfmt"
-	"github.com/go-logr/logr/testr"
 
 	_ "github.com/godror/godror" // Oracle
 	`+pbImport+`
@@ -247,7 +243,7 @@ func testSetup(t *testing.T) *oracallServer {
 		if testDB, err = sql.Open("godror", *flagConnect); err != nil {
 			panic(fmt.Errorf("%s: %s", *flagConnect, err))
 		}
-		testServer = NewServer(testDB, testr.New(t), nil)
+		testServer = NewServer(testDB, orasrv.NewT(t), nil)
 	})
 	return testServer
 }

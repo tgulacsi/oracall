@@ -15,13 +15,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-logr/logr/testr"
+	"github.com/UNO-SOFT/zlog/v2"
 )
 
 var flagKeep = flag.Bool("keep", false, "keep temp files")
 
 func TestWriteStruct(t *testing.T) {
-	logger = testr.New(t)
+	logger = zlog.NewT(t).SLog()
 	var (
 		dn, fn string
 		keep   = *flagKeep

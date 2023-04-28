@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-logr/logr"
+	"golang.org/x/exp/slog"
 )
 
 // Log is discarded by default.
-var logger = logr.Discard()
+var logger *slog.Logger
 
-func SetLogger(lgr logr.Logger) { logger = lgr }
+func SetLogger(lgr *slog.Logger) { logger = lgr }
 
 const (
 	MarkNull = "\u2400" // 0x2400 = nul
