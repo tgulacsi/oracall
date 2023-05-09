@@ -186,9 +186,9 @@ if DebugLevel > 0 {
 	defer stmt.Close()
 	stmtP := fmt.Sprintf("%p", stmt)
 	dl, _ := ctx.Deadline()
-	logger.Debug( "calling", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
+	logger.Debug( "calling", "fun", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
 	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(` + aS + `))...)
-	logger.Info( "finished", funName, "stmt", stmtP, "error", err)
+	logger.Info( "finished", "fun", funName, "stmt", stmtP, "error", err)
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return
