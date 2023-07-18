@@ -26,6 +26,10 @@ func TestDateTimeXML(t *testing.T) {
 			S:  `<element xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"></element>`,
 		},
 		{
+			Dt: custom.DateTime{Time: time.Date(2023, 6, 30, 0, 0, 0, 0, time.Local)},
+			S:  `<element>2023-06-30</element>`,
+		},
+		{
 			Dt: custom.DateTime{Time: time.Date(2019, 10, 22, 16, 56, 32, 0, time.Local)},
 			S:  `<element>2019-10-22T16:56:32+02:00</element>`,
 		},
@@ -35,7 +39,7 @@ func TestDateTimeXML(t *testing.T) {
 		},
 		{
 			Dt: custom.DateTime{Time: time.Date(2023, 6, 30, 0, 0, 0, 0, time.Local)},
-			S:  `<element>2023-06-30</element>`,
+			S:  `<element>2023-06-30+02:00</element>`,
 		},
 	} {
 		//t.Log(tC)
@@ -45,6 +49,7 @@ func TestDateTimeXML(t *testing.T) {
 		}
 		if got := buf.String(); tC.S != got &&
 			got != strings.Replace(tC.S, ":00.000+", ":00+", 1) &&
+			tC.S != strings.Replace(got, "T00:00:00+", "+", 1) &&
 			tC.S != strings.Replace(got, "T00:00:00+02:00", "", 1) {
 			t.Errorf("%v: got %q wanted %q", tC.Dt, got, tC.S)
 		}

@@ -163,6 +163,13 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 	if bytes.IndexByte(data, '.') >= 19 {
 		layout = time.RFC3339Nano
 	}
+	var layoutSuffix string
+	if n > 6 && (data[n-6] == '+' || data[n-6] == '-') && data[n-3] == ':' {
+		data = data[:n-6]
+		n -= 6
+		layout = layout[:len(layout)-6]
+		layoutSuffix = "Z07:00"
+	}
 	if n < 10 {
 		layout = "20060102"
 	} else {
@@ -186,6 +193,12 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 			}
 		}
 	}
+	if layoutSuffix != "" {
+		layout += layoutSuffix
+		data = data[:n+6]
+		n += 6
+	}
+	//fmt.Println("n:", n, "layout:", layout)
 	// Fractional seconds are handled implicitly by Parse.
 	t, err := time.ParseInLocation(layout, string(data), time.Local)
 	//log.Printf("s=%q time=%v err=%+v", data, dt.Time, err)
