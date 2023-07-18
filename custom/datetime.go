@@ -39,7 +39,11 @@ type DateTime struct {
 func getWriter(enc *xml.Encoder) *bufio.Writer {
 	rEnc := reflect.ValueOf(enc)
 	rP := rEnc.Elem().FieldByName("p").Addr()
-	return *(**bufio.Writer)(unsafe.Pointer(rP.Elem().FieldByName("Writer").UnsafeAddr()))
+	field := "w"
+	if _, ok := rP.Elem().Type().FieldByName(field); !ok {
+		field = "Writer"
+	}
+	return *(**bufio.Writer)(unsafe.Pointer(rP.Elem().FieldByName(field).UnsafeAddr()))
 }
 
 func (dt *DateTime) Format(layout string) string {
