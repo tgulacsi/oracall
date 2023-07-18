@@ -13,23 +13,49 @@ import (
 	"github.com/tgulacsi/oracall/custom"
 )
 
-func TestDateTimeMarshalXML(t *testing.T) {
+func TestDateTimeXML(t *testing.T) {
 	var buf strings.Builder
 	enc := xml.NewEncoder(&buf)
 	st := xml.StartElement{Name: xml.Name{Local: "element"}}
 	for _, tC := range []struct {
-		In   custom.DateTime
-		Want string
+		Dt custom.DateTime
+		S  string
 	}{
-		{In: custom.DateTime{}, Want: `<element xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"></element>`},
-		{In: custom.DateTime{Time: time.Date(2019, 10, 22, 16, 56, 32, 0, time.Local)}, Want: `<element>2019-10-22T16:56:32+02:00</element>`},
+		{
+			Dt: custom.DateTime{},
+			S:  `<element xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"></element>`,
+		},
+		{
+			Dt: custom.DateTime{Time: time.Date(2019, 10, 22, 16, 56, 32, 0, time.Local)},
+			S:  `<element>2019-10-22T16:56:32+02:00</element>`,
+		},
+		{
+			Dt: custom.DateTime{Time: time.Date(2023, 6, 30, 0, 0, 0, 0, time.Local)},
+			S:  `<element>2023-06-30T00:00:00.000+02:00</element>`,
+		},
+		{
+			Dt: custom.DateTime{Time: time.Date(2023, 6, 30, 0, 0, 0, 0, time.Local)},
+			S:  `<element>2023-06-30</element>`,
+		},
 	} {
+		//t.Log(tC)
 		buf.Reset()
-		if err := tC.In.MarshalXML(enc, st); err != nil {
-			t.Fatalf("%v: %+v", tC.In, err)
+		if err := tC.Dt.MarshalXML(enc, st); err != nil {
+			t.Fatalf("%v: %+v", tC.Dt, err)
 		}
-		if got := buf.String(); tC.Want != got {
-			t.Errorf("%v: got %q wanted %q", tC.In, got, tC.Want)
+		if got := buf.String(); tC.S != got &&
+			got != strings.Replace(tC.S, ":00.000+", ":00+", 1) &&
+			tC.S != strings.Replace(got, "T00:00:00+02:00", "", 1) {
+			t.Errorf("%v: got %q wanted %q", tC.Dt, got, tC.S)
+		}
+
+		var dt custom.DateTime
+		if err := xml.Unmarshal([]byte(tC.S), &dt); err != nil {
+			t.Fatalf("%v: %+v", tC.S, err)
+		}
+		t.Log(dt)
+		if !dt.Time.Equal(tC.Dt.Time) {
+			t.Errorf("%v: got %q wanted %q", tC.S, dt, tC.Dt)
 		}
 	}
 }
