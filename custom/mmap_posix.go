@@ -30,7 +30,7 @@ func Mmap(f *os.File) ([]byte, error) {
 	}
 	p, err := syscall.Mmap(int(f.Fd()), 0, int(fi.Size()),
 		syscall.PROT_READ,
-		syscall.MAP_PRIVATE|syscall.MAP_DENYWRITE|syscall.MAP_POPULATE)
+		syscall.MAP_PRIVATE|0x800|0x8000)
 	if err != nil {
 		p, _ = io.ReadAll(f)
 		return p, err
