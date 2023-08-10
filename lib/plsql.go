@@ -600,7 +600,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
 					callArgs[arg.Name] = vn
-					decls = append(decls, vn+" "+arg.TypeName+"; --C="+arg.Name)
+					decls = append(decls, vn+" "+arg.TypeName+ " := " + arg.TypeName + "()" + "; --C="+arg.Name)
 
 					aname := (CamelCase(arg.Name))
 					//aname := capitalize(replHidden(arg.Name))
@@ -633,7 +633,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							err = fmt.Errorf("nonsense table type of %s", arg)
 							return
 						}
-						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D="+arg.Name)
+						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+ " := " + typ + "()" + "; --D="+arg.Name)
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
 						if arg.IsInput() {
@@ -676,6 +676,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							k, *arg.TableOf)
 
 						if arg.IsInput() {
+							pre = append(pre,
+								"  "+vn+".extend;")
 							pre = append(pre,
 								"  "+vn+"(i1)."+k+" := "+tmp+"(i1);")
 						}
