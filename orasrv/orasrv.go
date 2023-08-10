@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/UNO-SOFT/zlog/v2"
-	"golang.org/x/exp/slog"
+	"github.com/UNO-SOFT/zlog/v2/slog"
 
 	bp "github.com/tgulacsi/go/bufpool"
 	oracall "github.com/tgulacsi/oracall/lib"

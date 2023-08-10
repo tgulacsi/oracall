@@ -18,7 +18,7 @@ import (
 	"strings"
 	"text/template"
 
-	"golang.org/x/exp/slog"
+	"github.com/UNO-SOFT/zlog/v2/slog"
 
 	"github.com/godror/godror"
 )

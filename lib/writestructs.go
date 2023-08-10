@@ -88,7 +88,7 @@ import (
 	"github.com/godror/knownpb/timestamppb"
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 	"github.com/godror/godror"
-	"golang.org/x/exp/slog"
+	"github.com/UNO-SOFT/zlog/v2/slog"
 
 	`+pbImport+`
 )
@@ -225,7 +225,7 @@ import (
     "time"    
 
 	"github.com/go-logfmt/logfmt"
-	"golang.org/x/exp/slog"
+	"github.com/UNO-SOFT/zlog/v2/slog"
 	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
 
 	_ "github.com/godror/godror" // Oracle
