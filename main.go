@@ -263,16 +263,16 @@ func Main() error {
 				if err := cmd.Run(); err != nil {
 					return fmt.Errorf("%q: %w", cmd.Args, err)
 				}
-				//cmd = exec.CommandContext(ctx,
-				//	"sed", "-i", "-e",
-				//	(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",}; ` +
-				//		`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",}; `),
-				//	strings.TrimSuffix(pbFn, ".proto")+".pb.go",
-				//)
-				//cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-				//if err := cmd.Run(); err != nil {
-				//	return fmt.Errorf("%q: %w", cmd.Args, err)
-				//}
+				cmd = exec.CommandContext(ctx,
+					"sed", "-i", "-e",
+					(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",; ` +
+						`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",; `),
+					strings.TrimSuffix(pbFn, ".proto")+".pb.go",
+				)
+				cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+				if err := cmd.Run(); err != nil {
+					return fmt.Errorf("%q: %w", cmd.Args, err)
+				}
 				return nil
 			})
 
@@ -309,7 +309,7 @@ func Main() error {
 		},
 	}
 
-	//fs = flag.NewFlagSet("oracall", flag.ContinueOnError)
+	fs = flag.NewFlagSet("oracall", flag.ContinueOnError)
 	fs.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
 	app := ffcli.Command{Name: "oracall", FlagSet: fs,
 		Subcommands: []*ffcli.Command{&callCmd, &genModelCmd},
