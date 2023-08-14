@@ -49,7 +49,7 @@ var (
 )
 
 func main() {
-	godror.SetLogger(zlog.NewLogger(logger.Handler()).Logr())
+	godror.SetLogger(logger)
 	oracall.SetLogger(logger.WithGroup("oracall"))
 	if err := Main(); err != nil {
 		logger.Error("ERROR", "error", err)
@@ -264,8 +264,8 @@ func Main() error {
 				}
 				cmd = exec.CommandContext(ctx,
 					"sed", "-i", "-e",
-					(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ {s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",}; ` +
-						`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ {s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",}; `),
+					(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",; ` +
+						`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",; `),
 					strings.TrimSuffix(pbFn, ".proto")+".pb.go",
 				)
 				cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr

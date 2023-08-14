@@ -62,8 +62,8 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 		}
 		reqID := ContextGetReqID(ctx)
 		ctx = ContextWithReqID(ctx, reqID)
-		lgr := zlog.NewLogger(logger.With("reqID", reqID).Handler())
-		ctx = zlog.NewContext(ctx, lgr)
+		lgr := logger.With("reqID", reqID)
+		ctx = zlog.NewSContext(ctx, lgr)
 		verbose := verbose
 		var wasThere bool
 		if !verbose {
@@ -72,9 +72,8 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 			erroredMethodsMu.RUnlock()
 			wasThere = verbose
 		} else {
-			logger := zlog.NewLogger(logger.WithGroup("godror").Handler())
-			godror.SetLogger(logger.Logr())
-			ctx = zlog.NewContext(ctx, logger)
+			godror.SetLogger(logger.WithGroup("godror"))
+			ctx = zlog.NewSContext(ctx, logger)
 		}
 		commit := func(err error) {
 			if wasThere && err == nil {
@@ -87,7 +86,7 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				erroredMethodsMu.Unlock()
 			}
 		}
-		return lgr.SLog(), commit, ctx, cancel
+		return lgr, commit, ctx, cancel
 	}
 
 	opts := []grpc.ServerOption{
