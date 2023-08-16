@@ -500,7 +500,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 				decls = append(decls, ");")
 			}
-			decls = append(decls, vn+" "+arg.TypeName+"; --E="+arg.Name)
+			decls = append(decls, vn+" "+arg.TypeName+ " := " + arg.TypeName + "()" + "; --E="+arg.Name)
 			callArgs[arg.Name] = vn
 			aname := (CamelCase(arg.Name))
 			//aname := capitalize(replHidden(arg.Name))
@@ -572,7 +572,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 					vn = getInnerVarName(fun.Name(), arg.Name)
 					callArgs[arg.Name] = vn
-					decls = append(decls, vn+" "+arg.TypeName+"; --B="+arg.Name)
+					decls = append(decls, vn+" "+arg.TypeName+ " := " + arg.TypeName + "()" + "; --B="+arg.Name)
 					if arg.IsInput() {
 						pre = append(pre,
 							vn+".DELETE;",
