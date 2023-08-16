@@ -22,7 +22,7 @@ require (
 )
 
 require (
-	github.com/UNO-SOFT/zlog v0.7.4
+	github.com/UNO-SOFT/zlog v0.7.6
 	github.com/godror/knownpb v0.1.1
 	github.com/google/renameio/v2 v2.0.0
 	github.com/peterbourgon/ff/v3 v3.4.0
