@@ -142,7 +142,7 @@ type Argument struct {
 	Name           string
 	Type, TypeName string
 	AbsType        string
-	Charset        string
+	Charset, IndexBy string
 	RecordOf       []NamedArgument //this argument is a record (map) of this type
 	PlsType
 	Charlength uint
@@ -176,7 +176,7 @@ func (a Argument) IsOutput() bool {
 
 // Should check for Associative Array (when using INDEX BY)
 func (a Argument) IsNestedTable() bool {
-	if a.Type == "TABLE" {
+	if a.Type == "TABLE" && a.IndexBy == ""{
 		return true
 	}
 
