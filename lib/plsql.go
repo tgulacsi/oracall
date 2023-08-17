@@ -676,8 +676,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							k, *arg.TableOf)
 
 						if arg.IsInput() {
-							pre = append(pre,
-								"  "+vn+".extend;")
+							if arg.IsNestedTable() {
+								pre = append(pre,
+									"  "+vn+".extend;")
+							}
 							pre = append(pre,
 								"  "+vn+"(i1)."+k+" := "+tmp+"(i1);")
 						}

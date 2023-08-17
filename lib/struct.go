@@ -174,6 +174,15 @@ func (a Argument) IsOutput() bool {
 	return a.Direction&DIR_OUT > 0
 }
 
+// Should check for Associative Array (when using INDEX BY)
+func (a Argument) IsNestedTable() bool {
+	if a.Type == "TABLE" {
+		return true
+	}
+
+	return false
+}
+
 func NewArgument(name, dataType, plsType, typeName, dirName string, dir direction,
 	charset string, precision, scale uint8, charlength uint) Argument {
 
