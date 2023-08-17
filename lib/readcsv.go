@@ -30,6 +30,7 @@ type UserArgument struct {
 	DataType string `sql:"DATA_TYPE"`
 
 	CharacterSetName string `sql:"CHARACTER_SET_NAME"`
+	IndexBy          string `sql:"INDEX_BY"`
 
 	PlsType     string `sql:"PLS_TYPE"`
 	TypeLink    string `sql:"TYPE_LINK"`
@@ -153,7 +154,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	for _, h := range []string{"OBJECT_ID", "SUBPROGRAM_ID", "PACKAGE_NAME",
 		"OBJECT_NAME", "DATA_LEVEL", "SEQUENCE", "ARGUMENT_NAME", "IN_OUT",
 		"DATA_TYPE", "DATA_PRECISION", "DATA_SCALE", "CHARACTER_SET_NAME",
-		"PLS_TYPE", "CHAR_LENGTH",
+		"INDEX_BY", "PLS_TYPE", "CHAR_LENGTH",
 		"TYPE_LINK", "TYPE_OWNER", "TYPE_NAME", "TYPE_SUBNAME"} {
 		csvFields[h] = -1
 	}
@@ -195,6 +196,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			DataScale:     mustBeUint8(rec[csvFields["DATA_SCALE"]]),
 
 			CharacterSetName: rec[csvFields["CHARACTER_SET_NAME"]],
+			IndexBy:          rec[csvFields["INDEX_BY"]],
 			CharLength:       mustBeUint(rec[csvFields["CHAR_LENGTH"]]),
 
 			PlsType:     rec[csvFields["PLS_TYPE"]],
@@ -242,6 +244,7 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []
 				ua.InOut,
 				0,
 				ua.CharacterSetName,
+				ua.IndexBy,
 				ua.DataPrecision,
 				ua.DataScale,
 				ua.CharLength,

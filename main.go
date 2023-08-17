@@ -49,7 +49,7 @@ var (
 )
 
 func main() {
-	godror.SetLogger(zlog.NewLogger(logger.Handler()).Logr())
+	godror.SetLogger(logger)
 	oracall.SetLogger(logger.WithGroup("oracall"))
 	if err := Main(); err != nil {
 		logger.Error("ERROR", "error", err)
@@ -353,14 +353,15 @@ func (r dbRow) String() string {
 }
 
 type dbType struct {
-	Argument                                       string
-	Data, PLS, Owner, Name, Subname, Link, Charset string
-	Level                                          int
-	Prec, Scale, Length                            sql.NullInt64
+	Argument                        string
+	Data, PLS, Owner, Name, Subname string
+	Link, Charset, IndexBy          string
+	Level                           int
+	Prec, Scale, Length             sql.NullInt64
 }
 
 func (t dbType) String() string {
-	return fmt.Sprintf("%s{%s}[%d](%s/%s.%s.%s@%s)", t.Argument, t.Data, t.Level, t.PLS, t.Owner, t.Name, t.Subname, t.Link)
+	return fmt.Sprintf("%s{%s}[%d](%s[%s]/%s.%s.%s@%s)", t.Argument, t.Data, t.Level, t.PLS, t.IndexBy, t.Owner, t.Name, t.Subname, t.Link)
 }
 
 func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, annotations []oracall.Annotation, err error) {
@@ -374,7 +375,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
     (SELECT DISTINCT object_id object_id, subprogram_id, sequence*100 seq,
            package_name, object_name,
            data_level, argument_name, in_out,
-           data_type, data_precision, data_scale, character_set_name,
+           data_type, data_precision, data_scale, character_set_name, NULL AS index_by,
            pls_type, char_length, type_owner, type_name, type_subname, type_link
       FROM ` + tbl + `
       WHERE data_type <> 'OBJECT' AND package_name||'.'||object_name LIKE UPPER(:1)
@@ -382,7 +383,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
      SELECT DISTINCT object_id object_id, subprogram_id, A.sequence*100 + B.attr_no,
             package_name, object_name,
             A.data_level, B.attr_name, A.in_out,
-            B.ATTR_TYPE_NAME, B.PRECISION, B.scale, B.character_set_name,
+            B.ATTR_TYPE_NAME, B.PRECISION, B.scale, B.character_set_name, NULL AS index_by,
             NVL2(B.ATTR_TYPE_OWNER, B.attr_type_owner||'.', '')||B.attr_type_name, B.length,
 			NULL, NULL, NULL, NULL
        FROM all_type_attrs B, ` + tbl + ` A
@@ -497,7 +498,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			var row dbRow
 			if err = rows.Scan(&row.OID, &row.SubID, &row.Seq, &row.Package, &row.Object,
 				&row.Level, &row.Argument, &row.InOut,
-				&row.Data, &row.Prec, &row.Scale, &row.Charset,
+				&row.Data, &row.Prec, &row.Scale, &row.Charset, &row.IndexBy,
 				&row.PLS, &row.Length, &row.Owner, &row.Name, &row.Subname, &row.Link,
 			); err != nil {
 				return fmt.Errorf("reading row=%v: %w", rows, err)
@@ -523,7 +524,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				for _, p := range plus {
 					row.Seq = seq
 					seq++
-					row.Argument, row.Data, row.Length, row.Prec, row.Scale, row.Charset = p.Argument, p.Data, p.Length, p.Prec, p.Scale, p.Charset
+					row.Argument, row.Data, row.Length, row.Prec, row.Scale, row.Charset, row.IndexBy = p.Argument, p.Data, p.Length, p.Prec, p.Scale, p.Charset, p.IndexBy
 					row.Owner, row.Name, row.Subname, row.Link = p.Owner, p.Name, p.Subname, p.Link
 					row.Level = p.Level
 					select {
@@ -587,7 +588,10 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 		defer func() {
 			cwMu.Lock()
 			cw.Flush()
-			err = fmt.Errorf("csv flush: %w", cw.Error())
+			err := cw.Error()
+			if err != nil {
+				err = fmt.Errorf("csv flush: %w", err)
+			}
 			cwMu.Unlock()
 			if err != nil {
 				logger.Error("flush", "csv", fh.Name(), "error", err)
@@ -644,7 +648,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 				err := cw.Write([]string{
 					strconv.Itoa(row.OID), N(row.SubID), strconv.Itoa(row.Seq), row.Package.String, row.Object.String,
 					strconv.Itoa(row.Level), row.Argument, ua.InOut,
-					ua.DataType, N(row.Prec), N(row.Scale), row.Charset,
+					ua.DataType, N(row.Prec), N(row.Scale), row.Charset, row.IndexBy,
 					row.PLS, N(row.Length),
 					row.Owner, row.Name, row.Subname, row.Link,
 				})
@@ -728,6 +732,9 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			}
 			if row.Charset != "" {
 				ua.CharacterSetName = row.Charset
+			}
+			if row.IndexBy != "" {
+				ua.IndexBy = row.IndexBy
 			}
 			if row.PLS != "" {
 				ua.PlsType = row.PLS
@@ -854,11 +861,11 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 		defer rows.Close()
 		for rows.Next() {
 			var t dbType
-			var indexBy, typeCode string
+			var typeCode string
 			if err = rows.Scan(&t.Data, &t.Owner, &t.Subname, &t.Name,
-				&t.Length, &t.Prec, &t.Scale, &t.Charset, &indexBy, &typeCode,
+				&t.Length, &t.Prec, &t.Scale, &t.Charset, &t.IndexBy, &typeCode,
 			); err != nil {
-				return plus, err
+				return plus, fmt.Errorf("%v: %w", collStmt, err)
 			}
 			if typeCode != "COLLECTION" {
 				t.Data = typeCode
@@ -908,7 +915,7 @@ func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, 
 			if err = rows.Scan(&t.Argument, &t.Owner, &t.Subname, &t.Name,
 				&t.Length, &t.Prec, &t.Scale, &t.Charset, &attrNo, &typeCode,
 			); err != nil {
-				return plus, err
+				return plus, fmt.Errorf("%v: %w", attrStmt, err)
 			}
 			t.Data = typeCode
 			if typeCode == "COLLECTION" {
