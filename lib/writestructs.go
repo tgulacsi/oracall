@@ -28,8 +28,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 
 	var tagB strings.Builder
 	if pkg != "" {
-		var pbPkg string
-		pbPkg = CamelCase(path.Base(pbImport))
+		pbPkg := CamelCase(path.Base(pbImport))
 
 		if pbImport != "" {
 			pbImport = `pb "` + pbImport + `"`
