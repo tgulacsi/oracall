@@ -136,14 +136,14 @@ const (
 )
 
 type Argument struct {
-	TableOf        *Argument // this argument is a table (array) of this type
-	mu             *sync.Mutex
-	goTypeName     string
-	Name           string
-	Type, TypeName string
-	AbsType        string
-	Charset        string
-	RecordOf       []NamedArgument //this argument is a record (map) of this type
+	TableOf          *Argument // this argument is a table (array) of this type
+	mu               *sync.Mutex
+	goTypeName       string
+	Name             string
+	Type, TypeName   string
+	AbsType          string
+	Charset, IndexBy string
+	RecordOf         []NamedArgument //this argument is a record (map) of this type
 	PlsType
 	Charlength uint
 	Flavor     flavor
@@ -175,7 +175,7 @@ func (a Argument) IsOutput() bool {
 }
 
 func NewArgument(name, dataType, plsType, typeName, dirName string, dir direction,
-	charset string, precision, scale uint8, charlength uint) Argument {
+	charset, indexBy string, precision, scale uint8, charlength uint) Argument {
 
 	name = strings.ToLower(name)
 	if typeName == "..@" {
@@ -204,8 +204,8 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 		PlsType:  NewPlsType(plsType, precision, scale),
 		TypeName: typeName, Direction: dir,
 		Precision: precision, Scale: scale, Charlength: charlength,
-		Charset: charset,
-		mu:      new(sync.Mutex),
+		Charset: charset, IndexBy: indexBy,
+		mu: new(sync.Mutex),
 	}
 	if arg.ora == "" {
 		panic(fmt.Sprintf("empty PLS type of %#v", arg))

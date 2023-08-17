@@ -931,47 +931,47 @@ func (arg Argument) getFromRset(rsetRow string) string {
 }
 
 /*
-func getOutConvTSwitch(name, pTyp string) string {
-	parse := ""
-	if strings.HasPrefix(pTyp, "int") {
-		bits := "32"
-		if len(pTyp) == 5 {
-			bits = pTyp[3:5]
-		}
-		parse = "ParseInt(xi, 10, " + bits + ")"
-	} else if strings.HasPrefix(pTyp, "float") {
-		bits := pTyp[5:7]
-		parse = "ParseFloat(xi, " + bits + ")"
-	}
-	if parse != "" {
-		return fmt.Sprintf(`
-			var y `+pTyp+`
-			err = nil
-			switch xi := x.(type) {
-				case int: y = `+pTyp+`(xi)
-				case int8: y = `+pTyp+`(xi)
-				case int16: y = `+pTyp+`(xi)
-				case int32: y = `+pTyp+`(xi)
-				case int64: y = `+pTyp+`(xi)
-				case float32: y = `+pTyp+`(xi)
-				case float64: y = `+pTyp+`(xi)
-				case string:
-					z, e := strconv.`+parse+`
-					y, err = `+pTyp+`(z), e
-				default:
-					err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
+	func getOutConvTSwitch(name, pTyp string) string {
+		parse := ""
+		if strings.HasPrefix(pTyp, "int") {
+			bits := "32"
+			if len(pTyp) == 5 {
+				bits = pTyp[3:5]
 			}
-			if err != nil {
-				return
-			}`, name, pTyp)
-	}
-	return fmt.Sprintf(`
-				y, ok := x.(%s)
-				if !ok {
-					err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
+			parse = "ParseInt(xi, 10, " + bits + ")"
+		} else if strings.HasPrefix(pTyp, "float") {
+			bits := pTyp[5:7]
+			parse = "ParseFloat(xi, " + bits + ")"
+		}
+		if parse != "" {
+			return fmt.Sprintf(`
+				var y `+pTyp+`
+				err = nil
+				switch xi := x.(type) {
+					case int: y = `+pTyp+`(xi)
+					case int8: y = `+pTyp+`(xi)
+					case int16: y = `+pTyp+`(xi)
+					case int32: y = `+pTyp+`(xi)
+					case int64: y = `+pTyp+`(xi)
+					case float32: y = `+pTyp+`(xi)
+					case float64: y = `+pTyp+`(xi)
+					case string:
+						z, e := strconv.`+parse+`
+						y, err = `+pTyp+`(z), e
+					default:
+						err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
+				}
+				if err != nil {
 					return
-				}`, pTyp, name, pTyp)
-}
+				}`, name, pTyp)
+		}
+		return fmt.Sprintf(`
+					y, ok := x.(%s)
+					if !ok {
+						err = fmt.Errorf("out parameter %s is bad type: awaited %s, got %%T", x)
+						return
+					}`, pTyp, name, pTyp)
+	}
 */
 func (arg Argument) getConvRec(
 	convIn, convOut []string,
