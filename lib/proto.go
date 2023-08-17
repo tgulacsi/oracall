@@ -21,7 +21,7 @@ var Gogo bool
 var NumberAsString bool
 
 //go:generate sh ./download-protoc.sh
-//go:generate go install google.golang.org/protobuf/protoc-gen-go@latest
+//go:generate go install github.com/golang/protobuf/protoc-gen-go@latest
 // go:generate go get -u github.com/gogo/protobuf/protoc-gen-gogofast
 // go:generate go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
 //go:generate go install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@latest

@@ -11,6 +11,7 @@ import (
 	"go/format"
 	"io"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 	"sync"
@@ -27,6 +28,8 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 
 	var tagB strings.Builder
 	if pkg != "" {
+		pbPkg := CamelCase(path.Base(pbImport))
+
 		if pbImport != "" {
 			pbImport = `pb "` + pbImport + `"`
 		}
@@ -41,7 +44,7 @@ func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, sa
 		}
 		var implement string
 		if !Gogo {
-			implement = "pb.Unimplemented" + CamelCase(pkg) + "Server"
+			implement = "pb.Unimplemented" + pbPkg + "Server"
 		}
 		tagB.Reset()
 		for _, fun := range functions {

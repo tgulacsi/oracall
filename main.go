@@ -73,6 +73,7 @@ func Main() error {
 	flagExcept := fs.String("except", "", "except these functions")
 	flagReplace := fs.String("replace", "", "funcA=>funcB")
 	fs.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
+	fs.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
 
 	var db *sql.DB
 

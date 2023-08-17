@@ -22,7 +22,7 @@ rmdir include || echo ''
 if [ ! -e $GOPATH/src/google/api/annotations.proto ] || [ ! -e $GOPATH/src/google/api/timestamp.proto ]; then
 	rm -rf $GOPATH/src/google/api
 	set -x
-	go get github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway
+	go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
 	mkdir -p $GOPATH/src/google
 	ln -s $GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/v2/third_party/googleapis/google/api $GOPATH/src/google/api
 fi
@@ -32,4 +32,6 @@ rm -rf "$tmpdir"
 if which protoc-gen-gofast 2>/dev/null && which protoc-gen-go 2>/dev/null; then
 	exit 0
 fi
-go get -u github.com/gogo/protobuf/protoc-gen-gofast@latest google.golang.org/protobuf/cmd/protoc-gen-go@latest google.golang.org/grpc/cmd/protoc-gen-go-grpc
+go install github.com/gogo/protobuf/protoc-gen-gofast@1.3.2
+go install google.golang.org/protobuf/cmd/protoc-gen-go@1.3.2
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
