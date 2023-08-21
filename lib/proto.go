@@ -162,7 +162,9 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		got = strings.TrimPrefix(got, "*")
 		if strings.HasPrefix(got, "[]") {
-			rule = "repeated "
+			if got[2:] != "byte" {
+				rule = "repeated "
+			}
 			got = got[2:]
 		}
 		got = strings.TrimPrefix(got, "*")
@@ -280,7 +282,7 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 		}
 		return "google.protobuf.Timestamp", nil
 
-	case "raw":
+	case "raw", "byte":
 		return "bytes", nil
 
 	case "godror.lob", "ora.lob":
