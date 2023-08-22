@@ -26,6 +26,7 @@ const (
 	MarkHidden = "_hidden"
 
 	DefaultMaxVARCHARLength = 32767
+	DefaultMaxRAWLength     = 32767
 	DefaultMaxCHARLength    = 10
 )
 
@@ -176,7 +177,7 @@ func (a Argument) IsOutput() bool {
 
 // Should check for Associative Array (when using INDEX BY)
 func (a Argument) IsNestedTable() bool {
-	if a.Type == "TABLE" && a.IndexBy == ""{
+	if a.Type == "TABLE" && a.IndexBy == "" {
 		return true
 	}
 
@@ -232,9 +233,12 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 	}
 
 	switch arg.Type {
-	case "CHAR", "NCHAR", "VARCHAR", "NVARCHAR", "VARCHAR2", "NVARCHAR2":
+	case "CHAR", "NCHAR", "VARCHAR", "NVARCHAR", "VARCHAR2", "NVARCHAR2",
+		"RAW":
 		if arg.Charlength == 0 {
-			if strings.Contains(arg.Type, "VAR") {
+			if arg.Type == "RAW" {
+				arg.Charlength = DefaultMaxRAWLength
+			} else if strings.Contains(arg.Type, "VAR") {
 				arg.Charlength = DefaultMaxVARCHARLength
 			} else {
 				arg.Charlength = DefaultMaxCHARLength

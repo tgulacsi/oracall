@@ -216,10 +216,10 @@ if DebugLevel > 0 {
     `)
 
 	callBuf.WriteString("\nif DebugLevel > 0 { logger.Debug(`result params`, params, `output`, output) }\n")
-	callBuf.WriteString("\nif s.AfterHook != nil { if err = s.AfterHook(ctx, funName, params, output); err != nil { return }}\n")
 	for _, line := range convOut {
 		io.WriteString(callBuf, line+"\n")
 	}
+	callBuf.WriteString("\nif s.AfterHook != nil { if err = s.AfterHook(ctx, funName, params, output); err != nil { return }}\n")
 	if !hasCursorOut {
 		fmt.Fprintf(callBuf, "\nerr = tx.Commit()\nreturn\n")
 	} else {
