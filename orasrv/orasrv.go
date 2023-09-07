@@ -118,8 +118,13 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				wss.WrappedContext = ctx
 				start := time.Now()
 				err = handler(srv, wss)
-				lgr.Info("handler", "RESP", info.FullMethod, "dur", time.Since(start).String(), "error", err)
+				dur := time.Since(start)
 				commit(err)
+				lvl := slog.LevelInfo
+				if err != nil {
+					lvl = slog.LevelError
+				}
+				lgr.Log(ctx, lvl, "handler", "method", info.FullMethod, "dur", dur.String(), "error", err)
 				return StatusError(err)
 			}),
 
@@ -165,15 +170,21 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 
 				start := time.Now()
 				res, err := handler(ctx, req)
-
-				logger.Info("handled", "RESP", info.FullMethod, "dur", time.Since(start).String(), "error", err)
+				dur := time.Since(start)
 				commit(err)
 
 				buf.Reset()
-				if jErr := jenc.Encode(res); err != nil {
-					logger.Error("marshal", jErr, "res", res, "error", err)
+				if jErr := jenc.Encode(res); jErr != nil {
+					buf.Reset()
+					fmt.Fprintf(buf, "%+v", res)
+					logger.Error("marshal", "response", buf.String(), "error", jErr)
 				}
-				logger.Info("encoded", "RESP", res, "error", err)
+				lvl := slog.LevelInfo
+				if err != nil {
+					lvl = slog.LevelError
+				}
+				logger.Log(ctx, lvl, "handled", "method", info.FullMethod, "response", buf.String(),
+					"dur", dur.String(), "error", err)
 
 				return res, StatusError(err)
 			}),
