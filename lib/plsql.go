@@ -502,7 +502,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 				decls = append(decls, ");")
 			}
-			decls = append(decls, vn+" "+arg.TypeName+" := "+arg.TypeName+"()"+"; --E="+arg.Name)
+			if arg.IsNestedTable() {
+				decls = append(decls, vn+" "+arg.TypeName+" := "+arg.TypeName+"()"+"; --E="+arg.Name)
+			} else {
+				decls = append(decls, vn+" "+arg.TypeName+"; --E="+arg.Name)
+			}
 			callArgs[arg.Name] = vn
 			aname := (CamelCase(arg.Name))
 			//aname := capitalize(replHidden(arg.Name))
@@ -574,7 +578,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 					vn = getInnerVarName(fun.Name(), arg.Name)
 					callArgs[arg.Name] = vn
-					decls = append(decls, vn+" "+arg.TypeName+" := "+arg.TypeName+"()"+"; --B="+arg.Name)
+					if arg.IsNestedTable() {
+						decls = append(decls, vn+" "+arg.TypeName+" := "+arg.TypeName+"()"+"; --B="+arg.Name)
+					} else {
+						decls = append(decls, vn+" "+arg.TypeName+"; --B="+arg.Name)
+					}
 					if arg.IsInput() {
 						pre = append(pre,
 							vn+".DELETE;",
@@ -602,7 +610,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				case FLAVOR_RECORD:
 					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
 					callArgs[arg.Name] = vn
-					decls = append(decls, vn+" "+arg.TypeName+" := "+arg.TypeName+"()"+"; --C="+arg.Name)
+					if arg.IsNestedTable() {
+						decls = append(decls, vn+" "+arg.TypeName+" := "+arg.TypeName+"()"+"; --C="+arg.Name)
+					} else {
+						decls = append(decls, vn+" "+arg.TypeName+"; --C="+arg.Name)
+					}
 
 					aname := (CamelCase(arg.Name))
 					//aname := capitalize(replHidden(arg.Name))
@@ -635,7 +647,11 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							err = fmt.Errorf("nonsense table type of %s", arg)
 							return
 						}
-						decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+" := "+typ+"()"+"; --D="+arg.Name)
+						if strings.IndexByte(typ, '%') >= 0 {
+							decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+"; --D="+arg.Name)
+						} else {
+							decls = append(decls, getParamName(fun.Name(), vn+"."+k)+" "+typ+" := "+typ+"()"+"; --D="+arg.Name)
+						}
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
 						if arg.IsInput() {
