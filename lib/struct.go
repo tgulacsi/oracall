@@ -157,6 +157,43 @@ type NamedArgument struct {
 	Name string
 }
 
+func (a Argument) TypeString(prefix, indent string) string {
+	typ := a.Type
+	var suffix string
+	var buf strings.Builder
+	switch a.Flavor {
+	case FLAVOR_RECORD:
+		fmt.Fprintf(&buf, "%s%s{\n", prefix, a.PlsType)
+		for _, b := range a.RecordOf {
+			fmt.Fprintf(&buf, "%s%s- %s - %s\n", prefix, indent, b.Name, b.TypeString(prefix+indent, indent))
+		}
+		buf.WriteString(prefix + "}")
+		return buf.String()
+	case FLAVOR_TABLE:
+		fmt.Fprintf(&buf, "%s%s[%s]\n", prefix, a.PlsType, a.TableOf.TypeString(prefix+indent, indent))
+		return buf.String()
+	}
+	switch typ {
+	case "CHAR", "NCHAR", "VARCHAR2", "NVARCHAR2":
+		suffix = fmt.Sprintf("(%d)", a.Charlength)
+	case "NUMBER":
+		if a.Precision <= 0 {
+			if a.Scale <= 0 {
+				suffix = ""
+			} else {
+				suffix = fmt.Sprintf("(*,%d)", a.Scale)
+			}
+		} else {
+			if a.Scale <= 0 {
+				suffix = fmt.Sprintf("(%d)", a.Precision)
+			} else {
+				suffix = fmt.Sprintf("(%d,%d)", a.Precision, a.Scale)
+			}
+		}
+	}
+	return typ + suffix
+}
+
 func (a Argument) String() string {
 	typ := a.Type
 	switch a.Flavor {

@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -23,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -63,6 +65,7 @@ func Main() error {
 	fs := flag.NewFlagSet("call", flag.ContinueOnError)
 	fs.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", true, "skip functions with missing TableOf info")
 	flagDump := fs.String("dump", "", "dump to this csv")
+	flagPrint := fs.String("print", "", "print spec to this file")
 	flagBaseDir := fs.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := fs.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := fs.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
@@ -80,7 +83,7 @@ func Main() error {
 	callCmd := ffcli.Command{Name: "call", FlagSet: fs,
 		Exec: func(ctx context.Context, args []string) error {
 			if *flagPbOut == "" {
-				if *flagDbOut == "" {
+				if *flagDbOut == "" && *flagPrint == "" {
 					return errors.New("-pb-out or -db-out is required")
 				}
 				*flagPbOut = *flagDbOut
@@ -125,6 +128,7 @@ func Main() error {
 			}
 
 			var annotations []oracall.Annotation
+			logger.Debug("parse", "db", db != nil, "pattern", pattern)
 			if db == nil {
 				if pattern != "%" {
 					rPattern := regexp.MustCompile("(?i)" + strings.Replace(strings.Replace(pattern, ".", "[.]", -1), "%", ".*", -1))
@@ -138,6 +142,47 @@ func Main() error {
 			}
 			if err != nil {
 				return fmt.Errorf("read %s: %w", flag.Arg(0), err)
+			}
+
+			logger.Debug("print", "print", *flagPrint, "functions", len(functions))
+			if *flagPrint != "" {
+				fh := io.WriteCloser(os.Stdout)
+				fhClose := fh.Close
+				if *flagPrint != "-" {
+					pf, err := renameio.NewPendingFile(*flagPrint)
+					if err != nil {
+						return err
+					}
+					defer pf.Cleanup()
+					fh, fhClose = pf, pf.CloseAtomicallyReplace
+				}
+				defer fhClose()
+				bw := bufio.NewWriter(fh)
+				defer bw.Flush()
+				for _, f := range functions {
+					fmt.Fprintf(bw, "\n# %s\n%s\n", f.RealName(), f.Documentation)
+					fmt.Fprintln(bw, "\n## Input")
+					for _, a := range f.Args {
+						if !a.IsInput() {
+							continue
+						}
+						fmt.Fprintf(bw, "  - %s - %s\n", a.Name, a.TypeString("  ", "  "))
+					}
+					fmt.Fprintln(bw, "\n## Output")
+					for _, a := range f.Args {
+						if !a.IsOutput() {
+							continue
+						}
+						fmt.Fprintf(bw, "  - %s - %s\n", a.Name, a.TypeString("  ", "  "))
+					}
+					bw.WriteString("\n")
+				}
+				if err = bw.Flush(); err != nil {
+					return nil
+				}
+				if err = fhClose(); err != nil {
+					return err
+				}
 			}
 
 			defer os.Stdout.Sync()
@@ -195,19 +240,21 @@ func Main() error {
 			sort.Slice(functions, func(i, j int) bool { return functions[i].Name() < functions[j].Name() })
 
 			var grp errgroup.Group
-			grp.Go(func() error {
-				pbPath := pbPath
-				if pbPath == dbPath {
-					pbPath = ""
-				}
-				if err := oracall.SaveFunctions(
-					out, functions,
-					dbPkg, pbPath, false,
-				); err != nil {
-					return fmt.Errorf("save functions: %w", err)
-				}
-				return nil
-			})
+			if dbPath != "" {
+				grp.Go(func() error {
+					pbPath := pbPath
+					if pbPath == dbPath {
+						pbPath = ""
+					}
+					if err := oracall.SaveFunctions(
+						out, functions,
+						dbPkg, pbPath, false,
+					); err != nil {
+						return fmt.Errorf("save functions: %w", err)
+					}
+					return nil
+				})
+			}
 			if testOut != nil {
 				grp.Go(func() error {
 					pbPath := pbPath
@@ -224,57 +271,64 @@ func Main() error {
 				})
 			}
 
-			grp.Go(func() error {
-				pbFn := "oracall.proto"
-				if pbPkg != "main" {
-					pbFn = pbPkg + ".proto"
-				}
-				pbFn = filepath.Join(*flagBaseDir, pbPath, pbFn)
-				// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
-				_ = os.MkdirAll(filepath.Dir(pbFn), 0775)
-				logger.Info("Writing Protocol Buffers", "file", pbFn)
-				fh, err := os.Create(pbFn)
-				if err != nil {
-					return fmt.Errorf("create proto: %w", err)
-				}
-				err = oracall.SaveProtobuf(fh, functions, pbPkg, pbPath)
-				if closeErr := fh.Close(); closeErr != nil && err == nil {
-					err = closeErr
-				}
-				if err != nil {
-					return fmt.Errorf("SaveProtobuf: %w", err)
-				}
-
-				args := append(make([]string, 0, 5),
-					"--proto_path="+*flagBaseDir+":.")
-				if oracall.Gogo {
-					args = append(args,
-						"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
-				} else {
-					args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
-					if *flagGenerator == "go-vtproto" {
-						args = append(args,
-							"--"+*flagGenerator+"_out=:"+*flagBaseDir)
+			if pbPath != "" {
+				logger.Debug("SaveProtobuf", "pbPath", pbPath)
+				grp.Go(func() error {
+					pbFn := "oracall.proto"
+					if pbPkg != "main" {
+						pbFn = pbPkg + ".proto"
 					}
-				}
-				cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
-				cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-				logger.Info("calling", "protoc", cmd.Args)
-				if err := cmd.Run(); err != nil {
-					return fmt.Errorf("%q: %w", cmd.Args, err)
-				}
-				cmd = exec.CommandContext(ctx,
-					"sed", "-i", "-e",
-					(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",; ` +
-						`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",; `),
-					strings.TrimSuffix(pbFn, ".proto")+".pb.go",
-				)
-				cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-				if err := cmd.Run(); err != nil {
-					return fmt.Errorf("%q: %w", cmd.Args, err)
-				}
-				return nil
-			})
+					pbFn = filepath.Join(*flagBaseDir, pbPath, pbFn)
+					// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
+					_ = os.MkdirAll(filepath.Dir(pbFn), 0775)
+					logger.Info("Writing Protocol Buffers", "file", pbFn)
+					fh, err := os.Create(pbFn)
+					if err != nil {
+						return fmt.Errorf("create proto: %w", err)
+					}
+					err = oracall.SaveProtobuf(fh, functions, pbPkg, pbPath)
+					if closeErr := fh.Close(); closeErr != nil && err == nil {
+						err = closeErr
+					}
+					if err != nil {
+						return fmt.Errorf("SaveProtobuf: %w", err)
+					}
+
+					if *flagGenerator == "" {
+						return nil
+					}
+
+					args := append(make([]string, 0, 5),
+						"--proto_path="+*flagBaseDir+":.")
+					if oracall.Gogo {
+						args = append(args,
+							"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
+					} else {
+						args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
+						if *flagGenerator == "go-vtproto" {
+							args = append(args,
+								"--"+*flagGenerator+"_out=:"+*flagBaseDir)
+						}
+					}
+					cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
+					cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+					logger.Info("calling", "protoc", cmd.Args)
+					if err := cmd.Run(); err != nil {
+						return fmt.Errorf("%q: %w", cmd.Args, err)
+					}
+					cmd = exec.CommandContext(ctx,
+						"sed", "-i", "-e",
+						(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",; ` +
+							`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",; `),
+						strings.TrimSuffix(pbFn, ".proto")+".pb.go",
+					)
+					cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+					if err := cmd.Run(); err != nil {
+						return fmt.Errorf("%q: %w", cmd.Args, err)
+					}
+					return nil
+				})
+			}
 
 			return grp.Wait()
 		},
@@ -333,7 +387,7 @@ func Main() error {
 		}
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -829,6 +883,9 @@ func i64ToString(n sql.NullInt64) string {
 }
 
 func parsePkgFlag(s string) (string, string) {
+	if s == "" {
+		return "", ""
+	}
 	if i := strings.LastIndexByte(s, ':'); i >= 0 {
 		return s[:i], s[i+1:]
 	}
