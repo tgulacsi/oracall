@@ -76,7 +76,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"io"
-	"io/ioutil"
 	"errors"
 	"fmt"
 	"strings"
@@ -117,7 +116,6 @@ var _ unsafe.Pointer
 var _ = os.Stdout
 var _ driver.Rows
 var _ = oracall.ErrInvalidArgument
-var _ = ioutil.ReadAll
 
 type iterator struct {
 	Reset func()
