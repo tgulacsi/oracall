@@ -72,8 +72,9 @@ func generateModel(ctx context.Context, w io.Writer, db *sql.Tx, patterns []stri
 
 	qry = `SELECT table_name, column_name, data_type, data_length, NVL(data_precision, 0), NVL(data_scale, 0), nullable
       FROM user_tab_cols A 
-	  WHERE INSTR(column_name, '$') = 0 AND ` + likeWhere + `
-	  ORDER BY 1, 2`
+	  WHERE INSTR(column_name, '$') = 0 AND virtual_column = 'NO' AND hidden_column = 'NO' AND 
+	        ` + likeWhere + `
+	  ORDER BY table_name, column_id`
 	rows, err = db.QueryContext(ctx, qry)
 	if err != nil {
 		return fmt.Errorf("%s: %w", qry, err)
@@ -374,6 +375,9 @@ func (c Column) PrintStruct(w io.Writer) error {
 func (c Column) GoType() string {
 	switch c.Type {
 	case "DATE":
+		if c.Nullable {
+			return "sql.NullTime"
+		}
 		return "time.Time"
 	case "NUMBER":
 		if c.Scale > 0 {
@@ -395,6 +399,8 @@ func (c Column) GoType() string {
 			}
 			return "int64"
 		}
+	case "RAW":
+		return "[]byte"
 	}
 	return "string"
 }
