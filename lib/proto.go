@@ -173,8 +173,10 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		typ, pOpts := protoType(got, arg.Name, arg.AbsType)
 		var optS string
-		if s := pOpts.String(); s != "" {
-			optS = " " + s
+		if pOpts != nil {
+			if s := pOpts.String(); s != "" {
+				optS = " " + s
+			}
 		}
 		if arg.Flavor == FLAVOR_SIMPLE || arg.Flavor == FLAVOR_TABLE && arg.TableOf.Flavor == FLAVOR_SIMPLE {
 			fmt.Fprintf(w, "%s\t// %s\n\t%s%s %s = %d%s;\n", asComment(D.Map[aName], "\t"), arg.AbsType, rule, typ, aName, i+1, optS)
@@ -332,6 +334,9 @@ func CopyStruct(dest interface{}, src interface{}) error {
 		dnm := df.Name()
 		for i, snm := range snames {
 			if snm == dnm || dnm == CamelCase(snm) || CamelCase(dnm) == snm {
+				if len(svalues) <= i {
+					panic(fmt.Errorf("more less svalues (%d) then names (%d)", len(svalues), len(snames)))
+				}
 				svalue := svalues[i]
 				if err := df.Set(svalue); err != nil {
 					return fmt.Errorf("set %q to %q (%v %T): %w", dnm, snm, svalue, svalue, err)

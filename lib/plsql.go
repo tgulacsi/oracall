@@ -325,7 +325,7 @@ func demap(plsql, callFun string) (string, string) {
 	callBuf.Reset()
 	prev := make(map[string]string)
 	for _, line := range bytes.Split(b, []byte{'\n'}) {
-		if line = bytes.TrimSpace(line); bytes.HasPrefix(line, []byte("params[")) && bytes.Contains(line, []byte("] = ")) {
+		if line = bytes.TrimSpace(line); len(line) != 0 && bytes.HasPrefix(line, []byte("params[")) && bytes.Contains(line, []byte("] = ")) {
 			idx := string(line[:bytes.IndexByte(line, ']')+1])
 			line = line[len(idx)+2:]
 			if i = bytes.Index(line, []byte("//")); i >= 0 {
@@ -1027,13 +1027,13 @@ func (arg Argument) getConvRec(
 			convOut = append(convOut, arg.FromOra("output."+name, varName, varName)+" // gcr2out")
 		}
 	} else if arg.IsInput() {
-		parts := strings.Split(name, ".")
+		parts, _, _ := strings.Cut(name, ".")
 		too, _ := arg.ToOra(paramName, "input."+name, arg.Direction)
 		convIn = append(convIn,
 			fmt.Sprintf(`if input.%s != nil {
 				%s
 			} // gcr1`,
-				parts[0], too))
+				parts, too))
 	}
 	return convIn, convOut
 }

@@ -293,6 +293,9 @@ func (t %s) Update(ctx context.Context, tx *sql.Tx) error {
 				}
 				prevIdx, prevTbl = idx, tbl
 			}
+			if columns[tbl] == nil {
+				panic("nil column")
+			}
 			c := columns[tbl][col]
 			c.InIndex = append(c.InIndex, idx)
 			columns[tbl][col] = c

@@ -278,23 +278,24 @@ func NewQueryError(qry string, err error) *QueryError {
 		error
 	}
 	var errS string
-	if errors.As(err, &ec) {
+	if errors.As(err, &ec) && ec != nil {
 		qe.code = ec.Code()
 		errS = ec.Error()
 	} else {
 		errS = err.Error()
 	}
 	var lines []string
-	parts := strings.Split(errS, ".")
-	for i := len(parts) - 1; i >= 0; i-- {
-		if j := strings.LastIndexByte(parts[i], ' '); j >= 0 {
-			if line, err := strconv.Atoi(parts[i][j+1:]); err == nil {
-				if lines == nil {
-					lines = strings.Split(qry, "\n")
-				}
-				if line < len(lines) {
-					qe.lineNo, qe.line = line, lines[line-1]
-					break
+	if parts := strings.Split(errS, "."); len(parts) != 0 {
+		for i := len(parts) - 1; i >= 0; i-- {
+			if j := strings.LastIndexByte(parts[i], ' '); j >= 0 {
+				if line, err := strconv.Atoi(parts[i][j+1:]); err == nil {
+					if lines == nil {
+						lines = strings.Split(qry, "\n")
+					}
+					if line < len(lines) {
+						qe.lineNo, qe.line = line, lines[line-1]
+						break
+					}
 				}
 			}
 		}

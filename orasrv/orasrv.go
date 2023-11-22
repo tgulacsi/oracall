@@ -204,7 +204,7 @@ func StatusError(err error) error {
 	}
 	if errors.Is(err, oracall.ErrInvalidArgument) {
 		code = codes.InvalidArgument
-	} else if errors.As(err, &sc) {
+	} else if errors.As(err, &sc) && sc != nil {
 		code = sc.Code()
 	}
 	if code == 0 {

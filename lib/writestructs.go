@@ -455,7 +455,8 @@ func (f Function) GenChecks(w io.Writer) (string, error) {
 	if len(checks) == 0 {
 		return "", nil
 	}
-	structName := CamelCase(strings.SplitN(f.getStructName(false, true), "__", 2)[1])
+	structName, _, _ := strings.Cut(f.getStructName(false, true), "__")
+	structName = CamelCase(structName)
 	buf := Buffers.Get()
 	defer Buffers.Put(buf)
 	nm := "Check" + structName
@@ -670,13 +671,8 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 		}
 	}
 	typName = strings.Replace(arg.TypeName, "%ROWTYPE", "_rt", 1)
-	chunks := strings.Split(typName, ".")
-	switch len(chunks) {
-	case 1:
-	case 2:
-		typName = chunks[1] + "__" + chunks[0]
-	default:
-		typName = strings.Join(chunks[1:], "__") + "__" + chunks[0]
+	if before, after, found := strings.Cut(typName, "."); found {
+		typName = strings.ReplaceAll(after, ".", "__") + "__" + before
 	}
 	//typName = goName(capitalize(typName))
 	typName = capitalize(typName)
