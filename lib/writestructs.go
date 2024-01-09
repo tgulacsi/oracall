@@ -127,7 +127,8 @@ type oracallServer struct {
 	db *sql.DB
 	tags map[string][]string
 	DBLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error)
-	BeforeHook func(ctx context.Context, funName string, callText *string, params *[]interface{}) error
+	BeforeHook func(ctx context.Context, funName string, input interface { ProtoMessage() }) error
+	PrepareHook func(ctx context.Context, funName string, callText *string, params *[]interface{}) error
 	AfterHook func(ctx context.Context, funName string, params []interface{}, output interface { ProtoMessage() }) error
 
 	`+implement+`

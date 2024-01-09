@@ -114,7 +114,10 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		logger = lgr
 	}
 	if err = ctx.Err(); err != nil { return }
-	`)
+	const funName = "%s"
+	if s.BeforeHook != nil { if err = s.BeforeHook(ctx, funName, input); err != nil { return }}
+	`,
+		fun.Name())
 	for _, line := range convIn {
 		io.WriteString(callBuf, line+"\n")
 	}
@@ -142,7 +145,6 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	}
 	j := i + strings.Index(call[i:], ")") + 1
 	fmt.Fprintf(callBuf, `
-	const funName = "%s"
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var tx *sql.Tx
@@ -163,7 +165,6 @@ if DebugLevel > 0 {
 }
 	qry := %s
 `,
-		fun.Name(),
 		fun.Package, fun.name,
 		call[i:j], rIdentifier.ReplaceAllString(pls, "'%#v'"),
 		fun.getPlsqlConstName(),
@@ -178,7 +179,7 @@ if DebugLevel > 0 {
 	}
 
 	callBuf.WriteString(`
-	if s.BeforeHook != nil { if err = s.BeforeHook(ctx, funName, &qry, &params); err != nil { return } }
+	if s.PrepareHook != nil { if err = s.PrepareHook(ctx, funName, &qry, &params); err != nil { return } }
 	stmt, stmtErr := tx.PrepareContext(ctx, qry)
 	if stmtErr != nil {
 		err = fmt.Errorf("%s: %w", qry, stmtErr)
