@@ -18,13 +18,12 @@ import (
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/UNO-SOFT/zlog/v2/slog"
 
-	bp "github.com/tgulacsi/go/bufpool"
+	"github.com/tgulacsi/go/iohlp"
 	oracall "github.com/tgulacsi/oracall/lib"
-
-	"github.com/oklog/ulid"
 
 	"github.com/go-stack/stack"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2"
+	"github.com/oklog/ulid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	_ "google.golang.org/grpc/encoding/gzip"
@@ -33,11 +32,7 @@ import (
 	godror "github.com/godror/godror"
 )
 
-var (
-	Timeout = DefaultTimeout
-
-	bufpool = bp.New(4096)
-)
+var Timeout = DefaultTimeout
 
 const (
 	DefaultTimeout = time.Hour
@@ -151,20 +146,21 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 					return nil, status.Error(codes.Unauthenticated, err.Error())
 				}
 
-				buf := bufpool.Get()
-				defer bufpool.Put(buf)
-				jenc := json.NewEncoder(buf)
+				ht := &iohlp.HeadTailKeeper{Limit: 1024}
+				jenc := json.NewEncoder(ht)
 				if err = jenc.Encode(req); err != nil {
 					logger.Error("marshal", "req", req, "error", err)
 				}
-				logger.Info("marshaled", "REQ", info.FullMethod, "req", buf.String())
+				if logger.Enabled(ctx, slog.LevelDebug) {
+					logger.Debug("marshaled", "REQ", info.FullMethod, "req", ht.String())
+				}
 
 				// Fill PArgsHidden
 				if r := reflect.ValueOf(req).Elem(); r.Kind() != reflect.Struct {
 					logger.Info("not struct", "req", fmt.Sprintf("%T %#v", req, req))
 				} else {
 					if f := r.FieldByName("PArgsHidden"); f.IsValid() {
-						f.Set(reflect.ValueOf(buf.String()))
+						f.Set(reflect.ValueOf(ht.String()))
 					}
 				}
 
@@ -173,17 +169,16 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				dur := time.Since(start)
 				commit(err)
 
-				buf.Reset()
+				ht.Reset()
 				if jErr := jenc.Encode(res); jErr != nil {
-					buf.Reset()
-					fmt.Fprintf(buf, "%+v", res)
-					logger.Error("marshal", "response", buf.String(), "error", jErr)
+					fmt.Fprintf(ht, ": %+v", res)
+					logger.Error("marshal", "response", ht.String(), "error", jErr)
 				}
 				lvl := slog.LevelInfo
 				if err != nil {
 					lvl = slog.LevelError
 				}
-				logger.Log(ctx, lvl, "handled", "method", info.FullMethod, "response", buf.String(),
+				logger.Log(ctx, lvl, "handled", "method", info.FullMethod, "response", ht.String(),
 					"dur", dur.String(), "error", err)
 
 				return res, StatusError(err)
