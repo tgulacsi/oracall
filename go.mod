@@ -1,8 +1,6 @@
 module github.com/tgulacsi/oracall
 
-go 1.21
-
-toolchain go1.22.0
+go 1.22.0
 
 require (
 	github.com/UNO-SOFT/zlog v0.8.1

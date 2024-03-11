@@ -402,6 +402,8 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 			logger.Info("directive", "f", nm, "tag", a.Other)
 			if f := funcs[nm]; f != nil {
 				f.Tag = append(f.Tag, a.Other)
+			} else {
+				logger.Warn("no function for tag", "name", nm, "tag", a.Other, "have", funcs)
 			}
 		}
 	}
