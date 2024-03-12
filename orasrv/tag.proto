@@ -1,0 +1,10 @@
+syntax = "proto3";
+package oracall.orasrv;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/tgulacsi/oracall/orasrv;orasrv";
+
+extend google.protobuf.MethodOptions {
+  repeated string tag = 13020;
+}

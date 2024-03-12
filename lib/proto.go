@@ -38,7 +38,17 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg, path string) error {
 		fmt.Fprintf(w, `package %s;
 option go_package = %q;`, pkg, path)
 	}
-	io.WriteString(w, "\nimport \"google/protobuf/timestamp.proto\";\n")
+	io.WriteString(w, `
+import "google/protobuf/timestamp.proto";
+`)
+	for _, fun := range functions {
+		if len(fun.Tag) != 0 {
+			io.WriteString(w, `
+import "github.com/tgulacsi/oracall/orasrv/tag.proto";
+`)
+			break
+		}
+	}
 
 	if Gogo {
 		io.WriteString(w, "\nimport \"github.com/gogo/protobuf/gogoproto/gogo.proto\";\n")
@@ -47,6 +57,7 @@ option go_package = %q;`, pkg, path)
 
 	services := make([]string, 0, len(functions))
 
+	var tags strings.Builder
 FunLoop:
 	for _, fun := range functions {
 		//b, _ := json.Marshal(struct{Name, Documentation string}{Name:fun.Name(), Documentation:fun.Documentation})
@@ -73,13 +84,20 @@ FunLoop:
 		if fun.Documentation != "" {
 			comment = asComment(fun.Documentation, "")
 		}
+		if len(fun.Tag) != 0 {
+			tags.WriteString("\n")
+			for _, t := range fun.Tag {
+				fmt.Fprintf(&tags, "\toption (oracall.orasrv.tag) = %q;\n", t)
+			}
+		}
 		services = append(services,
-			fmt.Sprintf(`%srpc %s (%s) returns (%s%s) {}`,
+			fmt.Sprintf(`%srpc %s (%s) returns (%s%s) {%s}`,
 				comment,
 				name,
 				CamelCase(fun.getStructName(false, false)),
 				streamQual,
 				CamelCase(fun.getStructName(true, false)),
+				tags.String(),
 			),
 		)
 	}
