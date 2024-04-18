@@ -1,4 +1,4 @@
-// Copyright 2017, 2023 Tamas Gulacsi
+// Copyright 2017, 2024 Tamas Gulacsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -104,7 +104,8 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				lgr, commit, ctx, cancel := getLogger(ss.Context(), info.FullMethod)
 				defer cancel()
 
-				lgr.Info("checkAuth", "REQ", info.FullMethod)
+				lgr = lgr.With("method", info.FullMethod)
+				lgr.Info("checkAuth")
 				if err = checkAuth(ctx, info.FullMethod); err != nil {
 					return status.Error(codes.Unauthenticated, err.Error())
 				}
@@ -119,7 +120,7 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				if err != nil {
 					lvl = slog.LevelError
 				}
-				lgr.Log(ctx, lvl, "handler", "method", info.FullMethod, "dur", dur.String(), "error", err)
+				lgr.Log(ctx, lvl, "handler", "dur", dur.String(), "error", err)
 				return StatusError(err)
 			}),
 
@@ -141,6 +142,7 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				}
 				logger, commit, ctx, cancel := getLogger(ctx, info.FullMethod)
 				defer cancel()
+				logger = logger.With("method", info.FullMethod)
 
 				if err = checkAuth(ctx, info.FullMethod); err != nil {
 					return nil, status.Error(codes.Unauthenticated, err.Error())
@@ -151,8 +153,9 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				if err = jenc.Encode(req); err != nil {
 					logger.Error("marshal", "req", req, "error", err)
 				}
+				logger = logger.With("request", ht.String())
 				if logger.Enabled(ctx, slog.LevelDebug) {
-					logger.Debug("marshaled", "REQ", info.FullMethod, "req", ht.String())
+					logger.Debug("marshaled")
 				}
 
 				// Fill PArgsHidden
@@ -178,7 +181,7 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				if err != nil {
 					lvl = slog.LevelError
 				}
-				logger.Log(ctx, lvl, "handled", "method", info.FullMethod, "response", ht.String(),
+				logger.Log(ctx, lvl, "handled", "response", ht.String(),
 					"dur", dur.String(), "error", err)
 
 				return res, StatusError(err)
