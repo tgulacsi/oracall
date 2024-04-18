@@ -6,7 +6,6 @@ package orasrv
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/UNO-SOFT/otel"
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/UNO-SOFT/zlog/v2/slog"
 
@@ -23,7 +23,7 @@ import (
 
 	"github.com/go-stack/stack"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2"
-	"github.com/oklog/ulid"
+	"github.com/oklog/ulid/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	_ "google.golang.org/grpc/encoding/gzip"
@@ -215,16 +215,22 @@ type reqIDCtxKey struct{}
 
 func ContextWithReqID(ctx context.Context, reqID string) context.Context {
 	if reqID == "" {
-		reqID = NewULID()
+		if sc := otel.SpanContextFromContext(ctx); sc.IsValid() {
+			reqID = sc.TraceID().String() + "-" + sc.SpanID().String()
+		} else {
+			reqID = NewULID()
+		}
 	}
 	return context.WithValue(ctx, reqIDCtxKey{}, reqID)
 }
 func ContextGetReqID(ctx context.Context) string {
 	if reqID, ok := ctx.Value(reqIDCtxKey{}).(string); ok {
 		return reqID
+	} else if sc := otel.SpanContextFromContext(ctx); sc.IsValid() {
+		return sc.TraceID().String() + "-" + sc.SpanID().String()
 	}
 	return NewULID()
 }
 func NewULID() string {
-	return ulid.MustNew(ulid.Now(), rand.Reader).String()
+	return ulid.MustNew(ulid.Now(), ulid.DefaultEntropy()).String()
 }
