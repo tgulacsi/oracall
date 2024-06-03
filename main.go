@@ -35,6 +35,7 @@ import (
 	"github.com/peterbourgon/ff/v3/ffcli"
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
+	"github.com/tgulacsi/oracall/source"
 
 	// for Oracle-specific drivers
 	"github.com/godror/godror"
@@ -48,6 +49,8 @@ var (
 	dsn     string
 	verbose zlog.VerboseVar
 	logger  = zlog.NewLogger(zlog.MaybeConsoleHandler(&verbose, os.Stderr)).SLog()
+
+	rReplace = regexp.MustCompile(`\s*=>\s*`)
 )
 
 func main() {
@@ -731,39 +734,16 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 						return nil
 					}
 					replMu.Lock()
-					for _, b := range rAnnotation.FindAll(buf.Bytes(), -1) {
-						b = bytes.TrimSpace(bytes.TrimPrefix(b, []byte("--oracall:")))
-						a := oracall.Annotation{Package: ua.PackageName}
-						if i := bytes.IndexByte(b, ' '); i < 0 {
-							continue
-						} else {
-							a.Type, b = string(b[:i]), b[i+1:]
+					bb := buf.String()
+					funDocs, annots, docsErr := source.Parse(bb)
+					if len(annots) != 0 {
+						for _, a := range annotations {
+							a.Package = ua.PackageName
+							annotations = append(annotations, a)
 						}
-						if i := bytes.Index(b, []byte("=>")); i < 0 {
-							if i = bytes.IndexByte(b, '='); i < 0 {
-								a.Name = string(bytes.TrimSpace(b))
-							} else {
-								a.Name = string(bytes.TrimSpace(b[:i]))
-								size, err := strconv.Atoi(string(bytes.TrimSpace(b[i+1:])))
-								if err != nil {
-									return err
-								}
-								a.Size = size
-							}
-						} else {
-							a.Name, a.Other = string(bytes.TrimSpace(b[:i])), string(bytes.TrimSpace(b[i+2:]))
-						}
-						annotations = append(annotations, a)
-					}
-					bb := buf.Bytes()
-					if len(annotations) != 0 {
-						logger.Info("found", "annotations", annotations)
-						bb = rAnnotation.ReplaceAll(bb, nil)
+						logger.Info("found", "annotations", annots)
 					}
 					replMu.Unlock()
-					subCtx, subCancel := context.WithTimeout(ctx, 1*time.Minute)
-					funDocs, docsErr := parseDocs(subCtx, string(bb))
-					subCancel()
 					logger.Info("parseDocs", "docs", len(funDocs), "error", docsErr)
 					docsMu.Lock()
 					pn := oracall.UnoCap(ua.PackageName) + "."
@@ -895,9 +875,6 @@ func parsePkgFlag(s string) (string, string) {
 	}
 	return s, pkg
 }
-
-var rReplace = regexp.MustCompile(`\s*=>\s*`)
-var rAnnotation = regexp.MustCompile(`--oracall:(?:(replace(_json)?|rename|tag)\s+[a-zA-Z0-9_#]+\s*=>\s*.+|(handle|private)\s+[a-zA-Z0-9_#]+|max-table-size\s+[a-zA-Z0-9_$]+\s*=\s*[0-9]+)`)
 
 func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, pkg, sub string) ([]dbType, error) {
 	plus := make([]dbType, 0, 4)

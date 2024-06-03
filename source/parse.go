@@ -2,25 +2,70 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package source
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+
+	oracall "github.com/tgulacsi/oracall/lib"
 )
 
-func parseDocs(ctx context.Context, text string) (map[string]string, error) {
+var rDecl = regexp.MustCompile(`(FUNCTION|PROCEDURE) +([^ (;]+)`)
+
+func Parse(src string) (docs map[string]string, annotations []oracall.Annotation, err error) {
+	if annotations, err = parseAnnotations(src); err != nil {
+		return nil, annotations, err
+	}
+	if len(annotations) != 0 {
+		// logger.Info("found", "annotations", annotations)
+		src = rAnnotation.ReplaceAllString(src, "")
+	}
+	docs, err = parseDocs(src)
+	// logger.Info("parseDocs", "docs", len(funDocs), "error", docsErr)
+	return docs, annotations, err
+}
+
+var rAnnotation = regexp.MustCompile(`--oracall:(?:(replace(_json)?|rename|tag)\s+[a-zA-Z0-9_#]+\s*=>\s*.+|(handle|private)\s+[a-zA-Z0-9_#]+|max-table-size\s+[a-zA-Z0-9_$]+\s*=\s*[0-9]+)`)
+
+func parseAnnotations(src string) ([]oracall.Annotation, error) {
+	var annotations []oracall.Annotation
+	for _, b := range rAnnotation.FindAllString(src, -1) {
+		b = strings.TrimSpace(strings.TrimPrefix(b, "--oracall:"))
+		var a oracall.Annotation
+		if i := strings.IndexByte(b, ' '); i < 0 {
+			continue
+		} else {
+			a.Type, b = string(b[:i]), b[i+1:]
+		}
+		if i := strings.Index(b, "=>"); i < 0 {
+			if i = strings.IndexByte(b, '='); i < 0 {
+				a.Name = strings.TrimSpace(b)
+			} else {
+				a.Name = strings.TrimSpace(b[:i])
+				size, err := strconv.Atoi(strings.TrimSpace(b[i+1:]))
+				if err != nil {
+					return annotations, err
+				}
+				a.Size = size
+			}
+		} else {
+			a.Name, a.Other = strings.TrimSpace(b[:i]), strings.TrimSpace(b[i+2:])
+		}
+		annotations = append(annotations, a)
+	}
+	return annotations, nil
+}
+
+func parseDocs(text string) (map[string]string, error) {
 	m := make(map[string]string)
 	l := lex("docs", text)
 	var buf bytes.Buffer
 	for {
-		if err := ctx.Err(); err != nil {
-			return m, err
-		}
 		item := l.nextItem()
 		//logger.Log("item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
 		switch item.typ {
@@ -39,8 +84,6 @@ func parseDocs(ctx context.Context, text string) (map[string]string, error) {
 		}
 	}
 }
-
-var rDecl = regexp.MustCompile(`(FUNCTION|PROCEDURE) +([^ (;]+)`)
 
 // The lexer structure shamelessly copied from
 // https://talks.golang.org/2011/lex.slide#22

@@ -2,23 +2,18 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package source
 
 import (
-	"context"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/kylelemons/godebug/diff"
 )
 
 func TestParseDocs(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
 	type testCase struct {
 		Want   map[string]string
 		Source string
@@ -358,7 +353,7 @@ END DB_web_dbx;`,
 		},
 	} {
 
-		docs, err := parseDocs(ctx, tc.Source)
+		docs, err := parseDocs(tc.Source)
 		if err != nil {
 			t.Errorf("%q. %v", tcName, err)
 			continue
