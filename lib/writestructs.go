@@ -229,8 +229,7 @@ import (
     "time"    
 
 	"github.com/go-logfmt/logfmt"
-	"github.com/UNO-SOFT/zlog/v2/slog"
-	oracall "github.com/tgulacsi/oracall/lib"	// ErrInvalidArgument
+	"github.com/tgulacsi/oracall/orasrv"	
 
 	_ "github.com/godror/godror" // Oracle
 	`+pbImport+`
