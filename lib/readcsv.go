@@ -399,9 +399,9 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 
 		case "tag":
 			nm := L(a.FullName())
-			logger.Info("directive", "f", nm, "tag", a.Other)
 			if f := funcs[nm]; f != nil {
 				f.Tag = append(f.Tag, a.Other)
+				logger.Info("directive", "f", nm, "tag", f.Tag)
 			} else {
 				logger.Warn("no function for tag", "name", nm, "tag", a.Other, "have", funcs)
 			}
@@ -410,6 +410,11 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 	functions = functions[:0]
 	for _, f := range funcs {
 		functions = append(functions, *f)
+	}
+	for _, f := range functions {
+		if len(f.Tag) != 0 {
+			logger.Info("ApplyAnnotations", "f", f.name, "tag", f.Tag)
+		}
 	}
 	return functions
 }

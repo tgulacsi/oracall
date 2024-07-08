@@ -84,7 +84,9 @@ FunLoop:
 		if fun.Documentation != "" {
 			comment = asComment(fun.Documentation, "")
 		}
-		if len(fun.Tag) != 0 {
+		if len(fun.Tag) == 0 {
+			tags.Reset()
+		} else {
 			tags.WriteString("\n")
 			for _, t := range fun.Tag {
 				fmt.Fprintf(&tags, "\toption (oracall.orasrv.tag) = %q;\n", t)

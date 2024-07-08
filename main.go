@@ -147,7 +147,7 @@ func Main() error {
 				return fmt.Errorf("read %s: %w", flag.Arg(0), err)
 			}
 
-			logger.Debug("print", "print", *flagPrint, "functions", len(functions))
+			logger.Debug("print", "print", *flagPrint, "functions", len(functions), "annotations", annotations)
 			if *flagPrint != "" {
 				fh := io.WriteCloser(os.Stdout)
 				fhClose := fh.Close
@@ -737,11 +737,10 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 					bb := buf.String()
 					funDocs, annots, docsErr := source.Parse(bb)
 					if len(annots) != 0 {
-						for _, a := range annotations {
+						for _, a := range annots {
 							a.Package = ua.PackageName
 							annotations = append(annotations, a)
 						}
-						logger.Info("found", "annotations", annots)
 					}
 					replMu.Unlock()
 					logger.Info("parseDocs", "docs", len(funDocs), "error", docsErr)
@@ -828,6 +827,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 	if any {
 		logger.Info("any", "has", docNames)
 	}
+	logger.Info("found", "annotations", annotations)
 	return functions, annotations, nil
 }
 
