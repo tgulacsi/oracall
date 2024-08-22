@@ -38,9 +38,6 @@ func SaveProtobuf(dst io.Writer, functions []Function, pkg, path string) error {
 		fmt.Fprintf(w, `package %s;
 option go_package = %q;`, pkg, path)
 	}
-	io.WriteString(w, `
-import "google/protobuf/timestamp.proto";
-`)
 	for _, fun := range functions {
 		if len(fun.Tag) != 0 {
 			io.WriteString(w, `
@@ -57,6 +54,8 @@ import "github.com/tgulacsi/oracall/orasrv/tag.proto";
 
 	services := make([]string, 0, len(functions))
 
+	// hold on till we know whether we need Timestamp or not
+	var buf bytes.Buffer
 	var tags strings.Builder
 FunLoop:
 	for _, fun := range functions {
@@ -67,7 +66,7 @@ FunLoop:
 			fName = fun.alias
 		}
 		fName = strings.ToLower(fName)
-		if err := fun.SaveProtobuf(w, seen); err != nil {
+		if err := fun.SaveProtobuf(&buf, seen); err != nil {
 			if SkipMissingTableOf && (errors.Is(err, ErrMissingTableOf) ||
 				errors.Is(err, ErrUnknownSimpleType)) {
 				logger.Info("SKIP function, missing TableOf info", "function", fName)
@@ -102,6 +101,15 @@ FunLoop:
 				tags.String(),
 			),
 		)
+	}
+	{
+		b := buf.Bytes()
+		if bytes.Contains(b, []byte("google.protobuf.Timestamp")) {
+			io.WriteString(w, `
+import "google/protobuf/timestamp.proto";
+`)
+		}
+		w.Write(b)
 	}
 
 	fmt.Fprintf(w, "\nservice %s {\n", CamelCase(pkg))
