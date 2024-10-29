@@ -1,6 +1,6 @@
 module github.com/tgulacsi/oracall
 
-go 1.22.0
+go 1.23.0
 
 require (
 	github.com/UNO-SOFT/zlog v0.8.3
@@ -12,7 +12,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/kylelemons/godebug v1.1.0
 	github.com/tgulacsi/go v0.27.5
-	golang.org/x/net v0.27.0 // indirect
+	golang.org/x/net v0.27.0
 	golang.org/x/sync v0.7.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
@@ -20,10 +20,12 @@ require (
 
 require (
 	github.com/UNO-SOFT/otel v0.8.6
+	github.com/davecgh/go-spew v1.1.1
 	github.com/godror/knownpb v0.1.1
 	github.com/google/renameio/v2 v2.0.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/peterbourgon/ff/v3 v3.4.0
+	github.com/pkg/errors v0.9.1
 )
 
 require (
