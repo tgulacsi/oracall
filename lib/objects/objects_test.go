@@ -45,7 +45,7 @@ func TestReadTypes(t *testing.T) {
 syntax = "proto3";
 
 package objects;
-option go_package = "objects";
+option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 
 import "google/protobuf/timestamp.proto";
 
@@ -62,12 +62,21 @@ import "google/protobuf/timestamp.proto";
 		}
 	}
 	bw.Flush()
-	os.WriteFile("_test.proto", buf.Bytes(), 0664)
+	os.MkdirAll("testdata", 0755)
+	os.WriteFile("testdata/x.proto", buf.Bytes(), 0664)
+	os.WriteFile("testdata/buf.gen.yaml", []byte(`version: v2
+plugins:
+  - local: protoc-gen-go
+    out: .
+    opt:
+      - paths=source_relative
+`), 0640)
 
 	cmd := exec.CommandContext(ctx,
 		//"protoc", "-I.", "-I../../../../../google/protobuf/timestamp.proto", "--go_out=_test.go",
-		"buf", "build",
-		"_test.proto")
+		"buf", "generate",
+		"x.proto")
+	cmd.Dir = "testdata"
 	if b, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("%q\n%s\n%+v", cmd.Args, string(b), err)
 	}
