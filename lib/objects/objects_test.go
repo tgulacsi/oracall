@@ -12,7 +12,6 @@ import (
 	"flag"
 	"os"
 	"os/exec"
-	"sort"
 	"testing"
 	"time"
 
@@ -26,23 +25,19 @@ import (
 func TestReadTypes(t *testing.T) {
 	logger := zlog.NewT(t).SLog()
 	ctx := zlog.NewSContext(context.Background(), logger)
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	db, err := sql.Open("godror", os.Getenv("BRUNO_OWNER_ID"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	types, err := objects.ReadTypes(ctx, db, flag.Args()...)
+	types, err := objects.NewTypes(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	names := make([]string, 0, len(types))
-	for k := range types {
-		names = append(names, k)
-	}
-	sort.Strings(names)
-	for _, nm := range names {
-		t.Logf("%s: %v", nm, types[nm])
+	names, err := types.Names(ctx, flag.Args()...)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	var buf bytes.Buffer
@@ -57,7 +52,12 @@ import "google/protobuf/timestamp.proto";
 `)
 	bw := bufio.NewWriter(&buf)
 	for _, nm := range names {
-		if err = types[nm].WriteProtobufMessageType(ctx, bw); err != nil {
+		x, err := types.Get(ctx, nm)
+		t.Logf("%s: %v", nm, x)
+		if err != nil {
+			t.Fatalf("%s: %+v", nm, err)
+		}
+		if err = x.WriteProtobufMessageType(ctx, bw); err != nil {
 			t.Fatal(nm, err)
 		}
 	}
