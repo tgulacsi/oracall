@@ -482,10 +482,10 @@ func (p protoImports) String() string {
 // Field numbers 19,000 to 19,999 are reserved for the Protocol Buffers implementation. The protocol buffer compiler will complain if you use one of these reserved field numbers in your message.
 var ProtoExtends = protoExtends{
 	`extend google.protobuf.MessageOptions {
-  optional string oracall_object_type = 79396128;
+  string oracall_object_type = 79396128;
 }`,
 	`extend google.protobuf.FieldOptions {
-  optional string oracall_field_type = 79396128;
+  string oracall_field_type = 79396128;
 }`,
 }
 
