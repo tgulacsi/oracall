@@ -477,6 +477,11 @@ func (p protoImports) String() string {
 	return buf.String()
 }
 
+const (
+	MessageTypeExtension = 79396128
+	FieldTypeExtension   = 79396128
+)
+
 // a number between 1 and 536,870,911 with the following restrictions:
 // The given number must be unique among all fields for that message.
 // Field numbers 19,000 to 19,999 are reserved for the Protocol Buffers implementation. The protocol buffer compiler will complain if you use one of these reserved field numbers in your message.
