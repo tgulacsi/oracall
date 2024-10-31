@@ -331,7 +331,7 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 	}
 	bw := bufio.NewWriter(w)
 	// logger := zlog.SFromContext(ctx)
-	fmt.Fprintf(bw, "// %s\nmessage %s {\n", t.name("."), t.ProtoMessageName())
+	fmt.Fprintf(bw, "// %s\nmessage %s {\n\toption (oracall_object_type) = %q;\n", t.name("."), t.ProtoMessageName(), t.OraType())
 	if t.Arguments != nil {
 		var i int
 		for _, a := range t.Arguments {
@@ -353,7 +353,7 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 				s = s.Elem
 			}
 			i++
-			fmt.Fprintf(bw, "\t%s%s %s = %d;  // %s\n", rule, s.protoType(), oracall.CamelCase(name), i, s.name("."))
+			fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n", rule, s.protoType(), strings.ToLower(name), i, s.OraType())
 		}
 	} else if s := t.Elem; s != nil {
 		// fmt.Fprintf(bw, "\trepeated %s = %d;  //b %s\n", s.protoType(), 1, s.name("."))
@@ -363,6 +363,28 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 	}
 	bw.WriteString("}\n")
 	return bw.Flush()
+}
+
+func (t Type) OraType() string {
+	if t.composite() {
+		return t.name(".")
+	}
+	switch t.Name {
+	case "CHAR", "VARCHAR2":
+		return fmt.Sprintf("%s(%d)", t.Name, t.Length.Int32)
+	case "NUMBER":
+		if t.Precision.Valid {
+			if t.Scale.Int32 != 0 {
+				return fmt.Sprintf("NUMBER(%d,%d)", t.Precision.Int32, t.Scale.Int32)
+			}
+			return fmt.Sprintf("NUMBER(%d)", t.Precision.Int32)
+		} else if t.Scale.Valid {
+			return fmt.Sprintf("NUMBER(*,%d)", t.Scale.Int32)
+		}
+		return "NUMBER"
+	default:
+		return t.Name
+	}
 }
 
 func (t Type) protoType() string {
@@ -428,4 +450,47 @@ func (t Type) protoTypeName() string {
 }
 func (t Type) Valid() bool {
 	return t.Name != "" && (isSimpleType(t.Name) || t.Elem != nil || t.Arguments != nil)
+}
+
+func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
+	return fmt.Errorf("not implemented")
+}
+
+var ProtoImports = protoImports{
+	"google/protobuf/timestamp.proto",
+	"google/protobuf/descriptor.proto",
+}
+
+type protoImport string
+
+func (p protoImport) String() string {
+	return fmt.Sprintf("import %q;\n", string(p))
+}
+
+type protoImports []protoImport
+
+func (p protoImports) String() string {
+	var buf strings.Builder
+	for _, s := range p {
+		buf.WriteString(s.String())
+	}
+	return buf.String()
+}
+
+// a number between 1 and 536,870,911 with the following restrictions:
+// The given number must be unique among all fields for that message.
+// Field numbers 19,000 to 19,999 are reserved for the Protocol Buffers implementation. The protocol buffer compiler will complain if you use one of these reserved field numbers in your message.
+var ProtoExtends = protoExtends{
+	`extend google.protobuf.MessageOptions {
+  optional string oracall_object_type = 79396128;
+}`,
+	`extend google.protobuf.FieldOptions {
+  optional string oracall_field_type = 79396128;
+}`,
+}
+
+type protoExtends []string
+
+func (p protoExtends) String() string {
+	return strings.Join(p, "\n")
 }

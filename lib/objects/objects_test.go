@@ -47,8 +47,8 @@ syntax = "proto3";
 package objects;
 option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 
-import "google/protobuf/timestamp.proto";
-
+` + objects.ProtoImports.String() + `
+` + objects.ProtoExtends.String() + `
 `)
 	bw := bufio.NewWriter(&buf)
 	for _, nm := range names {
