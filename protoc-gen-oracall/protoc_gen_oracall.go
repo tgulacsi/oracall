@@ -73,6 +73,7 @@ func Main() error {
 package %s
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -82,6 +83,7 @@ import (
 )
 
 var (
+	_ context.Context
 	_ = io.ReadAll
 	_ strings.Builder
 	_ = timestamppb.New
@@ -158,8 +160,138 @@ var (
 }
 
 func (msg message) writeToFrom(w io.Writer) {
-	fmt.Fprintf(w, "func (x %s) ToObject() (*godror.Object) {return nil}\n", msg.Name)
+	FieldName := func(f nameType) string {
+		fieldName := oracall.CamelCase(f.Name)
+		if fieldName == "Size" {
+			fieldName += "_"
+		}
+		return fieldName
+	}
+	// ToObject
+	fmt.Fprintf(w, `func (x %s) ToObject(ctx context.Context, ex godror.Execer) (*godror.Object, error) {
+	objT, err := godror.GetObjectType(ctx, ex, %q)
+	if err != nil {
+		return nil, fmt.Errorf("GetObjectType(%s): %%w", err)
+	}
+	obj, err := objT.NewObject()
+	if err != nil {
+		objT.Close(); 
+		return nil, err
+	}
+	var d godror.Data
+	if err := func() error {
+`,
+		msg.Name,
+		msg.DBType,
+		msg.DBType,
+	)
+	for _, f := range msg.Fields {
+		var fun, conv, getValue string
+		switch typ, post, _ := strings.Cut(f.DBType, "("); typ {
+		case "DATE", "TIMESTAMP":
+			fun, conv = "Time", "%s.AsTime()"
+		case "CHAR", "VARCHAR2", "LONG", "PL/SQL ROWID", "CLOB":
+			fun, conv = "Bytes", "[]byte(%s)"
+		case "RAW", "LONG RAW", "BLOB":
+			fun = "Bytes"
+		case "PL/SQL PLS INTEGER", "PL/SQL BINARY INTEGER":
+			fun, conv = "Int64", "int64(%s)"
+		case "PL/SQL BOOLEAN":
+			fun = "Bool"
+		case "BINARY_DOUBLE":
+			fun = "Float64"
+		case "NUMBER", "INTEGER":
+			if post != "" {
+				precS, scaleS, _ := strings.Cut(post[:len(post)-1], ",")
+				if precS != "*" {
+					prec, err := strconv.Atoi(precS)
+					if err != nil {
+						panic(fmt.Errorf("parse %q as precision from %q: %w", precS, f.DBType, err))
+					}
+					if scaleS == "0" || scaleS == "" {
+						if prec < 10 {
+							fun, conv = "Int64", "int64(%s)"
+						} else if prec < 20 {
+							fun = "Int64"
+						}
+					} else if _, err := strconv.Atoi(scaleS); err != nil {
+						panic(fmt.Errorf("parse %q as scale from %q: %w", scaleS, f.DBType, err))
+					} else if prec < 8 {
+						fun = "Float32"
+					} else if prec < 16 {
+						fun = "Float64"
+					}
+				}
+			}
+			if fun == "" {
+				fun, conv = "Bytes", "[]byte(%s)"
+			}
+		case "XMLTYPE", "TEST_SUBTYPECLOSE_LT":
 
+		default:
+			if strings.IndexByte(typ, '.') < 0 { // Object
+				panic(fmt.Errorf("unknown type %q (%q)", typ, f.DBType))
+			}
+		}
+
+		if conv == "" {
+			conv = "%s"
+		}
+		fieldName := FieldName(f)
+		if !f.Repeated {
+			if getValue == "" {
+				getValue = fmt.Sprintf(conv, "x.%s")
+			}
+			getValue = fmt.Sprintf(getValue, fieldName)
+			fmt.Fprintf(w, "d.Set%s(%s)\n", fun, getValue)
+		} else {
+			if getValue == "" {
+				getValue = fmt.Sprintf(conv, "e")
+			} else {
+				getValue = fmt.Sprintf(getValue, "e")
+			}
+			fmt.Fprintf(w, `
+		OT, err := godror.GetObjectType(ctx, ex, %q)
+		if err != nil {return fmt.Errorf("NewObjectType(%s): %%w", err)}
+		O, err := OT.NewObject()
+		if err != nil {OT.Close(); return fmt.Errorf("NewObject(%s): %%w", err)}
+		C := O.Collection()
+		for _, e := range x.%s {
+			d.Set%s(%s)
+			if err = C.AppendData(&d); err != nil {
+				O.Close()
+				OT.Close()
+				return fmt.Errorf("AppendData(%s): %%w", err)
+			}
+		}
+		d.SetObject(C.Object)
+	`,
+				f.DBType, f.DBType, f.DBType,
+				fieldName,
+				fun, getValue,
+				f.DBType,
+			)
+		}
+		fmt.Fprintf(w, `if err := obj.SetAttribute(%q, &d); err != nil {
+		return fmt.Errorf("SetAttribute(%s): %%w", err)
+	}
+`,
+			strings.ToUpper(f.Name),
+			strings.ToUpper(f.Name),
+		)
+	}
+
+	fmt.Fprintf(w, `
+		return nil
+	}(); err != nil { 
+		obj.Close(); objT.Close(); 
+		return nil, err 
+	}
+	return obj, nil
+}
+`)
+
+	// FromObject
 	fmt.Fprintf(w, "func (x *%s) FromObject(obj *godror.Object) error {\nvar d godror.Data\nx.Reset()\n", msg.Name)
 	for _, f := range msg.Fields {
 		nm := strings.ToUpper(oracall.SnakeCase(f.Name))
@@ -215,10 +347,7 @@ func (msg message) writeToFrom(w io.Writer) {
 				panic(fmt.Errorf("unknown type %q (%q)", typ, f.DBType))
 			}
 		}
-		fieldName := oracall.CamelCase(f.Name)
-		if fieldName == "Size" {
-			fieldName += "_"
-		}
+		fieldName := FieldName(f)
 		if !(getValue == "" && fun == "") {
 			if getValue == "" {
 				getValue = fmt.Sprintf("v := %s(d.Get%s())", conv, fun)
