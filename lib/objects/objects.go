@@ -427,7 +427,7 @@ func (t Type) protoTypeName() string {
 	case "PL/SQL PLS INTEGER", "PL/SQL BINARY INTEGER":
 		return "int32"
 	case "BINARY_DOUBLE":
-		return "float"
+		return "double"
 	case "NUMBER", "INTEGER":
 		if t.Precision.Valid {
 			if t.Scale.Int32 == 0 {
