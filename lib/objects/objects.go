@@ -72,14 +72,16 @@ SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A
 	grp, grpCtx := errgroup.WithContext(ctx)
 	grp.SetLimit(8)
 	for rows.Next() {
-		var t Type
+		t := Type{Owner: tt.currentSchema}
 		if err := rows.Scan(&t.Name, &t.Package, &t.TypeCode); err != nil {
 			return nil, fmt.Errorf("scan %s: %w", qry, err)
 		}
 		if len(only) != 0 {
 			var found bool
 			for _, k := range only {
-				if found = k == t.Name || k == t.Package; found {
+				i := strings.IndexByte(k, '.')
+				if found = i < 0 && (k == t.Name || k == t.Package) ||
+					i >= 0 && k == t.Package+"."+t.Name; found {
 					break
 				}
 			}
@@ -137,17 +139,43 @@ func (tt *Types) get(ctx context.Context, name string) (*Type, error) {
 	logger := zlog.SFromContext(ctx)
 	_ = logger
 	t := tt.m[name]
-	if t == nil {
-		const qry = `SELECT A.type_name, NULL AS package_name, A.typecode FROM user_types A WHERE type_name = :type
+	if t == nil || t.TypeCode == "" {
+		const qry = `SELECT A.owner, A.type_name, NULL AS package_name, A.typecode 
+  FROM all_types A 
+  WHERE owner IN (COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')), COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))) AND 
+        type_name = :type
 UNION ALL
-SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A WHERE package_name = :package AND type_name = :type
+SELECT SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AS owner, A.type_name, A.package_name, A.typecode 
+  FROM user_plsql_types A 
+  WHERE package_name = :package AND type_name = :type
+UNION ALL
+SELECT owner, :type AS type_name, NULL AS package_name, '%ROWTYPE' AS typecode 
+  FROM all_tables 
+  WHERE owner IN (COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')), COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))) AND 
+        table_name = REGEXP_REPLACE(:type, '%ROWTYPE$')
 `
-		pkg, typ, ok := strings.Cut(name, ".")
-		if !ok {
-			pkg, typ = typ, pkg
+		owner, pkg, typ := tt.currentSchema, "", name
+		fields := strings.Split(name, ".")
+		switch len(fields) {
+		case 1:
+		case 2:
+			if strings.HasSuffix(name, "%ROWTYPE") {
+				owner, typ = fields[0], fields[1]
+			} else {
+				pkg, typ = fields[0], fields[1]
+			}
+		case 3:
+			owner, pkg, typ = fields[0], fields[1], fields[2]
+		default:
+			return nil, fmt.Errorf("too many parts: %q", fields)
 		}
+
 		t = &Type{}
-		if err := tt.db.QueryRowContext(ctx, qry, sql.Named("package", pkg), sql.Named("type", typ)).Scan(&t.Name, &t.Package, &t.TypeCode); err != nil {
+		if err := tt.db.QueryRowContext(ctx, qry,
+			sql.Named("owner", owner), sql.Named("package", pkg), sql.Named("type", typ),
+		).Scan(
+			&t.Owner, &t.Name, &t.Package, &t.TypeCode,
+		); err != nil {
 			return nil, fmt.Errorf("%q: %s [%q, %q]: %w: %w", name, qry, pkg, typ, err, errUnknownType)
 		}
 		name = t.name(".")
@@ -155,38 +183,43 @@ SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A WHERE pac
 	}
 	const (
 		collQry = `
-SELECT 0+NULL AS attr_no, NULL AS attr_name, B.elem_type_owner, B.elem_type_name, NULL AS elem_package_name, B.length, B.precision, B.scale, B.coll_type, NULL AS index_by
+SELECT 'C' AS orig, 0+NULL AS attr_no, NULL AS attr_name, B.elem_type_owner, B.elem_type_name, NULL AS elem_package_name, B.length, B.precision, B.scale, B.coll_type, NULL AS index_by
   FROM all_coll_types B 
-  WHERE B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND B.type_name = :name
+  WHERE B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND 
+        B.type_name = :name
 UNION ALL
-SELECT 0+NULL AS attr_no, NULL AS attr_name, B.elem_type_owner, B.elem_type_name, B.elem_type_package, B.length, B.precision, B.scale, B.coll_type, B.index_by 
+SELECT 'D' as orig, 0+NULL AS attr_no, NULL AS attr_name, B.elem_type_owner, B.elem_type_name, B.elem_type_package, B.length, B.precision, B.scale, B.coll_type, B.index_by 
   FROM user_plsql_coll_types B 
-  WHERE B.type_name = :name AND B.package_name = :package
-  ORDER BY 1, 2
+  WHERE B.package_name = :package AND 
+        B.type_name = :name 
+  ORDER BY 2, 3
 `
 
 		attrQry = `
-SELECT B.attr_no, B.attr_name, B.attr_type_owner, B.attr_type_name, NULL AS attr_package_name, B.length, B.precision, B.scale, NULL as coll_type, NULL AS index_by
+SELECT 'A' as orig, B.attr_no, B.attr_name, B.attr_type_owner, B.attr_type_name, NULL AS attr_package_name, B.length, B.precision, B.scale, NULL as coll_type, NULL AS index_by
   FROM all_type_attrs B 
-  WHERE B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND B.type_name = :name
+  WHERE B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND 
+        B.type_name = :name
 UNION ALL
-SELECT B.attr_no, B.attr_name, B.attr_type_owner, B.attr_type_name, B.attr_type_package, B.length, B.precision, B.scale, NULL as coll_type, NULL AS index_by
+SELECT 'B' as orign, B.attr_no, B.attr_name, B.attr_type_owner, B.attr_type_name, B.attr_type_package, B.length, B.precision, B.scale, NULL as coll_type, NULL AS index_by
   FROM user_plsql_type_attrs B 
-  WHERE B.package_name = :package AND B.type_name = :name
-  ORDER BY 1, 2
+  WHERE B.package_name = :package AND 
+        B.type_name = :name
+  ORDER BY 2, 3
 `
 
 		tblQry = `
-SELECT B.column_id AS attr_no, B.column_name, B.data_type_owner, B.data_type, NULL, B.data_length, B.data_precision, B.data_scale, NULL as coll_type, NULL AS index_by
-  FROM user_tab_cols B 
-  WHERE B.table_name = REGEXP_REPLACE(:name, '%ROWTYPE$') AND :package IS NULL AND 
-        COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
-  ORDER BY 1, 2`
+SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.data_type, NULL, B.data_length, B.data_precision, B.data_scale, NULL as coll_type, NULL AS index_by
+  FROM all_tab_cols B 
+  WHERE INSTR(B.column_name, '$') = 0 AND
+        B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND
+        :package IS NULL AND
+        B.table_name = REGEXP_REPLACE(:name, '%ROWTYPE$') 
+  ORDER BY 2, 3`
 	)
-	logger.Debug("resolve", "t", t)
-	typesKey := t.name(".")
-	u := tt.m[typesKey]
-	if u != nil && t.Valid() {
+	u := tt.m[name]
+	logger.Debug("resolve", "t", t, "key", name, "tc", t.TypeCode, "u", u, "uIsValid", u.Valid(), "isColl", t.IsColl(), "t#", fmt.Sprintf("%#v", t))
+	if u != nil && u.Valid() {
 		*t = *u
 		return t, nil
 	}
@@ -207,18 +240,18 @@ SELECT B.column_id AS attr_no, B.column_name, B.data_type_owner, B.data_type, NU
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var attrName string
+			var orig, attrName, collType string
 			var attrNo sql.NullInt32
 			var s Type
 			if err := rows.Scan(
 				// SELECT B.attr_type_owner, B.attr_type_name, B.attr_type_package, B.length, B.precision, B.scale, NULL as coll_type, NULL AS index_by
-				&attrNo, &attrName,
-				&s.Owner, &s.Name, &s.Package, &s.Length, &s.Precision, &s.Scale, &s.CollType, &s.IndexBy,
+				&orig, &attrNo, &attrName,
+				&s.Owner, &s.Name, &s.Package, &s.Length, &s.Precision, &s.Scale, &collType, &s.IndexBy,
 			); err != nil {
 				return t, fmt.Errorf("%s: %w", qry, err)
 			}
-			if s.Owner != "" && s.Owner == tt.currentSchema {
-				s.Owner = ""
+			if collType != "" && t.CollType == "" {
+				t.CollType = collType
 			}
 			if attrName != "" && len(t.Arguments) != 0 && t.Arguments[len(t.Arguments)-1].Name == attrName {
 				continue
@@ -230,16 +263,18 @@ SELECT B.column_id AS attr_no, B.column_name, B.data_type_owner, B.data_type, NU
 			if !p.Valid() {
 				key := p.name(".")
 				tt.m[key] = p
-				if p, err = tt.get(ctx, p.name(".")); err != nil {
+				if p, err = tt.get(ctx, key); err != nil {
 					return t, err
 				}
+				logger.Debug("x", "get", key, "p", p)
 			}
+			i++
 			if isColl {
 				t.Elem = p
+				break
 			} else {
 				t.Arguments = append(t.Arguments, Argument{Name: attrName, Type: p})
 			}
-			i++
 		}
 		if err := rows.Close(); err != nil {
 			return t, err
@@ -248,45 +283,13 @@ SELECT B.column_id AS attr_no, B.column_name, B.data_type_owner, B.data_type, NU
 			break
 		}
 	}
-	logger.Debug("resolved", "type", t, "rows", i)
+	logger.Debug("resolved", "type", t, "rows", i, "isColl", t.IsColl(), "elem", t.Elem)
 	if !t.Valid() {
 		return t, fmt.Errorf("could not resolve %s (%s owner=%q pkg=%q name=%q; rowcount=%d): %#v",
-			typesKey, qry, t.Package, t.Owner, t.Name, i, t)
+			name, qry, t.Package, t.Owner, t.Name, i, t)
 	}
-	// if x := tt.m[typesKey]; x == nil || x.Elem == nil || x.Arguments == nil {
-	tt.m[typesKey] = t
-	// }
+	tt.m[name] = t
 
-	/*
-		var fill func(t *Type) *Type
-		fill = func(t *Type) *Type {
-			if t == nil || t.Name == "" || !t.composite() {
-				return t
-			}
-			if !t.Valid() {
-				logger.Debug("fill", "t", t)
-				u, err := tt.get(ctx, t.name("."))
-				if err != nil {
-					if t.name(".") != "PUBLIC.XMLTYPE" {
-						panic(fmt.Errorf("no type found of %s: %w", t.name("."), err))
-					}
-				} else {
-					*t = *u
-					return u
-				}
-			}
-			// logger.Debug("fill", "elem", t)
-			t.Elem = fill(t.Elem)
-			for i, v := range t.Arguments {
-				v.Type = fill(v.Type)
-				t.Arguments[i] = v
-			}
-			return t
-		}
-		for _, nm := range seen {
-			fill(tt.m[nm])
-		}
-	*/
 	return t, nil
 }
 
@@ -336,10 +339,6 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 		var i int
 		for _, a := range t.Arguments {
 			name := a.Name
-			if name == "" {
-				// panic(fmt.Sprintf("empty attr %#v", t))
-				name = "record"
-			}
 			s := a.Type
 			var rule string
 			// logger.Debug("attr", "t", t.Name, "a", a.Name, "type", fmt.Sprintf("%#v", s), "isColl", s.IsColl(), "elem", s.Elem)
@@ -351,6 +350,9 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 			} else if s.Elem != nil {
 				rule = "repeated "
 				s = s.Elem
+				if name == "" {
+					name = "record"
+				}
 			}
 			i++
 			fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n", rule, s.protoType(), strings.ToLower(name), i, s.OraType())
@@ -448,8 +450,8 @@ func (t Type) protoTypeName() string {
 	}
 	return ""
 }
-func (t Type) Valid() bool {
-	return t.Name != "" && (isSimpleType(t.Name) || t.Elem != nil || t.Arguments != nil)
+func (t *Type) Valid() bool {
+	return t != nil && t.Name != "" && (isSimpleType(t.Name) || t.Elem != nil || t.Arguments != nil)
 }
 
 func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
