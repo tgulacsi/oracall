@@ -340,6 +340,7 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 		for _, a := range t.Arguments {
 			name := a.Name
 			s := a.Type
+			oraType := s.OraType()
 			var rule string
 			// logger.Debug("attr", "t", t.Name, "a", a.Name, "type", fmt.Sprintf("%#v", s), "isColl", s.IsColl(), "elem", s.Elem)
 			if s.IsColl() {
@@ -355,7 +356,7 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 				}
 			}
 			i++
-			fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n", rule, s.protoType(), strings.ToLower(name), i, s.OraType())
+			fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n", rule, s.protoType(), strings.ToLower(name), i, oraType)
 		}
 	} else if s := t.Elem; s != nil {
 		// fmt.Fprintf(bw, "\trepeated %s = %d;  //b %s\n", s.protoType(), 1, s.name("."))
