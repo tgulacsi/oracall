@@ -2,7 +2,7 @@
 syntax = "proto3";
 
 package objects;
-option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
+option go_package = "github.com/tgulacsi/oracall/protoc-gen-oracall/testdata";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/descriptor.proto";
