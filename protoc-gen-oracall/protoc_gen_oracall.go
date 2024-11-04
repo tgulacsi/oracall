@@ -77,6 +77,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 		
 	"github.com/godror/godror"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -86,6 +87,7 @@ var (
 	_ context.Context
 	_ = io.ReadAll
 	_ strings.Builder
+	_ time.Time
 	_ = timestamppb.New
 	_ godror.Number
 )
@@ -99,6 +101,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -125,6 +128,53 @@ func getTx(ctx context.Context) (*sql.Tx, error) {
 	dbOnce.Do(func() { db, err = sql.Open("godror", os.Getenv("BRUNO_ID")) })
 	if err != nil { return nil, err }
 	return db.BeginTx(ctx, nil)
+}
+func fakeData(t *testing.T, dest any) {
+    // t.Logf("fakeData: %%T", dest)
+	switch x := dest.(type) {
+		case *time.Time: *x = time.Now().UTC().Truncate(time.Second); return
+		case **timestamppb.Timestamp: *x = timestamppb.New(time.Now().UTC().Truncate(time.Second)); return
+		case *string: *x = "-16"; return
+	}
+	rv := reflect.ValueOf(dest).Elem()
+	rt := rv.Type()
+	switch rt.Kind() {
+		case reflect.Pointer: fakeData(t, rv.Interface())  
+		case reflect.Bool: rv.SetBool(true) 
+		case reflect.Int:   rv.SetInt(-999999999) 
+		case reflect.Int8:  rv.SetInt(-118) 
+		case reflect.Int16: rv.SetInt(-32716) 
+		case reflect.Int32: rv.SetInt(-999999932) 
+		case reflect.Int64: rv.SetInt(-1234567890123456764) 
+		case reflect.Uint:   rv.SetUint(999999999) 
+		case reflect.Uint8:  rv.SetUint(118)
+		case reflect.Uint16: rv.SetUint(32716)
+		case reflect.Uint32: rv.SetUint(999999932)
+		case reflect.Uint64: rv.SetUint(1234567890123456764)
+		case reflect.Float32: rv.SetFloat(3.1432) 
+		case reflect.Float64: rv.SetFloat(3.1464) 
+		case reflect.String: rv.SetString("X") 
+		case reflect.Slice: 
+			ss := reflect.MakeSlice(rt, 0, 2)
+			ret := rt.Elem()
+			if ret.Kind() == reflect.Pointer {
+				ret = ret.Elem()
+			}
+			re := reflect.New(ret)
+			fakeData(t, re.Interface())
+			rv.Set(reflect.Append(ss, re))
+			
+		case reflect.Struct:
+			for i := range rt.NumField() {
+				ft := rt.Field(i)
+				if !ft.IsExported() {
+					continue
+				}
+				vv := reflect.New(ft.Type)
+				fakeData(t, vv.Interface())
+				rv.FieldByIndex(ft.Index).Set(vv.Elem())		
+			}
+	}
 }
 `, file.GoPackageName, file.GoImportPath)
 
@@ -155,6 +205,10 @@ func getTx(ctx context.Context) (*sql.Tx, error) {
 					switch nativeType = string(f.Message().FullName()); nativeType {
 					case "google.protobuf.Timestamp":
 						nativeType = "*timestamppb.Timestamp"
+					default:
+						if strings.HasPrefix(nativeType, "objects.") {
+							nativeType = strings.TrimPrefix(nativeType, "objects.")
+						}
 					}
 				}
 				m.Fields = append(m.Fields, nameType{
@@ -234,7 +288,7 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 		var fun, conv, getValue string
 		switch typ, post, _ := strings.Cut(f.DBType, "("); typ {
 		case "DATE", "TIMESTAMP":
-			fun, conv = "Time", "%s.AsTime()"
+			fun, conv = "Time", "%s.AsTime().In(time.Local)"
 		case "CHAR", "VARCHAR2", "LONG", "PL/SQL ROWID", "CLOB":
 			fun, conv = "Bytes", "[]byte(%s)"
 		case "RAW", "LONG RAW", "BLOB":
@@ -271,7 +325,8 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 			if fun == "" {
 				fun, conv = "Bytes", "[]byte(%s)"
 			}
-		case "XMLTYPE", "TEST_SUBTYPECLOSE_LT":
+		case "PUBLIC.XMLTYPE", "SYS.XMLTYPE", "XMLTYPE":
+			fun, conv = "Bytes", "[]byte(%s)"
 
 		default:
 			if strings.IndexByte(typ, '.') < 0 { // Object
@@ -284,25 +339,52 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 		}
 		fieldName := FieldName(f)
 		if !f.Repeated {
-			if getValue == "" {
-				getValue = fmt.Sprintf(conv, "x.%s")
-			}
-			getValue = fmt.Sprintf(getValue, fieldName)
-			fmt.Fprintf(w, "d.Set%s(%s)\n", fun, getValue)
-		} else {
-			if getValue == "" {
-				getValue = fmt.Sprintf(conv, "e")
+			if fun == "" {
+				getValue = `if x.%[1]s == nil { d.SetNull() } else {
+				sub, err := x.%[1]s.ToObject(ctx, ex)
+				if err != nil {return err}
+				d.SetObject(sub)
+				}`
 			} else {
-				getValue = fmt.Sprintf(getValue, "e")
+				if getValue == "" {
+					getValue = fmt.Sprintf(conv, "x.%s")
+				}
+				getValue = fmt.Sprintf("d.Set%s(%s)\n", fun, getValue)
+			}
+			fmt.Fprintf(w, "%s\n", fmt.Sprintf(getValue, fieldName))
+		} else {
+			if fun == "" {
+				switch f.NativeType {
+				case "int32":
+					getValue = "d.SetInt64(int64(e))"
+				case "string":
+					getValue = "d.SetBytes([]byte(e))"
+				case "*timestamppb.Timestamp":
+					getValue = "d.SetTime(e.AsTime().In(time.Local))"
+				default:
+					getValue = `{
+					// ` + f.NativeType + `
+				sub, err := e.ToObject(ctx, ex)
+				if err != nil {return err}
+				d.SetObject(sub)}`
+				}
+			} else {
+				if getValue == "" {
+					getValue = fmt.Sprintf(conv, "e")
+				} else {
+					getValue = fmt.Sprintf(getValue, "e")
+				}
+				getValue = fmt.Sprintf("d.Set%s(%s)", fun, getValue)
 			}
 			fmt.Fprintf(w, `
+		{
 		OT, err := godror.GetObjectType(ctx, ex, %q)
 		if err != nil {return fmt.Errorf("NewObjectType(%s): %%w", err)}
 		O, err := OT.NewObject()
 		if err != nil {OT.Close(); return fmt.Errorf("NewObject(%s): %%w", err)}
 		C := O.Collection()
 		for _, e := range x.%s {
-			d.Set%s(%s)
+			%s
 			if err = C.AppendData(&d); err != nil {
 				O.Close()
 				OT.Close()
@@ -310,20 +392,22 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 			}
 		}
 		d.SetObject(C.Object)
+		}
 	`,
 				f.DBType, f.DBType,
 				strings.ReplaceAll(f.DBType, "%", "%%"),
 				fieldName,
-				fun, getValue,
+				getValue,
 				strings.ReplaceAll(f.DBType, "%", "%%"),
 			)
 		}
+		Name := strings.ToUpper(f.Name)
 		fmt.Fprintf(w, `if err := obj.SetAttribute(%q, &d); err != nil {
-		return fmt.Errorf("SetAttribute(%s): %%w", err)
+		return fmt.Errorf("SetAttribute(%s, %%+v): %%w", d, err)
 	}
 `,
-			strings.ToUpper(f.Name),
-			strings.ToUpper(f.Name),
+			Name,
+			Name,
 		)
 	}
 
@@ -386,7 +470,8 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 			if fun == "" {
 				fun, conv = "Bytes", "string"
 			}
-		case "XMLTYPE", "TEST_SUBTYPECLOSE_LT":
+		case "PUBLIC.XMLTYPE", "SYS.XMLTYPE", "XMLTYPE":
+			fun, conv = "Bytes", "string"
 
 		default:
 			if strings.IndexByte(typ, '.') < 0 { // Object
@@ -396,14 +481,26 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 		fieldName := FieldName(f)
 		if !(getValue == "" && fun == "") {
 			if getValue == "" {
-				getValue = fmt.Sprintf("v := %s(d.Get%s())", conv, fun)
+				switch f.NativeType {
+				case "string":
+					getValue = `v := string(d.GetBytes())
+					if v == "" {
+						v = fmt.Sprintf("%v", d.Get())	
+					}
+					`
+				case "*timestamppb.Timestamp":
+					getValue = "v := timestamppb.New(d.GetTime())"
+				default:
+					getValue = fmt.Sprintf("v := %s(d.Get%s())", conv, fun)
+				}
 			} else if strings.Contains(getValue, "%") {
 				getValue = fmt.Sprintf(getValue, fieldName)
 			}
 			if !f.Repeated {
 				fmt.Fprintf(w, "%s\nx.%s = v\n", getValue, fieldName)
 			} else {
-				fmt.Fprintf(w, `O := d.GetObject().Collection()
+				fmt.Fprintf(w, `{
+	O := d.GetObject().Collection()
 	length, err := O.Len()
 	if err != nil { return err }
 	x.%s = make([]%s, 0, length)
@@ -417,13 +514,62 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 		%s
 		x.%s = append(x.%s, v)
 	}
-`,
+}`,
 					fieldName, f.NativeType,
 					getValue,
 					fieldName, fieldName,
 				)
 			}
 		} else if strings.IndexByte(f.DBType, '.') >= 0 {
+			if !f.Repeated {
+				fmt.Fprintf(w, `{
+				var sub %s; 
+				if err := sub.FromObject(d.GetObject()); err != nil {
+					return err 
+				}
+				x.%s = &sub; 
+				}`,
+					f.NativeType, fieldName,
+				)
+			} else {
+				nativeType, at := "*"+f.NativeType, '&'
+				get := `if err := sub.FromObject(d.GetObject()); err != nil {
+			return err
+		}`
+				switch f.NativeType {
+				case "int32":
+					nativeType, at = f.NativeType, ' '
+					get = "sub = int32(d.GetInt64())"
+				case "*timestamppb.Timestamp":
+					nativeType, at = f.NativeType, ' '
+					get = "sub = timestamppb.New(d.GetTime())"
+				case "string":
+					nativeType, at = f.NativeType, ' '
+					get = `sub = string(d.GetBytes())`
+				}
+				fmt.Fprintf(w, `{
+	O := d.GetObject().Collection()
+	length, err := O.Len()
+	if err != nil { return err }
+	x.%s = make([]%s, 0, length)
+	for i, err := O.First(); err == nil; i, err = O.Next(i) {
+		if O.CollectionOf.IsObject() {
+			d.ObjectType = O.CollectionOf
+		}
+		if err = O.GetItem(&d, i); err != nil {
+			return err
+		}
+		var sub %s
+		%s
+		x.%s = append(x.%s, %csub)
+	}
+				}`,
+					fieldName, nativeType,
+					f.NativeType,
+					get,
+					fieldName, fieldName, at,
+				)
+			}
 
 		} else {
 			// panic(fmt.Errorf("not implemented (%q)", f.Type))
@@ -439,14 +585,15 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 	if err != nil { t.Fatal(err) }
 	defer tx.Rollback()
 	var want, got %s.%s
+	fakeData(t, &want)
 	wantJ, err := protojson.Marshal(&want)
 	if err != nil { t.Fatalf("protojson.Marshal(%s): %%+v", err)}
 	obj, err := want.ToObject(ctx, tx)
-	if err != nil { t.Fatalf("%s.ToObject: %%+v", err)}
+	if err != nil { t.Fatalf("%s=%%s.ToObject: %%+v", wantJ, err)}
 	if err = got.FromObject(obj); err != nil { t.Fatalf("%s.FromObject: %%+v", err) }
 	gotJ, err := protojson.Marshal(&got)
 	if err != nil { t.Fatalf("protojson.Marshal(%s): %%+v", err)}
-	if d := cmp.Diff(string(wantJ), string(gotJ)); d != "" { t.Error(d) }
+	if d := cmp.Diff(string(wantJ), string(gotJ)); d != "" { t.Error(d, "want="+string(wantJ), "\n", "got="+string(gotJ)) }
 	`,
 		msg.Name,
 		pkg, msg.Name,

@@ -132,6 +132,8 @@ func (tt *Types) Get(ctx context.Context, name string) (*Type, error) {
 	return tt.get(ctx, name)
 }
 
+// INDEX BY VARCHAR2 nem tamogatott!
+
 func (tt *Types) get(ctx context.Context, name string) (*Type, error) {
 	if name == "" {
 		panic(`Types.Get("")`)

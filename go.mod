@@ -31,6 +31,7 @@ require (
 require (
 	github.com/dgryski/go-linebreak v0.0.0-20180812204043-d8f37254e7d3 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/go-faker/faker/v4 v4.5.0 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
