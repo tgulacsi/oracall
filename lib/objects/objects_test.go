@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"flag"
 	"os"
 	"os/exec"
@@ -55,7 +56,12 @@ option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 		x, err := types.Get(ctx, nm)
 		t.Logf("%s: %v", nm, x)
 		if err != nil {
-			t.Fatalf("%s: %+v", nm, err)
+			if errors.Is(err, objects.ErrNotSupported) {
+				t.Logf("%+v", err)
+				continue
+			} else {
+				t.Fatalf("%s: %+v", nm, err)
+			}
 		}
 		if err = x.WriteProtobufMessageType(ctx, bw); err != nil {
 			t.Fatal(nm, err)

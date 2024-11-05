@@ -69,6 +69,7 @@ SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A
 		return nil, fmt.Errorf("%s: %w", qry, err)
 	}
 	defer rows.Close()
+	logger := zlog.SFromContext(ctx)
 	grp, grpCtx := errgroup.WithContext(ctx)
 	grp.SetLimit(8)
 	for rows.Next() {
@@ -105,6 +106,10 @@ SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A
 			}
 			tt.m[key] = u
 			_, err = tt.get(grpCtx, key)
+			if errors.Is(err, ErrNotSupported) {
+				logger.Warn("not supported", "type", key, "error", err)
+				err = nil
+			}
 			return err
 		})
 	}
@@ -235,6 +240,7 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 	// logger.Debug("resolve", "type", t, "isColl", isColl)
 	var i int
 	var qry string
+	var errs []error
 	for _, qry = range qrys {
 		rows, err := tt.db.QueryContext(ctx, qry, sql.Named("package", t.Package), sql.Named("owner", t.Owner), sql.Named("name", t.Name))
 		if err != nil {
@@ -254,6 +260,11 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 			}
 			if collType != "" && t.CollType == "" {
 				t.CollType = collType
+			}
+			if t.CollType != "" && s.IndexBy != "" && !strings.Contains(s.IndexBy, "INTEGER") {
+				logger.Warn("unsupported", "indexBy", s.IndexBy, "of", t)
+				errs = append(errs, fmt.Errorf("%s[%s]: %w", t, s.IndexBy, ErrNotSupported))
+				continue
 			}
 			if attrName != "" && len(t.Arguments) != 0 && t.Arguments[len(t.Arguments)-1].Name == attrName {
 				continue
@@ -287,13 +298,15 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 	}
 	logger.Debug("resolved", "type", t, "rows", i, "isColl", t.IsColl(), "elem", t.Elem)
 	if !t.Valid() {
-		return t, fmt.Errorf("could not resolve %s (%s owner=%q pkg=%q name=%q; rowcount=%d): %#v",
-			name, qry, t.Package, t.Owner, t.Name, i, t)
+		return t, fmt.Errorf("could not resolve %s (%s owner=%q pkg=%q name=%q; rowcount=%d): %#v: %w",
+			name, qry, t.Package, t.Owner, t.Name, i, t, errors.Join(errs...))
 	}
 	tt.m[name] = t
 
 	return t, nil
 }
+
+var ErrNotSupported = errors.New("not supported")
 
 func (t Type) name(sep string) string {
 	name := t.Name

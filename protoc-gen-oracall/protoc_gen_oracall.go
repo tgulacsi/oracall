@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
+//go:generate bash -c "sed -e '/go_package =/ s,lib/objects,protoc-gen-oracall,' ../lib/objects/testdata/x.proto > testdata/x.proto"
 func main() {
 	if err := Main(); err != nil {
 		log.Fatal(err)
@@ -133,10 +134,15 @@ func fakeData(t *testing.T, dest any) {
     // t.Logf("fakeData: %%T", dest)
 	switch x := dest.(type) {
 		case *time.Time: *x = time.Now().UTC().Truncate(time.Second); return
+		case *timestamppb.Timestamp: *x = *(timestamppb.New(time.Now().UTC().Truncate(time.Second))); return
 		case **timestamppb.Timestamp: *x = timestamppb.New(time.Now().UTC().Truncate(time.Second)); return
 		case *string: *x = "-16"; return
 	}
-	rv := reflect.ValueOf(dest).Elem()
+	rv := reflect.ValueOf(dest)
+	if rv.IsNil() {
+		rv.Set(reflect.New(rv.Type().Elem()))
+	}
+	rv = rv.Elem()
 	rt := rv.Type()
 	switch rt.Kind() {
 		case reflect.Pointer: fakeData(t, rv.Interface())  
@@ -157,11 +163,15 @@ func fakeData(t *testing.T, dest any) {
 		case reflect.Slice: 
 			ss := reflect.MakeSlice(rt, 0, 2)
 			ret := rt.Elem()
-			if ret.Kind() == reflect.Pointer {
+			ptr := ret.Kind() == reflect.Pointer
+			if ptr {
 				ret = ret.Elem()
 			}
 			re := reflect.New(ret)
 			fakeData(t, re.Interface())
+			if !ptr {
+				re = re.Elem()
+			}
 			rv.Set(reflect.Append(ss, re))
 			
 		case reflect.Struct:
@@ -170,9 +180,19 @@ func fakeData(t *testing.T, dest any) {
 				if !ft.IsExported() {
 					continue
 				}
-				vv := reflect.New(ft.Type)
+				var vv reflect.Value
+				ptr := ft.Type.Kind() == reflect.Pointer
+				if ptr {
+					vv = reflect.New(ft.Type.Elem())
+				} else {
+					vv = reflect.New(ft.Type)
+				}
 				fakeData(t, vv.Interface())
-				rv.FieldByIndex(ft.Index).Set(vv.Elem())		
+				if ptr {
+					rv.FieldByIndex(ft.Index).Set(vv)
+				} else {
+					rv.FieldByIndex(ft.Index).Set(vv.Elem())
+				}
 			}
 	}
 }
@@ -483,8 +503,10 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 			if getValue == "" {
 				switch f.NativeType {
 				case "string":
-					getValue = `v := string(d.GetBytes())
-					if v == "" {
+					getValue = `var v string
+					if d.NativeTypeNum == 3004 {  //godror.NativeTypeBytes 
+					v = string(d.GetBytes()) 
+					} else { 
 						v = fmt.Sprintf("%v", d.Get())	
 					}
 					`

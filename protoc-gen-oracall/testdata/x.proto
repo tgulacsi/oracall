@@ -173,8 +173,6 @@ message BrunoOwner_Db_12702_BiztRecType {
 	string nev = 5 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 bekor = 6 [(oracall_field_type) = "NUMBER(4)"];
 	int32 szulev = 7 [(oracall_field_type) = "NUMBER(4)"];
-	repeated BrunoOwner_Db_12702_BiztModulRec halm_bo = 8 [(oracall_field_type) = "BRUNO_OWNER.DB_12702.BO_REC_TYPE"];
-	string elutasit = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 }
 // BRUNO_OWNER.DB_12702.E_HALM_REC_TYPE
 message BrunoOwner_Db_12702_EHalmRecType {
@@ -2191,7 +2189,6 @@ message BrunoOwner_DbEuroSpeed_HozamRecType {
 message BrunoOwner_DbEuroSpeed_KockDijKimutTestType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_EURO_SPEED.KOCK_DIJ_KIMUT_TEST_TYPE";
 	google.protobuf.Timestamp f_hataly = 1 [(oracall_field_type) = "DATE"];
-	repeated BrunoOwner_DbEuroSpeed_KockDijType kockdij = 2 [(oracall_field_type) = "BRUNO_OWNER.DB_EURO_SPEED.KOCK_DIJ_TABLE_TEST_TYPE"];
 }
 // BRUNO_OWNER.DB_EURO_SPEED.KOCK_DIJ_TYPE
 message BrunoOwner_DbEuroSpeed_KockDijType {
@@ -2676,13 +2673,6 @@ message BrunoOwner_DbGapTart_RecType {
 	float f_max_onresz_kar_sz = 6 [(oracall_field_type) = "NUMBER(6,4)"];
 	google.protobuf.Timestamp f_hatalytol = 7 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 8 [(oracall_field_type) = "DATE"];
-}
-// BRUNO_OWNER.DB_GDPR_KPI.TAB_RT
-message BrunoOwner_DbGdprKpi_TabRt {
-	option (oracall_object_type) = "BRUNO_OWNER.DB_GDPR_KPI.TAB_RT";
-	repeated string mezok = 1 [(oracall_field_type) = "BRUNO_OWNER.DB_GDPR_KPI.TXT_TT"];
-	string feltetelek = 2 [(oracall_field_type) = "VARCHAR2(1000)"];
-	bool del = 3 [(oracall_field_type) = "PL/SQL BOOLEAN"];
 }
 // BRUNO_OWNER.DB_GFB.REC_KEDV
 message BrunoOwner_DbGfb_RecKedv {
@@ -5034,7 +5024,6 @@ message BrunoOwner_DbKutSoap_SzerzodesRecTyp {
 	google.protobuf.Timestamp szerveg = 10 [(oracall_field_type) = "DATE"];
 	string elo = 11 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp statusz_dt = 12 [(oracall_field_type) = "DATE"];
-	repeated string ugyfelek = 13 [(oracall_field_type) = "BRUNO_OWNER.DB_KUT_SOAP.KUTID_TAB_TYP"];
 }
 // BRUNO_OWNER.DB_KUT_SOAP.UGYFEL_REC_TYP
 message BrunoOwner_DbKutSoap_UgyfelRecTyp {
@@ -6491,7 +6480,6 @@ message BrunoOwner_DbOke_MkReszlRecTyp {
 	int32 alapdij = 3 [(oracall_field_type) = "NUMBER(9)"];
 	int32 evesdij = 4 [(oracall_field_type) = "NUMBER(9)"];
 	double netto_dij = 5 [(oracall_field_type) = "NUMBER(15,5)"];
-	repeated BrunoOwner_DbOke_ModulKedvPdijRecTyp kedvpdij = 6 [(oracall_field_type) = "BRUNO_OWNER.DB_OKE.MODUL_KEDV_PDIJ_TAB_TYP"];
 }
 // BRUNO_OWNER.DB_OKE.MODULOK_REC_TYP
 message BrunoOwner_DbOke_ModulokRecTyp {
@@ -11117,18 +11105,6 @@ message BrunoOwner_TKarUgyfel_Rowtype {
 	int32 f_levl_kulf_azon = 37 [(oracall_field_type) = "NUMBER(9)"];
 	string f_hibas = 38 [(oracall_field_type) = "VARCHAR2(1)"];
 }
-// BRUNO_OWNER.T_KIEG%ROWTYPE
-message BrunoOwner_TKieg_Rowtype {
-	option (oracall_object_type) = "BRUNO_OWNER.T_KIEG%ROWTYPE";
-	int32 f_szerz_azon = 1 [(oracall_field_type) = "NUMBER(9)"];
-	string f_modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
-	google.protobuf.Timestamp f_hatalytol = 3 [(oracall_field_type) = "DATE"];
-	google.protobuf.Timestamp f_hatalyig = 4 [(oracall_field_type) = "DATE"];
-	google.protobuf.Timestamp f_datum = 5 [(oracall_field_type) = "DATE"];
-	int32 f_dazon = 6 [(oracall_field_type) = "NUMBER(6)"];
-	string f_tipus = 7 [(oracall_field_type) = "CHAR(1)"];
-	string f_zartip = 8 [(oracall_field_type) = "CHAR(1)"];
-}
 // BRUNO_OWNER.T_KOLTSEG_13100%ROWTYPE
 message BrunoOwner_TKoltseg_13100_Rowtype {
 	option (oracall_object_type) = "BRUNO_OWNER.T_KOLTSEG_13100%ROWTYPE";
@@ -11559,25 +11535,6 @@ message BrunoOwner_TUgyfel_Rowtype {
 	string f_halott = 47 [(oracall_field_type) = "CHAR(1)"];
 	string f_nyilvszam = 48 [(oracall_field_type) = "VARCHAR2(30)"];
 	string f_abl_ugyf_az = 49 [(oracall_field_type) = "VARCHAR2(13)"];
-}
-// BRUNO_OWNER.T_UGYFEL_ATVIL%ROWTYPE
-message BrunoOwner_TUgyfelAtvil_Rowtype {
-	option (oracall_object_type) = "BRUNO_OWNER.T_UGYFEL_ATVIL%ROWTYPE";
-	int32 f_ugyazon = 1 [(oracall_field_type) = "NUMBER(9)"];
-	string f_azonosito = 2 [(oracall_field_type) = "VARCHAR2(15)"];
-	int32 f_ssz = 3 [(oracall_field_type) = "NUMBER(3)"];
-	string f_oka = 4 [(oracall_field_type) = "CHAR(1)"];
-	string f_tipus = 5 [(oracall_field_type) = "CHAR(1)"];
-	string f_teljes = 6 [(oracall_field_type) = "CHAR(1)"];
-	string f_torzsszam = 7 [(oracall_field_type) = "VARCHAR2(10)"];
-	google.protobuf.Timestamp f_atvil_dat = 8 [(oracall_field_type) = "DATE"];
-	string f_szerszam = 9 [(oracall_field_type) = "VARCHAR2(20)"];
-	int32 f_kontakt_azon = 10 [(oracall_field_type) = "NUMBER(9)"];
-	double f_osszeg = 11 [(oracall_field_type) = "NUMBER(12,2)"];
-	int32 f_penznem = 12 [(oracall_field_type) = "NUMBER(3)"];
-	google.protobuf.Timestamp f_datum = 13 [(oracall_field_type) = "DATE"];
-	int32 f_dazon = 14 [(oracall_field_type) = "NUMBER(9)"];
-	google.protobuf.Timestamp f_rogzites_dat = 15 [(oracall_field_type) = "DATE"];
 }
 // BRUNO_OWNER.T_UTITARS_ELET%ROWTYPE
 message BrunoOwner_TUtitarsElet_Rowtype {
