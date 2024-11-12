@@ -41,6 +41,7 @@ func getTx(ctx context.Context, t *testing.T) (*sql.Tx, error) {
 			cv, _ := godror.ClientVersion(ctx, db)
 			sv, _ := godror.ServerVersion(ctx, db)
 			t.Logf("Client: %+v; Server: %+v", cv, sv)
+			err = setup(ctx, db, t)
 		}
 	})
 	if err != nil {
@@ -183,7 +184,7 @@ func fakeData(t *testing.T, dest any, fieldType string) {
 		}
 	}
 }
-func TestToFromObject_BrunoOwner_BzsXlsx_FontRt(t *testing.T) {
+func TestToFromObject_Test_Ora21062_FontRt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	tx, err := getTx(ctx, t)
@@ -191,29 +192,29 @@ func TestToFromObject_BrunoOwner_BzsXlsx_FontRt(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	var want, got ORA21062.BrunoOwner_BzsXlsx_FontRt
+	var want, got ORA21062.Test_Ora21062_FontRt
 	fakeData(t, &want, "")
 	wantJ, err := protojson.Marshal(&want)
 	if err != nil {
-		t.Fatalf("protojson.Marshal(BrunoOwner_BzsXlsx_FontRt): %+v", err)
+		t.Fatalf("protojson.Marshal(Test_Ora21062_FontRt): %+v", err)
 	}
 	obj, err := want.ToObject(ctx, tx)
 	if err != nil {
-		t.Fatalf("BrunoOwner_BzsXlsx_FontRt=%s.ToObject: %+v", wantJ, err)
+		t.Fatalf("Test_Ora21062_FontRt=%s.ToObject: %+v", wantJ, err)
 	}
 	if err = got.FromObject(obj); err != nil {
-		t.Fatalf("BrunoOwner_BzsXlsx_FontRt.FromObject: %+v", err)
+		t.Fatalf("Test_Ora21062_FontRt.FromObject: %+v", err)
 	}
 	gotJ, err := protojson.Marshal(&got)
 	if err != nil {
-		t.Fatalf("protojson.Marshal(BrunoOwner_BzsXlsx_FontRt): %+v", err)
+		t.Fatalf("protojson.Marshal(Test_Ora21062_FontRt): %+v", err)
 	}
 	t.Logf("got=%s", gotJ)
 	if d := cmp.Diff(string(wantJ), string(gotJ)); d != "" {
 		t.Error(d, "want="+string(wantJ), "\n", "got="+string(gotJ))
 	}
 }
-func TestToFromObject_BrunoOwner_BzsXlsx_RichTextRt(t *testing.T) {
+func TestToFromObject_Test_Ora21062_RichTextRt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	tx, err := getTx(ctx, t)
@@ -221,22 +222,22 @@ func TestToFromObject_BrunoOwner_BzsXlsx_RichTextRt(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	var want, got ORA21062.BrunoOwner_BzsXlsx_RichTextRt
+	var want, got ORA21062.Test_Ora21062_RichTextRt
 	fakeData(t, &want, "")
 	wantJ, err := protojson.Marshal(&want)
 	if err != nil {
-		t.Fatalf("protojson.Marshal(BrunoOwner_BzsXlsx_RichTextRt): %+v", err)
+		t.Fatalf("protojson.Marshal(Test_Ora21062_RichTextRt): %+v", err)
 	}
 	obj, err := want.ToObject(ctx, tx)
 	if err != nil {
-		t.Fatalf("BrunoOwner_BzsXlsx_RichTextRt=%s.ToObject: %+v", wantJ, err)
+		t.Fatalf("Test_Ora21062_RichTextRt=%s.ToObject: %+v", wantJ, err)
 	}
 	if err = got.FromObject(obj); err != nil {
-		t.Fatalf("BrunoOwner_BzsXlsx_RichTextRt.FromObject: %+v", err)
+		t.Fatalf("Test_Ora21062_RichTextRt.FromObject: %+v", err)
 	}
 	gotJ, err := protojson.Marshal(&got)
 	if err != nil {
-		t.Fatalf("protojson.Marshal(BrunoOwner_BzsXlsx_RichTextRt): %+v", err)
+		t.Fatalf("protojson.Marshal(Test_Ora21062_RichTextRt): %+v", err)
 	}
 	t.Logf("got=%s", gotJ)
 	if d := cmp.Diff(string(wantJ), string(gotJ)); d != "" {

@@ -21,50 +21,50 @@ var (
 	_ godror.Number
 )
 
-// "BrunoOwner_BzsXlsx_FontRt"="BRUNO_OWNER.BZS_XLSX.FONT_RT"
-func (BrunoOwner_BzsXlsx_FontRt) ObjecTypeName() string { return "BRUNO_OWNER.BZS_XLSX.FONT_RT" }
-func (BrunoOwner_BzsXlsx_FontRt) FieldTypeName(f string) string {
+// "Test_Ora21062_FontRt"="TEST_ORA21062.FONT_RT"
+func (Test_Ora21062_FontRt) ObjecTypeName() string { return "TEST_ORA21062.FONT_RT" }
+func (Test_Ora21062_FontRt) FieldTypeName(f string) string {
 	switch f {
-	// "BrunoOwner_BzsXlsx_FontRt"."Bold" = "PL/SQL BOOLEAN"
+	// "Test_Ora21062_FontRt"."Bold" = "PL/SQL BOOLEAN"
 	case "bold", "Bold":
 		return "PL/SQL BOOLEAN"
-	// "BrunoOwner_BzsXlsx_FontRt"."Italic" = "PL/SQL BOOLEAN"
+	// "Test_Ora21062_FontRt"."Italic" = "PL/SQL BOOLEAN"
 	case "italic", "Italic":
 		return "PL/SQL BOOLEAN"
-	// "BrunoOwner_BzsXlsx_FontRt"."Underline" = "VARCHAR2(30)"
+	// "Test_Ora21062_FontRt"."Underline" = "VARCHAR2(30)"
 	case "underline", "Underline":
 		return "VARCHAR2(30)"
-	// "BrunoOwner_BzsXlsx_FontRt"."Family" = "VARCHAR2(30)"
+	// "Test_Ora21062_FontRt"."Family" = "VARCHAR2(30)"
 	case "family", "Family":
 		return "VARCHAR2(30)"
-	// "BrunoOwner_BzsXlsx_FontRt"."Size" = "BINARY_DOUBLE"
+	// "Test_Ora21062_FontRt"."Size" = "BINARY_DOUBLE"
 	case "size_", "Size":
 		return "BINARY_DOUBLE"
-	// "BrunoOwner_BzsXlsx_FontRt"."Strike" = "PL/SQL BOOLEAN"
+	// "Test_Ora21062_FontRt"."Strike" = "PL/SQL BOOLEAN"
 	case "strike", "Strike":
 		return "PL/SQL BOOLEAN"
-	// "BrunoOwner_BzsXlsx_FontRt"."Color" = "VARCHAR2(30)"
+	// "Test_Ora21062_FontRt"."Color" = "VARCHAR2(30)"
 	case "color", "Color":
 		return "VARCHAR2(30)"
-	// "BrunoOwner_BzsXlsx_FontRt"."Colorindexed" = "PL/SQL PLS INTEGER"
+	// "Test_Ora21062_FontRt"."Colorindexed" = "PL/SQL PLS INTEGER"
 	case "colorindexed", "Colorindexed":
 		return "PL/SQL PLS INTEGER"
-	// "BrunoOwner_BzsXlsx_FontRt"."Colortheme" = "PL/SQL PLS INTEGER"
+	// "Test_Ora21062_FontRt"."Colortheme" = "PL/SQL PLS INTEGER"
 	case "colortheme", "Colortheme":
 		return "PL/SQL PLS INTEGER"
-	// "BrunoOwner_BzsXlsx_FontRt"."Colortint" = "BINARY_DOUBLE"
+	// "Test_Ora21062_FontRt"."Colortint" = "BINARY_DOUBLE"
 	case "colortint", "Colortint":
 		return "BINARY_DOUBLE"
-	// "BrunoOwner_BzsXlsx_FontRt"."Vertalign" = "VARCHAR2(30)"
+	// "Test_Ora21062_FontRt"."Vertalign" = "VARCHAR2(30)"
 	case "vertalign", "Vertalign":
 		return "VARCHAR2(30)"
 	}
 	return ""
 }
-func (x BrunoOwner_BzsXlsx_FontRt) ToObject(ctx context.Context, ex godror.Execer) (*godror.Object, error) {
-	objT, err := godror.GetObjectType(ctx, ex, "BRUNO_OWNER.BZS_XLSX.FONT_RT")
+func (x Test_Ora21062_FontRt) ToObject(ctx context.Context, ex godror.Execer) (*godror.Object, error) {
+	objT, err := godror.GetObjectType(ctx, ex, "TEST_ORA21062.FONT_RT")
 	if err != nil {
-		return nil, fmt.Errorf("GetObjectType(BRUNO_OWNER.BZS_XLSX.FONT_RT): %w", err)
+		return nil, fmt.Errorf("GetObjectType(TEST_ORA21062.FONT_RT): %w", err)
 	}
 	obj, err := objT.NewObject()
 	if err != nil {
@@ -137,7 +137,7 @@ func (x BrunoOwner_BzsXlsx_FontRt) ToObject(ctx context.Context, ex godror.Exece
 	}
 	return obj, nil
 }
-func (x *BrunoOwner_BzsXlsx_FontRt) FromObject(obj *godror.Object) error {
+func (x *Test_Ora21062_FontRt) FromObject(obj *godror.Object) error {
 	var d godror.Data
 	x.Reset()
 	if err := obj.GetAttribute(&d, "BOLD"); err != nil {
@@ -244,25 +244,25 @@ func (x *BrunoOwner_BzsXlsx_FontRt) FromObject(obj *godror.Object) error {
 	return nil
 }
 
-// "BrunoOwner_BzsXlsx_RichTextRt"="BRUNO_OWNER.BZS_XLSX.RICH_TEXT_RT"
-func (BrunoOwner_BzsXlsx_RichTextRt) ObjecTypeName() string {
-	return "BRUNO_OWNER.BZS_XLSX.RICH_TEXT_RT"
+// "Test_Ora21062_RichTextRt"="TEST_ORA21062.RICH_TEXT_RT"
+func (Test_Ora21062_RichTextRt) ObjecTypeName() string {
+	return "TEST_ORA21062.RICH_TEXT_RT"
 }
-func (BrunoOwner_BzsXlsx_RichTextRt) FieldTypeName(f string) string {
+func (Test_Ora21062_RichTextRt) FieldTypeName(f string) string {
 	switch f {
-	// "BrunoOwner_BzsXlsx_RichTextRt"."Font" = "BRUNO_OWNER.BZS_XLSX.FONT_RT"
+	// "Test_Ora21062_RichTextRt"."Font" = "TEST_ORA21062.FONT_RT"
 	case "font", "Font":
-		return "BRUNO_OWNER.BZS_XLSX.FONT_RT"
-	// "BrunoOwner_BzsXlsx_RichTextRt"."Text" = "VARCHAR2(1000)"
+		return "TEST_ORA21062.FONT_RT"
+	// "Test_Ora21062_RichTextRt"."Text" = "VARCHAR2(1000)"
 	case "text", "Text":
 		return "VARCHAR2(1000)"
 	}
 	return ""
 }
-func (x BrunoOwner_BzsXlsx_RichTextRt) ToObject(ctx context.Context, ex godror.Execer) (*godror.Object, error) {
-	objT, err := godror.GetObjectType(ctx, ex, "BRUNO_OWNER.BZS_XLSX.RICH_TEXT_RT")
+func (x Test_Ora21062_RichTextRt) ToObject(ctx context.Context, ex godror.Execer) (*godror.Object, error) {
+	objT, err := godror.GetObjectType(ctx, ex, "TEST_ORA21062.RICH_TEXT_RT")
 	if err != nil {
-		return nil, fmt.Errorf("GetObjectType(BRUNO_OWNER.BZS_XLSX.RICH_TEXT_RT): %w", err)
+		return nil, fmt.Errorf("GetObjectType(TEST_ORA21062.RICH_TEXT_RT): %w", err)
 	}
 	obj, err := objT.NewObject()
 	if err != nil {
@@ -297,7 +297,7 @@ func (x BrunoOwner_BzsXlsx_RichTextRt) ToObject(ctx context.Context, ex godror.E
 	}
 	return obj, nil
 }
-func (x *BrunoOwner_BzsXlsx_RichTextRt) FromObject(obj *godror.Object) error {
+func (x *Test_Ora21062_RichTextRt) FromObject(obj *godror.Object) error {
 	var d godror.Data
 	x.Reset()
 	if err := obj.GetAttribute(&d, "FONT"); err != nil {
@@ -305,7 +305,7 @@ func (x *BrunoOwner_BzsXlsx_RichTextRt) FromObject(obj *godror.Object) error {
 	}
 	if !d.IsNull() {
 		{
-			var sub BrunoOwner_BzsXlsx_FontRt
+			var sub Test_Ora21062_FontRt
 			if err := sub.FromObject(d.GetObject()); err != nil {
 				return err
 			}

@@ -22,8 +22,8 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// BRUNO_OWNER.BZS_XLSX.FONT_RT
-type BrunoOwner_BzsXlsx_FontRt struct {
+// .FONT_RT
+type Test_Ora21062_FontRt struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -41,20 +41,20 @@ type BrunoOwner_BzsXlsx_FontRt struct {
 	Vertalign    string  `protobuf:"bytes,11,opt,name=vertalign,proto3" json:"vertalign,omitempty"`
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) Reset() {
-	*x = BrunoOwner_BzsXlsx_FontRt{}
+func (x *Test_Ora21062_FontRt) Reset() {
+	*x = Test_Ora21062_FontRt{}
 	mi := &file_ora21062_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) String() string {
+func (x *Test_Ora21062_FontRt) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrunoOwner_BzsXlsx_FontRt) ProtoMessage() {}
+func (*Test_Ora21062_FontRt) ProtoMessage() {}
 
-func (x *BrunoOwner_BzsXlsx_FontRt) ProtoReflect() protoreflect.Message {
+func (x *Test_Ora21062_FontRt) ProtoReflect() protoreflect.Message {
 	mi := &file_ora21062_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -66,112 +66,112 @@ func (x *BrunoOwner_BzsXlsx_FontRt) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrunoOwner_BzsXlsx_FontRt.ProtoReflect.Descriptor instead.
-func (*BrunoOwner_BzsXlsx_FontRt) Descriptor() ([]byte, []int) {
+// Deprecated: Use Test_Ora21062_FontRt.ProtoReflect.Descriptor instead.
+func (*Test_Ora21062_FontRt) Descriptor() ([]byte, []int) {
 	return file_ora21062_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetBold() bool {
+func (x *Test_Ora21062_FontRt) GetBold() bool {
 	if x != nil {
 		return x.Bold
 	}
 	return false
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetItalic() bool {
+func (x *Test_Ora21062_FontRt) GetItalic() bool {
 	if x != nil {
 		return x.Italic
 	}
 	return false
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetUnderline() string {
+func (x *Test_Ora21062_FontRt) GetUnderline() string {
 	if x != nil {
 		return x.Underline
 	}
 	return ""
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetFamily() string {
+func (x *Test_Ora21062_FontRt) GetFamily() string {
 	if x != nil {
 		return x.Family
 	}
 	return ""
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetSize_() float64 {
+func (x *Test_Ora21062_FontRt) GetSize_() float64 {
 	if x != nil {
 		return x.Size_
 	}
 	return 0
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetStrike() bool {
+func (x *Test_Ora21062_FontRt) GetStrike() bool {
 	if x != nil {
 		return x.Strike
 	}
 	return false
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetColor() string {
+func (x *Test_Ora21062_FontRt) GetColor() string {
 	if x != nil {
 		return x.Color
 	}
 	return ""
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetColorindexed() int32 {
+func (x *Test_Ora21062_FontRt) GetColorindexed() int32 {
 	if x != nil {
 		return x.Colorindexed
 	}
 	return 0
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetColortheme() int32 {
+func (x *Test_Ora21062_FontRt) GetColortheme() int32 {
 	if x != nil {
 		return x.Colortheme
 	}
 	return 0
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetColortint() float64 {
+func (x *Test_Ora21062_FontRt) GetColortint() float64 {
 	if x != nil {
 		return x.Colortint
 	}
 	return 0
 }
 
-func (x *BrunoOwner_BzsXlsx_FontRt) GetVertalign() string {
+func (x *Test_Ora21062_FontRt) GetVertalign() string {
 	if x != nil {
 		return x.Vertalign
 	}
 	return ""
 }
 
-// BRUNO_OWNER.BZS_XLSX.RICH_TEXT_RT
-type BrunoOwner_BzsXlsx_RichTextRt struct {
+// .RICH_TEXT_RT
+type Test_Ora21062_RichTextRt struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Font *BrunoOwner_BzsXlsx_FontRt `protobuf:"bytes,1,opt,name=font,proto3" json:"font,omitempty"`
+	Font *Test_Ora21062_FontRt `protobuf:"bytes,1,opt,name=font,proto3" json:"font,omitempty"`
 	Text string                     `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
 }
 
-func (x *BrunoOwner_BzsXlsx_RichTextRt) Reset() {
-	*x = BrunoOwner_BzsXlsx_RichTextRt{}
+func (x *Test_Ora21062_RichTextRt) Reset() {
+	*x = Test_Ora21062_RichTextRt{}
 	mi := &file_ora21062_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrunoOwner_BzsXlsx_RichTextRt) String() string {
+func (x *Test_Ora21062_RichTextRt) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrunoOwner_BzsXlsx_RichTextRt) ProtoMessage() {}
+func (*Test_Ora21062_RichTextRt) ProtoMessage() {}
 
-func (x *BrunoOwner_BzsXlsx_RichTextRt) ProtoReflect() protoreflect.Message {
+func (x *Test_Ora21062_RichTextRt) ProtoReflect() protoreflect.Message {
 	mi := &file_ora21062_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -183,19 +183,19 @@ func (x *BrunoOwner_BzsXlsx_RichTextRt) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrunoOwner_BzsXlsx_RichTextRt.ProtoReflect.Descriptor instead.
-func (*BrunoOwner_BzsXlsx_RichTextRt) Descriptor() ([]byte, []int) {
+// Deprecated: Use Test_Ora21062_RichTextRt.ProtoReflect.Descriptor instead.
+func (*Test_Ora21062_RichTextRt) Descriptor() ([]byte, []int) {
 	return file_ora21062_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *BrunoOwner_BzsXlsx_RichTextRt) GetFont() *BrunoOwner_BzsXlsx_FontRt {
+func (x *Test_Ora21062_RichTextRt) GetFont() *Test_Ora21062_FontRt {
 	if x != nil {
 		return x.Font
 	}
 	return nil
 }
 
-func (x *BrunoOwner_BzsXlsx_RichTextRt) GetText() string {
+func (x *Test_Ora21062_RichTextRt) GetText() string {
 	if x != nil {
 		return x.Text
 	}
@@ -324,13 +324,13 @@ func file_ora21062_proto_rawDescGZIP() []byte {
 
 var file_ora21062_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_ora21062_proto_goTypes = []any{
-	(*BrunoOwner_BzsXlsx_FontRt)(nil),     // 0: objects.BrunoOwner_BzsXlsx_FontRt
-	(*BrunoOwner_BzsXlsx_RichTextRt)(nil), // 1: objects.BrunoOwner_BzsXlsx_RichTextRt
+	(*Test_Ora21062_FontRt)(nil),     // 0: objects.Test_Ora21062_FontRt
+	(*Test_Ora21062_RichTextRt)(nil), // 1: objects.Test_Ora21062_RichTextRt
 	(*descriptorpb.MessageOptions)(nil),   // 2: google.protobuf.MessageOptions
 	(*descriptorpb.FieldOptions)(nil),     // 3: google.protobuf.FieldOptions
 }
 var file_ora21062_proto_depIdxs = []int32{
-	0, // 0: objects.BrunoOwner_BzsXlsx_RichTextRt.font:type_name -> objects.BrunoOwner_BzsXlsx_FontRt
+	0, // 0: objects.Test_Ora21062_RichTextRt.font:type_name -> objects.Test_Ora21062_FontRt
 	2, // 1: objects.oracall_object_type:extendee -> google.protobuf.MessageOptions
 	3, // 2: objects.oracall_field_type:extendee -> google.protobuf.FieldOptions
 	3, // [3:3] is the sub-list for method output_type
