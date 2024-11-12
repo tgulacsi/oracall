@@ -14,7 +14,10 @@ import (
 	"time"
 )
 
-var flagConnect = flag.String("connect", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_ID")), "DSN to connect with")
+var (
+	flagRun     = flag.String("only", "", "run this")
+	flagConnect = flag.String("connect", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_ID")), "DSN to connect with")
+)
 
 func TestProtocGenOracall(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -47,7 +50,7 @@ func TestProtocGenOracall(t *testing.T) {
 		t.Fatalf("%q: %+v", cmd.Args, err)
 	}
 
-	cmd = exec.CommandContext(ctx, "go", "test", "-connect="+*flagConnect)
+	cmd = exec.CommandContext(ctx, "go", "test", "-run="+*flagRun, "-connect="+*flagConnect)
 	cmd.Dir = "testdata"
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {

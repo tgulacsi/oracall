@@ -114,7 +114,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	_ "github.com/godror/godror"
+	godror "github.com/godror/godror"
 
 	%s
 )
@@ -130,9 +130,15 @@ var (
 	db *sql.DB
 	dbOnce sync.Once
 )
-func getTx(ctx context.Context) (*sql.Tx, error) {
+func getTx(ctx context.Context, t *testing.T) (*sql.Tx, error) {
 	var err error
-	dbOnce.Do(func() { db, err = sql.Open("godror", *flagConnect) })
+	dbOnce.Do(func() { 
+		if db, err = sql.Open("godror", *flagConnect); err == nil {
+			cv, _ := godror.ClientVersion(ctx, db)
+			sv, _ := godror.ServerVersion(ctx, db)
+			t.Logf("Client: %%+v; Server: %%+v", cv, sv)
+		} 
+	})
 	if err != nil { return nil, err }
 	return db.BeginTx(ctx, nil)
 }
@@ -656,7 +662,7 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 	fmt.Fprintf(tW, `func TestToFromObject_%s(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	tx, err := getTx(ctx)
+	tx, err := getTx(ctx, t)
 	if err != nil { t.Fatal(err) }
 	defer tx.Rollback()
 	var want, got %s.%s
