@@ -1,0 +1,36 @@
+
+syntax = "proto3";
+
+package objects;
+option go_package = "github.com/tgulacsi/oracall/protoc-gen-oracall/testdata/ORA21062";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MessageOptions {
+  string oracall_object_type = 79396128;
+}
+extend google.protobuf.FieldOptions {
+  string oracall_field_type = 79396128;
+}
+// BRUNO_OWNER.BZS_XLSX.FONT_RT
+message BrunoOwner_BzsXlsx_FontRt {
+	option (oracall_object_type) = "BRUNO_OWNER.BZS_XLSX.FONT_RT";
+	bool bold = 1 [(oracall_field_type) = "PL/SQL BOOLEAN"];
+	bool italic = 2 [(oracall_field_type) = "PL/SQL BOOLEAN"];
+	string underline = 3 [(oracall_field_type) = "VARCHAR2(30)"];
+	string family = 4 [(oracall_field_type) = "VARCHAR2(30)"];
+	double size_ = 5 [(oracall_field_type) = "BINARY_DOUBLE"];
+	bool strike = 6 [(oracall_field_type) = "PL/SQL BOOLEAN"];
+	string color = 7 [(oracall_field_type) = "VARCHAR2(30)"];
+	int32 colorindexed = 8 [(oracall_field_type) = "PL/SQL PLS INTEGER"];
+	int32 colortheme = 9 [(oracall_field_type) = "PL/SQL PLS INTEGER"];
+	double colortint = 10 [(oracall_field_type) = "BINARY_DOUBLE"];
+	string vertalign = 11 [(oracall_field_type) = "VARCHAR2(30)"];
+}
+// BRUNO_OWNER.BZS_XLSX.RICH_TEXT_RT
+message BrunoOwner_BzsXlsx_RichTextRt {
+	option (oracall_object_type) = "BRUNO_OWNER.BZS_XLSX.RICH_TEXT_RT";
+	BrunoOwner_BzsXlsx_FontRt font = 1 [(oracall_field_type) = "BRUNO_OWNER.BZS_XLSX.FONT_RT"];
+	string text = 2 [(oracall_field_type) = "VARCHAR2(1000)"];
+}
