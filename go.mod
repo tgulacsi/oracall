@@ -21,7 +21,7 @@ require (
 require (
 	github.com/UNO-SOFT/otel v0.8.6
 	github.com/davecgh/go-spew v1.1.1
-	github.com/godror/knownpb v0.1.1
+	github.com/godror/knownpb v0.1.2
 	github.com/google/renameio/v2 v2.0.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/peterbourgon/ff/v3 v3.4.0
@@ -31,7 +31,6 @@ require (
 require (
 	github.com/dgryski/go-linebreak v0.0.0-20180812204043-d8f37254e7d3 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/go-faker/faker/v4 v4.5.0 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -44,12 +43,13 @@ require (
 	go.opentelemetry.io/otel/sdk v1.28.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.28.0 // indirect
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
-	golang.org/x/exp v0.0.0-20240707233637-46b078467d37 // indirect
+	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 )
 
-//replace github.com/godror/godror => ../../godror/godror
+replace github.com/godror/godror => ../../godror/godror
+
 //replace github.com/UNO-SOFT/zlog => ../../UNO-SOFT/zlog

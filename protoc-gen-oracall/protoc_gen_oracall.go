@@ -103,6 +103,8 @@ import (
 	"database/sql"
 	"os"
 	"reflect"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -130,13 +132,40 @@ func getTx(ctx context.Context) (*sql.Tx, error) {
 	if err != nil { return nil, err }
 	return db.BeginTx(ctx, nil)
 }
-func fakeData(t *testing.T, dest any) {
-    // t.Logf("fakeData: %%T", dest)
+func fakeData(t *testing.T, dest any, fieldType string) {
+    // t.Logf("fakeData: %%T (%%q)", dest, fieldType)
+    var typ string
+    var length, precision, scale int
+    if fieldType != "" {
+		if typ, rest, ok := strings.Cut(strings.TrimSuffix(fieldType, ")"), "("); ok {
+			if strings.Contains(typ, "CHAR") {
+				length, _ = strconv.Atoi(strings.TrimSuffix(rest, ")"))
+			} else if precS, scaleS, ok := strings.Cut(rest, ","); ok {
+				precision, _ = strconv.Atoi(precS)
+				scale, _ = strconv.Atoi(scaleS)
+			} else {
+				precision, _ = strconv.Atoi(rest)
+			}
+		}
+	}
+	const num38 = "1234567890" + "1234567890" + "1234567890" + "12345678"
 	switch x := dest.(type) {
 		case *time.Time: *x = time.Now().UTC().Truncate(time.Second); return
 		case *timestamppb.Timestamp: *x = *(timestamppb.New(time.Now().UTC().Truncate(time.Second))); return
 		case **timestamppb.Timestamp: *x = timestamppb.New(time.Now().UTC().Truncate(time.Second)); return
-		case *string: *x = "-16"; return
+		case *string: 
+			if length > 0 {
+				*x = strings.Repeat("x", length)
+			} else if precision > 0 {
+				if scale > 0 { 
+					*x = num38[:precision-scale]+"."+num38[precision-scale:precision] 
+				} else { 
+					*x = num38[:precision] 
+				}
+			} else {
+				*x = "-16" 
+			} 
+			return
 	}
 	rv := reflect.ValueOf(dest)
 	if rv.IsNil() {
@@ -145,7 +174,7 @@ func fakeData(t *testing.T, dest any) {
 	rv = rv.Elem()
 	rt := rv.Type()
 	switch rt.Kind() {
-		case reflect.Pointer: fakeData(t, rv.Interface())  
+		case reflect.Pointer: fakeData(t, rv.Interface(), fieldType)
 		case reflect.Bool: rv.SetBool(true) 
 		case reflect.Int:   rv.SetInt(-999999999) 
 		case reflect.Int8:  rv.SetInt(-118) 
@@ -158,27 +187,47 @@ func fakeData(t *testing.T, dest any) {
 		case reflect.Uint32: rv.SetUint(999999932)
 		case reflect.Uint64: rv.SetUint(1234567890123456764)
 		case reflect.Float32: rv.SetFloat(3.1432) 
-		case reflect.Float64: rv.SetFloat(3.1464) 
-		case reflect.String: rv.SetString("X") 
+		case reflect.Float64: rv.SetFloat(3.1464000000000003) 
+		case reflect.String: 
+			var s string
+			if strings.Contains(typ, "CHAR") {
+				if length > 0 {
+					s = strings.Repeat("X", length)
+				}
+			} else if precision > 0 {
+				if scale > 0 {
+					s = num38[:precision-scale] + "." + num38[precision-scale:precision]
+				} else {
+					s = num38[:precision]
+				}
+			}
+			if s == "" { s = "X" }
+			rv.SetString(s)
+			
 		case reflect.Slice: 
-			ss := reflect.MakeSlice(rt, 0, 2)
+			ss := reflect.MakeSlice(rt, 0, 3)
 			ret := rt.Elem()
 			ptr := ret.Kind() == reflect.Pointer
 			if ptr {
 				ret = ret.Elem()
 			}
 			re := reflect.New(ret)
-			fakeData(t, re.Interface())
+			fakeData(t, re.Interface(), fieldType)
 			if !ptr {
 				re = re.Elem()
 			}
-			rv.Set(reflect.Append(ss, re))
+			rv.Set(reflect.Append(ss, re, re))
 			
 		case reflect.Struct:
+		    ftr, _ := dest.(interface{ FieldTypeName(string) string })
 			for i := range rt.NumField() {
 				ft := rt.Field(i)
 				if !ft.IsExported() {
 					continue
+				}
+				var fieldType string
+				if ftr != nil { 
+					fieldType = ftr.FieldTypeName(ft.Name)
 				}
 				var vv reflect.Value
 				ptr := ft.Type.Kind() == reflect.Pointer
@@ -187,7 +236,7 @@ func fakeData(t *testing.T, dest any) {
 				} else {
 					vv = reflect.New(ft.Type)
 				}
-				fakeData(t, vv.Interface())
+				fakeData(t, vv.Interface(), fieldType)
 				if ptr {
 					rv.FieldByIndex(ft.Index).Set(vv)
 				} else {
@@ -423,7 +472,7 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 		}
 		Name := strings.ToUpper(f.Name)
 		fmt.Fprintf(w, `if err := obj.SetAttribute(%q, &d); err != nil {
-		return fmt.Errorf("SetAttribute(%s, %%+v): %%w", d, err)
+		return fmt.Errorf("SetAttribute(attr=%s, data=%%+v): %%w", d, err)
 	}
 `,
 			Name,
@@ -607,7 +656,7 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 	if err != nil { t.Fatal(err) }
 	defer tx.Rollback()
 	var want, got %s.%s
-	fakeData(t, &want)
+	fakeData(t, &want, "")
 	wantJ, err := protojson.Marshal(&want)
 	if err != nil { t.Fatalf("protojson.Marshal(%s): %%+v", err)}
 	obj, err := want.ToObject(ctx, tx)
@@ -615,6 +664,7 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 	if err = got.FromObject(obj); err != nil { t.Fatalf("%s.FromObject: %%+v", err) }
 	gotJ, err := protojson.Marshal(&got)
 	if err != nil { t.Fatalf("protojson.Marshal(%s): %%+v", err)}
+	t.Logf("got=%%s", gotJ)
 	if d := cmp.Diff(string(wantJ), string(gotJ)); d != "" { t.Error(d, "want="+string(wantJ), "\n", "got="+string(gotJ)) }
 	`,
 		msg.Name,
