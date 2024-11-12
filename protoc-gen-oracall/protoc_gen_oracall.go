@@ -101,6 +101,7 @@ package %s_test
 import (
 	"context"
 	"database/sql"
+	"flag"
 	"os"
 	"reflect"
 	"strconv"
@@ -124,11 +125,14 @@ var (
 	_ = cmp.Diff
 )
 
-var db *sql.DB
-var dbOnce sync.Once
+var (
+	flagConnect = flag.String("connect", os.Getenv("ORACALL_DSN"), "DSN to connect with")
+	db *sql.DB
+	dbOnce sync.Once
+)
 func getTx(ctx context.Context) (*sql.Tx, error) {
 	var err error
-	dbOnce.Do(func() { db, err = sql.Open("godror", os.Getenv("BRUNO_ID")) })
+	dbOnce.Do(func() { db, err = sql.Open("godror", *flagConnect) })
 	if err != nil { return nil, err }
 	return db.BeginTx(ctx, nil)
 }
