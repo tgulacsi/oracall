@@ -36,7 +36,7 @@ func TestProtocGenOracall(t *testing.T) {
 	}
 
 	if *flagConnect == "" {
-		cmd = exec.CommandContext(ctx, "sh", "-c", `. env.sh; echo "${ORACALL_DSN:-${BRUNO_ID:-}}"`)
+		cmd = exec.CommandContext(ctx, "sh", "-c", `. ./env.sh; echo "${ORACALL_DSN:-${BRUNO_ID:-}}"`)
 		b, err := cmd.Output()
 		if *flagConnect = string(bytes.TrimSpace(b)); *flagConnect == "" {
 			t.Fatalf("%q: %+v", cmd.Args, err)
@@ -53,8 +53,17 @@ func TestProtocGenOracall(t *testing.T) {
 	cmd = exec.CommandContext(ctx, "go", "test", "-run="+*flagRun, "-connect="+*flagConnect)
 	cmd.Dir = "testdata"
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
 		t.Fatalf("%q: %+v", cmd.Args, err)
+	}
+	go func() {
+		<-ctx.Done()
+		cmd.Process.Kill()
+	}()
+	if state, err := cmd.Process.Wait(); err != nil {
+		t.Fatal(err)
+	} else if state.ExitCode() != 0 {
+		t.Fatal(state.ExitCode())
 	}
 }
 

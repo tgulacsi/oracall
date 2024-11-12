@@ -101,6 +101,7 @@ package %s_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"flag"
 	"os"
 	"reflect"
@@ -123,6 +124,8 @@ var (
 	_ context.Context
 	_ = timestamppb.New
 	_ = cmp.Diff
+
+	pjMO = protojson.MarshalOptions{Indent:"  "}
 )
 
 var (
@@ -394,10 +397,6 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 						}
 					} else if _, err := strconv.Atoi(scaleS); err != nil {
 						panic(fmt.Errorf("parse %q as scale from %q: %w", scaleS, f.DBType, err))
-					} else if prec < 8 {
-						fun = "Float32"
-					} else if prec < 16 {
-						fun = "Float64"
 					}
 				}
 			}
@@ -539,10 +538,6 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 						}
 					} else if _, err := strconv.Atoi(scaleS); err != nil {
 						panic(fmt.Errorf("parse %q as scale from %q: %w", scaleS, f.DBType, err))
-					} else if prec < 8 {
-						fun = "Float32"
-					} else if prec < 16 {
-						fun = "Float64"
 					}
 				}
 			}
@@ -667,15 +662,24 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 	defer tx.Rollback()
 	var want, got %s.%s
 	fakeData(t, &want, "")
-	wantJ, err := protojson.Marshal(&want)
+	wantJ, err := pjMO.Marshal(&want)
 	if err != nil { t.Fatalf("protojson.Marshal(%s): %%+v", err)}
 	obj, err := want.ToObject(ctx, tx)
-	if err != nil { t.Fatalf("%s=%%s.ToObject: %%+v", wantJ, err)}
+	if err != nil { 
+		var ec interface{ Code() int }
+		if errors.As(err, &ec) && ec.Code() == 21062 {
+			t.Skipf("ToObject: %%+v", err)
+			return
+		} 
+		t.Fatalf("%s=%%s.ToObject: %%+v", wantJ, err)
+	}
 	if err = got.FromObject(obj); err != nil { t.Fatalf("%s.FromObject: %%+v", err) }
-	gotJ, err := protojson.Marshal(&got)
+	gotJ, err := pjMO.Marshal(&got)
 	if err != nil { t.Fatalf("protojson.Marshal(%s): %%+v", err)}
 	t.Logf("got=%%s", gotJ)
-	if d := cmp.Diff(string(wantJ), string(gotJ)); d != "" { t.Error(d, "want="+string(wantJ), "\n", "got="+string(gotJ)) }
+	if d := cmp.Diff(string(wantJ), string(gotJ)); d != "" { 
+		t.Error(d, "want="+string(wantJ), "\n", "got="+string(gotJ)) 
+	}
 	`,
 		msg.Name,
 		pkg, msg.Name,

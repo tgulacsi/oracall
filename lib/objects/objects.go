@@ -454,12 +454,6 @@ func (t Type) protoTypeName() string {
 				} else if t.Precision.Int32 < 20 {
 					return "int64"
 				}
-			} else if t.Scale.Valid {
-				if t.Precision.Int32 < 8 {
-					return "float"
-				} else if t.Precision.Int32 < 16 {
-					return "double"
-				}
 			}
 		}
 		return "string"

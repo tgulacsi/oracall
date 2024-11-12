@@ -423,7 +423,7 @@ message BrunoOwner_DbAkrRiport_RecDolgozoiAtlag {
 	string nev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 rogzitett_db = 3 [(oracall_field_type) = "NUMBER(6)"];
 	int32 napok_szama = 4 [(oracall_field_type) = "NUMBER(6)"];
-	double napi_atlag = 5 [(oracall_field_type) = "NUMBER(9,3)"];
+	string napi_atlag = 5 [(oracall_field_type) = "NUMBER(9,3)"];
 }
 // BRUNO_OWNER.DB_AKR_RIPORT.REC_DOLGOZO_HETI
 message BrunoOwner_DbAkrRiport_RecDolgozoHeti {
@@ -524,7 +524,7 @@ message BrunoOwner_DbAkrRiport_RecNapiAtlag {
 	google.protobuf.Timestamp datum = 1 [(oracall_field_type) = "DATE"];
 	int32 rogzitett_db = 2 [(oracall_field_type) = "NUMBER(6)"];
 	int32 dolgozok_db = 3 [(oracall_field_type) = "NUMBER(6)"];
-	double dolgozoi_atlag = 4 [(oracall_field_type) = "NUMBER(9,3)"];
+	string dolgozoi_atlag = 4 [(oracall_field_type) = "NUMBER(9,3)"];
 }
 // BRUNO_OWNER.DB_AKR_RIPORT.REC_QUERY
 message BrunoOwner_DbAkrRiport_RecQuery {
@@ -631,7 +631,7 @@ message BrunoOwner_DbAllinDij_DijRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_ALLIN_DIJ.DIJ_REC_TYPE";
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 evesdij = 2 [(oracall_field_type) = "NUMBER(9)"];
-	float egyseg = 3 [(oracall_field_type) = "NUMBER(6,3)"];
+	string egyseg = 3 [(oracall_field_type) = "NUMBER(6,3)"];
 	int32 ed_azon = 4 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_ALRT.ATTACHMENT
@@ -744,8 +744,8 @@ message BrunoOwner_DbAtka_DijelvarRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_ATKA.DIJELVAR_REC_TYPE";
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	google.protobuf.Timestamp f_btkezd = 2 [(oracall_field_type) = "DATE"];
-	double f_alldijsum = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijelvar = 4 [(oracall_field_type) = "NUMBER(15,2)"];
+	string f_alldijsum = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 4 [(oracall_field_type) = "NUMBER(15,2)"];
 	string f_allapot = 5 [(oracall_field_type) = "VARCHAR2(2)"];
 }
 // BRUNO_OWNER.DB_ATKA.ETT_REC
@@ -762,8 +762,8 @@ message BrunoOwner_DbAtka_21801_DijelvarRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_ATKA_21801.DIJELVAR_REC_TYPE";
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	google.protobuf.Timestamp f_btkezd = 2 [(oracall_field_type) = "DATE"];
-	double f_alldijsum = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijelvar = 4 [(oracall_field_type) = "NUMBER(15,2)"];
+	string f_alldijsum = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 4 [(oracall_field_type) = "NUMBER(15,2)"];
 }
 // BRUNO_OWNER.DB_AUTOB.REC_CASCO_ELET
 message BrunoOwner_DbAutob_RecCascoElet {
@@ -893,7 +893,7 @@ message BrunoOwner_DbAutoboncaDij_DijparamRecType {
 	int32 onresz_szaz = 12 [(oracall_field_type) = "NUMBER(3)"];
 	int32 onresz_min = 13 [(oracall_field_type) = "NUMBER(6)"];
 	int32 extra_db = 14 [(oracall_field_type) = "NUMBER(3)"];
-	double alldijsum = 15 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alldijsum = 15 [(oracall_field_type) = "NUMBER(12,2)"];
 	string ertekkovetes = 16 [(oracall_field_type) = "VARCHAR2(1)"];
 	string index_szorzo = 17 [(oracall_field_type) = "NUMBER"];
 	int32 utas_db = 18 [(oracall_field_type) = "NUMBER(3)"];
@@ -907,7 +907,7 @@ message BrunoOwner_DbAutoboncaDij_DijRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_AUTOBONCA_DIJ.DIJ_REC_TYPE";
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 evesdij = 2 [(oracall_field_type) = "NUMBER(9)"];
-	float egyseg = 3 [(oracall_field_type) = "NUMBER(6,3)"];
+	string egyseg = 3 [(oracall_field_type) = "NUMBER(6,3)"];
 	string ajandek = 4 [(oracall_field_type) = "CHAR(1)"];
 	google.protobuf.Timestamp kezdet = 5 [(oracall_field_type) = "DATE"];
 }
@@ -1113,18 +1113,18 @@ message BrunoOwner_DbBonuszPool_BonuszPoolRecType {
 	google.protobuf.Timestamp f_hataly = 2 [(oracall_field_type) = "DATE"];
 	string f_gfb_allapot = 3 [(oracall_field_type) = "CHAR(2)"];
 	string f_casco_allapot = 4 [(oracall_field_type) = "CHAR(2)"];
-	double f_gfb_dijelvar = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_casco_dijelvar = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_gfb_dijelvar = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_casco_dijelvar = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_gfb_dijrend = 7 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_casco_dijrend = 8 [(oracall_field_type) = "DATE"];
-	double f_gfb_dijbefiz = 9 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_casco_dijbefiz = 10 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_gfb_dij = 11 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_casco_dij = 12 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_gfb_fin_dijtartoz = 13 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_casco_fin_dijtartoz = 14 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_gfb_dijbesum = 15 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_casco_dijbesum = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_gfb_dijbefiz = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_casco_dijbefiz = 10 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_gfb_dij = 11 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_casco_dij = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_gfb_fin_dijtartoz = 13 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_casco_fin_dijtartoz = 14 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_gfb_dijbesum = 15 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_casco_dijbesum = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_BONUSZ_POOL.ELET_REC
 message BrunoOwner_DbBonuszPool_EletRec {
@@ -1193,7 +1193,7 @@ message BrunoOwner_DbCallcenter2_TypeDijRecord {
 message BrunoOwner_DbCallcenter2_TypeHitelfedezetRecord {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_CALLCENTER2.TYPE_HITELFEDEZET_RECORD";
 	string f_ugyfelnev = 1 [(oracall_field_type) = "VARCHAR2(40)"];
-	double f_hitelosszeg = 2 [(oracall_field_type) = "NUMBER(15,2)"];
+	string f_hitelosszeg = 2 [(oracall_field_type) = "NUMBER(15,2)"];
 	string f_hitel_szam = 3 [(oracall_field_type) = "VARCHAR2(40)"];
 	google.protobuf.Timestamp f_hatalytol = 4 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 5 [(oracall_field_type) = "DATE"];
@@ -1228,7 +1228,7 @@ message BrunoOwner_DbCallcenter2_TypeKuldemenyRecord {
 	int32 f_kuld_azon = 2 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_sbl_azon = 3 [(oracall_field_type) = "NUMBER(6)"];
 	string f_sbl_megnevezes = 4 [(oracall_field_type) = "VARCHAR2(80)"];
-	double f_ertek = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_ertek = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_kuldes_datum = 6 [(oracall_field_type) = "DATE"];
 }
 // BRUNO_OWNER.DB_CALLCENTER2.TYPE_KULDEMENY_UJ2_RECORD
@@ -1278,14 +1278,14 @@ message BrunoOwner_DbCallcenter2_TypeModulRecord {
 	string f_modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_modrnev = 3 [(oracall_field_type) = "VARCHAR2(8)"];
 	int32 f_negyzetm = 4 [(oracall_field_type) = "NUMBER(6)"];
-	double f_biztossz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	float f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_dijtetel_szaz = 11 [(oracall_field_type) = "NUMBER(5,2)"];
-	double f_eves_dij = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_biztossz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_dijtetel_szaz = 11 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_eves_dij = 12 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_CALLCENTER2.TYPE_MODUL_RECORD2
 message BrunoOwner_DbCallcenter2_TypeModulRecord2 {
@@ -1294,18 +1294,18 @@ message BrunoOwner_DbCallcenter2_TypeModulRecord2 {
 	string f_modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_modrnev = 3 [(oracall_field_type) = "VARCHAR2(8)"];
 	int32 f_negyzetm = 4 [(oracall_field_type) = "NUMBER(6)"];
-	double f_biztossz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_kieg_uveg_szaz = 11 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_fust_korom_szaz = 12 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_beazas_szaz = 13 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_all_risk_szaz = 14 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_dijtetel_szaz = 15 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_eves_dij = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_biztossz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_kieg_uveg_szaz = 11 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_fust_korom_szaz = 12 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_beazas_szaz = 13 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_all_risk_szaz = 14 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_dijtetel_szaz = 15 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_eves_dij = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_CALLCENTER2.TYPE_NYOMOGOMB
 message BrunoOwner_DbCallcenter2_TypeNyomogomb {
@@ -1418,34 +1418,34 @@ message BrunoOwner_DbControllingLista_Leval_1ERt {
 	string modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
 	string nyito_ures = 3 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 nyito_db = 4 [(oracall_field_type) = "NUMBER(9)"];
-	double nyito_alldij = 5 [(oracall_field_type) = "NUMBER(15,2)"];
+	string nyito_alldij = 5 [(oracall_field_type) = "NUMBER(15,2)"];
 	string uj_ures = 6 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 uj_db = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double uj_alldij = 8 [(oracall_field_type) = "NUMBER(15,2)"];
+	string uj_alldij = 8 [(oracall_field_type) = "NUMBER(15,2)"];
 	string dijm_ures = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 dijm_db = 10 [(oracall_field_type) = "NUMBER(9)"];
-	double dijm_alldij = 11 [(oracall_field_type) = "NUMBER(15,2)"];
+	string dijm_alldij = 11 [(oracall_field_type) = "NUMBER(15,2)"];
 	string torl_ures = 12 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 torl_db = 13 [(oracall_field_type) = "NUMBER(9)"];
-	double torl_alldij = 14 [(oracall_field_type) = "NUMBER(15,2)"];
+	string torl_alldij = 14 [(oracall_field_type) = "NUMBER(15,2)"];
 	string ujit_ures = 15 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 ujit_db = 16 [(oracall_field_type) = "NUMBER(9)"];
-	double ujit_alldij = 17 [(oracall_field_type) = "NUMBER(15,2)"];
+	string ujit_alldij = 17 [(oracall_field_type) = "NUMBER(15,2)"];
 	string valt_ures = 18 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 valt_db = 19 [(oracall_field_type) = "NUMBER(9)"];
-	double valt_alldij = 20 [(oracall_field_type) = "NUMBER(15,2)"];
+	string valt_alldij = 20 [(oracall_field_type) = "NUMBER(15,2)"];
 	string lejar_ures1 = 21 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 lejar_db1 = 22 [(oracall_field_type) = "NUMBER(9)"];
-	double lejar_alldij1 = 23 [(oracall_field_type) = "NUMBER(15,2)"];
+	string lejar_alldij1 = 23 [(oracall_field_type) = "NUMBER(15,2)"];
 	string lejar_ures2 = 24 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 lejar_db2 = 25 [(oracall_field_type) = "NUMBER(9)"];
-	double lejar_alldij2 = 26 [(oracall_field_type) = "NUMBER(15,2)"];
+	string lejar_alldij2 = 26 [(oracall_field_type) = "NUMBER(15,2)"];
 	string halal_ures = 27 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 halal_db = 28 [(oracall_field_type) = "NUMBER(9)"];
-	double halal_alldij = 29 [(oracall_field_type) = "NUMBER(15,2)"];
+	string halal_alldij = 29 [(oracall_field_type) = "NUMBER(15,2)"];
 	string zaro_ures = 30 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 zaro_db = 31 [(oracall_field_type) = "NUMBER(9)"];
-	double zaro_alldij = 32 [(oracall_field_type) = "NUMBER(15,2)"];
+	string zaro_alldij = 32 [(oracall_field_type) = "NUMBER(15,2)"];
 }
 // BRUNO_OWNER.DB_CONTROLLING_LISTA.LEVAL_1NE_RT
 message BrunoOwner_DbControllingLista_Leval_1NeRt {
@@ -1454,25 +1454,25 @@ message BrunoOwner_DbControllingLista_Leval_1NeRt {
 	string modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
 	string nyito_ures = 3 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 nyito_db = 4 [(oracall_field_type) = "NUMBER(9)"];
-	double nyito_alldij = 5 [(oracall_field_type) = "NUMBER(15,2)"];
+	string nyito_alldij = 5 [(oracall_field_type) = "NUMBER(15,2)"];
 	string uj_ures = 6 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 uj_db = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double uj_alldij = 8 [(oracall_field_type) = "NUMBER(15,2)"];
+	string uj_alldij = 8 [(oracall_field_type) = "NUMBER(15,2)"];
 	string ujit_ures = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 ujit_db = 10 [(oracall_field_type) = "NUMBER(9)"];
-	double ujit_alldij = 11 [(oracall_field_type) = "NUMBER(15,2)"];
+	string ujit_alldij = 11 [(oracall_field_type) = "NUMBER(15,2)"];
 	string torl_ures = 12 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 torl_db = 13 [(oracall_field_type) = "NUMBER(9)"];
-	double torl_alldij = 14 [(oracall_field_type) = "NUMBER(15,2)"];
+	string torl_alldij = 14 [(oracall_field_type) = "NUMBER(15,2)"];
 	string lejar_ures = 15 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 lejar_db = 16 [(oracall_field_type) = "NUMBER(9)"];
-	double lejar_alldij = 17 [(oracall_field_type) = "NUMBER(15,2)"];
+	string lejar_alldij = 17 [(oracall_field_type) = "NUMBER(15,2)"];
 	string valt_ures = 18 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 valt_db = 19 [(oracall_field_type) = "NUMBER(9)"];
-	double valt_alldij = 20 [(oracall_field_type) = "NUMBER(15,2)"];
+	string valt_alldij = 20 [(oracall_field_type) = "NUMBER(15,2)"];
 	string zaro_ures = 21 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 zaro_db = 22 [(oracall_field_type) = "NUMBER(9)"];
-	double zaro_alldij = 23 [(oracall_field_type) = "NUMBER(15,2)"];
+	string zaro_alldij = 23 [(oracall_field_type) = "NUMBER(15,2)"];
 }
 // BRUNO_OWNER.DB_CONTROLLING_LISTA.LEVAL_1VALT_RT
 message BrunoOwner_DbControllingLista_Leval_1ValtRt {
@@ -1480,7 +1480,7 @@ message BrunoOwner_DbControllingLista_Leval_1ValtRt {
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	string mozgtip = 2 [(oracall_field_type) = "VARCHAR2(80)"];
 	int32 db = 3 [(oracall_field_type) = "NUMBER(9)"];
-	double alldij = 4 [(oracall_field_type) = "NUMBER(15,2)"];
+	string alldij = 4 [(oracall_field_type) = "NUMBER(15,2)"];
 }
 // BRUNO_OWNER.DB_CONTROLLING_LISTA.LEVAL_2_RT
 message BrunoOwner_DbControllingLista_Leval_2Rt {
@@ -1489,19 +1489,19 @@ message BrunoOwner_DbControllingLista_Leval_2Rt {
 	string modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
 	string uj_ures0 = 3 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 uj_db0 = 4 [(oracall_field_type) = "NUMBER(9)"];
-	double uj_alldij0 = 5 [(oracall_field_type) = "NUMBER(15,2)"];
+	string uj_alldij0 = 5 [(oracall_field_type) = "NUMBER(15,2)"];
 	string uj_ures1 = 6 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 uj_db1 = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double uj_alldij1 = 8 [(oracall_field_type) = "NUMBER(15,2)"];
+	string uj_alldij1 = 8 [(oracall_field_type) = "NUMBER(15,2)"];
 	string uj_ures2 = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 uj_db2 = 10 [(oracall_field_type) = "NUMBER(9)"];
-	double uj_alldij2 = 11 [(oracall_field_type) = "NUMBER(15,2)"];
+	string uj_alldij2 = 11 [(oracall_field_type) = "NUMBER(15,2)"];
 	string uj_ures3 = 12 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 uj_db3 = 13 [(oracall_field_type) = "NUMBER(9)"];
-	double uj_alldij3 = 14 [(oracall_field_type) = "NUMBER(15,2)"];
+	string uj_alldij3 = 14 [(oracall_field_type) = "NUMBER(15,2)"];
 	string uj_ures4 = 15 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 uj_db4 = 16 [(oracall_field_type) = "NUMBER(9)"];
-	double uj_alldij4 = 17 [(oracall_field_type) = "NUMBER(15,2)"];
+	string uj_alldij4 = 17 [(oracall_field_type) = "NUMBER(15,2)"];
 }
 // BRUNO_OWNER.DB_CONTROLLING_LISTA.LEVAL_3_RT
 message BrunoOwner_DbControllingLista_Leval_3Rt {
@@ -1509,10 +1509,10 @@ message BrunoOwner_DbControllingLista_Leval_3Rt {
 	string nev = 1 [(oracall_field_type) = "VARCHAR2(80)"];
 	string uj_ures = 2 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 uj_db = 3 [(oracall_field_type) = "NUMBER(9)"];
-	double uj_alldij = 4 [(oracall_field_type) = "NUMBER(15,2)"];
+	string uj_alldij = 4 [(oracall_field_type) = "NUMBER(15,2)"];
 	string torl_ures = 5 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 torl_db = 6 [(oracall_field_type) = "NUMBER(9)"];
-	double torl_alldij = 7 [(oracall_field_type) = "NUMBER(15,2)"];
+	string torl_alldij = 7 [(oracall_field_type) = "NUMBER(15,2)"];
 }
 // BRUNO_OWNER.DB_CSB.BO_DIJ_REC_TYP
 message BrunoOwner_DbCsb_BoDijRecTyp {
@@ -1536,12 +1536,12 @@ message BrunoOwner_DbCsb_ReszRecType {
 	string f_modkod = 5 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_dij_tipus = 6 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 f_biztossz = 7 [(oracall_field_type) = "NUMBER(9)"];
-	float f_alap = 8 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_alap = 8 [(oracall_field_type) = "NUMBER(5,2)"];
 	int32 f_evesdij = 9 [(oracall_field_type) = "NUMBER(9)"];
-	float f_betlop = 10 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_vizkar = 11 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_uveg = 12 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_arviz = 13 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_betlop = 10 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_vizkar = 11 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_uveg = 12 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_arviz = 13 [(oracall_field_type) = "NUMBER(5,2)"];
 }
 // BRUNO_OWNER.DB_CSEKK.TYPE_CSEKK_AZON_REC
 message BrunoOwner_DbCsekk_TypeCsekkAzonRec {
@@ -1551,7 +1551,7 @@ message BrunoOwner_DbCsekk_TypeCsekkAzonRec {
 // BRUNO_OWNER.DB_CSEKK.TY_CSEKK_OSSZEGEK
 message BrunoOwner_DbCsekk_TyCsekkOsszegek {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_CSEKK.TY_CSEKK_OSSZEGEK";
-	double f_osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_kod = 2 [(oracall_field_type) = "NUMBER(3)"];
 }
 // BRUNO_OWNER.DB_CSEKK.TY_SZELVENY
@@ -1559,7 +1559,7 @@ message BrunoOwner_DbCsekk_TySzelveny {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_CSEKK.TY_SZELVENY";
 	int32 f_szerz_azon = 1 [(oracall_field_type) = "NUMBER(9)"];
 	string f_befizaz = 2 [(oracall_field_type) = "VARCHAR2(24)"];
-	double f_dij = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dij = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_csekk_azon = 4 [(oracall_field_type) = "NUMBER(9)"];
 	string f_szelveny1 = 5 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_szelveny2 = 6 [(oracall_field_type) = "VARCHAR2(40)"];
@@ -1606,10 +1606,10 @@ message BrunoOwner_DbCsv_OradijRecTyp {
 	string tipus = 2 [(oracall_field_type) = "VARCHAR2(2000)"];
 	int32 ssz = 3 [(oracall_field_type) = "NUMBER(3)"];
 	string kedvezmeny = 4 [(oracall_field_type) = "VARCHAR2(2000)"];
-	double lakatos = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double fenyezo = 6 [(oracall_field_type) = "NUMBER(12,2)"];
-	double jegkar = 7 [(oracall_field_type) = "NUMBER(12,2)"];
-	double uveg = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string lakatos = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string fenyezo = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string jegkar = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string uveg = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string egyeb = 9 [(oracall_field_type) = "VARCHAR2(200)"];
 	google.protobuf.Timestamp hatalytol = 10 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp hatalyig = 11 [(oracall_field_type) = "DATE"];
@@ -1668,7 +1668,7 @@ message BrunoOwner_DbDijFigyeles_AdatRecType {
 	google.protobuf.Timestamp hatalyig = 2 [(oracall_field_type) = "DATE"];
 	string uto_allapot = 3 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp uj_kockvege = 4 [(oracall_field_type) = "DATE"];
-	double elvart_dij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string elvart_dij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp datum = 6 [(oracall_field_type) = "DATE"];
 	int32 dazon = 7 [(oracall_field_type) = "NUMBER(6)"];
 }
@@ -1686,7 +1686,7 @@ message BrunoOwner_DbDlt_HatralekosRt {
 	int32 szerz_azon = 1 [(oracall_field_type) = "PL/SQL PLS INTEGER"];
 	string allapot = 2 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp dijrend = 3 [(oracall_field_type) = "DATE"];
-	double egyenleg = 4 [(oracall_field_type) = "NUMBER(15,2)"];
+	string egyenleg = 4 [(oracall_field_type) = "NUMBER(15,2)"];
 }
 // BRUNO_OWNER.DB_DM_AKCIOK.AKCIO_REC_TYP
 message BrunoOwner_DbDmAkciok_AkcioRecTyp {
@@ -1737,11 +1737,11 @@ message BrunoOwner_DbElet_AfedEletRecType {
 	int32 f_alap = 4 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_fkoltseg = 5 [(oracall_field_type) = "NUMBER(4)"];
 	int32 f_fl = 6 [(oracall_field_type) = "NUMBER(9)"];
-	float f_index = 7 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_index = 7 [(oracall_field_type) = "NUMBER(6,3)"];
 	int32 f_hdij = 8 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_kdij = 9 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_rdij = 10 [(oracall_field_type) = "NUMBER(9)"];
-	float f_hindex = 11 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_hindex = 11 [(oracall_field_type) = "NUMBER(6,3)"];
 	int32 f_hsum = 12 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_ksum = 13 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_rsum = 14 [(oracall_field_type) = "NUMBER(9)"];
@@ -1759,7 +1759,7 @@ message BrunoOwner_DbElet_AfedRecType {
 	string f_alap = 6 [(oracall_field_type) = "NUMBER(16,3)"];
 	string f_pool = 7 [(oracall_field_type) = "NUMBER(16,3)"];
 	string f_nykamat = 8 [(oracall_field_type) = "NUMBER(16,3)"];
-	double f_koltseg = 9 [(oracall_field_type) = "NUMBER(12,4)"];
+	string f_koltseg = 9 [(oracall_field_type) = "NUMBER(12,4)"];
 	string f_hdij = 10 [(oracall_field_type) = "NUMBER(16,3)"];
 	string f_kdij = 11 [(oracall_field_type) = "NUMBER(16,3)"];
 	string f_rdij = 12 [(oracall_field_type) = "NUMBER(16,3)"];
@@ -1769,7 +1769,7 @@ message BrunoOwner_DbElet_SzfEletRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_ELET.SZF_ELET_REC_TYPE";
 	int32 f_ssz = 1 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_fodijresz = 2 [(oracall_field_type) = "NUMBER(9)"];
-	float f_koltf = 3 [(oracall_field_type) = "NUMBER(4,2)"];
+	string f_koltf = 3 [(oracall_field_type) = "NUMBER(4,2)"];
 	google.protobuf.Timestamp f_hataly = 4 [(oracall_field_type) = "DATE"];
 	string f_jel = 5 [(oracall_field_type) = "VARCHAR2(1)"];
 	int64 f_koltseg = 6 [(oracall_field_type) = "NUMBER(10)"];
@@ -1794,13 +1794,13 @@ message BrunoOwner_DbElet_SzfRecType {
 	int64 f_alap = 8 [(oracall_field_type) = "NUMBER(16)"];
 	string f_pool = 9 [(oracall_field_type) = "NUMBER(22,4)"];
 	string f_nykamat = 10 [(oracall_field_type) = "NUMBER(22,4)"];
-	double f_koltf = 11 [(oracall_field_type) = "NUMBER(15,3)"];
+	string f_koltf = 11 [(oracall_field_type) = "NUMBER(15,3)"];
 }
 // BRUNO_OWNER.DB_ESEDEKES.DIJ_REC_TYPE
 message BrunoOwner_DbEsedekes_DijRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_ESEDEKES.DIJ_REC_TYPE";
 	string tipus = 1 [(oracall_field_type) = "VARCHAR2(1)"];
-	double dijbesum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijbesum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_EUROP.DIJ_REC
 message BrunoOwner_DbEurop_DijRec {
@@ -2213,7 +2213,7 @@ message BrunoOwner_DbEuroSpeed_KoltsegRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_EURO_SPEED.KOLTSEG_REC_TYPE";
 	int32 f_tartam = 1 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_t1 = 2 [(oracall_field_type) = "NUMBER(3)"];
-	float f_mp_mult = 3 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_mp_mult = 3 [(oracall_field_type) = "NUMBER(5,2)"];
 }
 // BRUNO_OWNER.DB_EURO_SPEED.KOMB_REC_TYPE
 message BrunoOwner_DbEuroSpeed_KombRecType {
@@ -2515,19 +2515,19 @@ message BrunoOwner_DbFair2_ZaradekRekType {
 // BRUNO_OWNER.DB_FENNTARTASI.FENNT_SZAZALEK_RECTYPE
 message BrunoOwner_DbFenntartasi_FenntSzazalekRectype {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_FENNTARTASI.FENNT_SZAZALEK_RECTYPE";
-	float f_szazalek = 1 [(oracall_field_type) = "NUMBER(7,3)"];
+	string f_szazalek = 1 [(oracall_field_type) = "NUMBER(7,3)"];
 	int32 f_tol = 2 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_ig = 3 [(oracall_field_type) = "NUMBER(3)"];
 }
 // BRUNO_OWNER.DB_FENNTARTASI.JUTALEK_REC_TYPE
 message BrunoOwner_DbFenntartasi_JutalekRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_FENNTARTASI.JUTALEK_REC_TYPE";
-	double jutalap = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string jutalap = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 	string jut_szaz = 2 [(oracall_field_type) = "NUMBER"];
-	double jutalek = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string jutalek = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	string jutalap_szorzo = 4 [(oracall_field_type) = "NUMBER"];
-	double bi_jutalap = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double bi_jutalek = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string bi_jutalap = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string bi_jutalek = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	string bi_jutalap_szorzo = 7 [(oracall_field_type) = "NUMBER"];
 	int32 kivetel_sor_azon = 8 [(oracall_field_type) = "NUMBER(9)"];
 	string kivetel_azon_tipus = 9 [(oracall_field_type) = "VARCHAR2(1)"];
@@ -2550,7 +2550,7 @@ message BrunoOwner_DbFinanc_StockRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_FINANC.STOCK_REC_TYPE";
 	int32 astock = 1 [(oracall_field_type) = "NUMBER(6)"];
 	string modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
-	double ertek = 3 [(oracall_field_type) = "NUMBER(15,3)"];
+	string ertek = 3 [(oracall_field_type) = "NUMBER(15,3)"];
 }
 // BRUNO_OWNER.DB_FLOTTA.GYAKVALT_REC_TYPE
 message BrunoOwner_DbFlotta_GyakvaltRecType {
@@ -2571,7 +2571,7 @@ message BrunoOwner_DbFlotta_SzerzRecType {
 	google.protobuf.Timestamp btkezd = 5 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp kockezd = 6 [(oracall_field_type) = "DATE"];
 	string allapot = 7 [(oracall_field_type) = "CHAR(2)"];
-	double alldijsum = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alldijsum = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp dijrend = 9 [(oracall_field_type) = "DATE"];
 	string egyenleg = 10 [(oracall_field_type) = "NUMBER"];
 	string jelleg = 11 [(oracall_field_type) = "VARCHAR2(2)"];
@@ -2583,12 +2583,12 @@ message BrunoOwner_DbFlottaDij_DijRec {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_FLOTTA_DIJ.DIJ_REC";
 	int32 szerz_azon = 1 [(oracall_field_type) = "NUMBER(9)"];
 	int32 dijbesum = 2 [(oracall_field_type) = "NUMBER(9)"];
-	double dijra = 3 [(oracall_field_type) = "NUMBER(12,4)"];
-	double mabisz_hatra = 4 [(oracall_field_type) = "NUMBER(12,4)"];
-	double mabiszra = 5 [(oracall_field_type) = "NUMBER(12,4)"];
-	double elmaradt_dij_hatra = 6 [(oracall_field_type) = "NUMBER(12,4)"];
+	string dijra = 3 [(oracall_field_type) = "NUMBER(12,4)"];
+	string mabisz_hatra = 4 [(oracall_field_type) = "NUMBER(12,4)"];
+	string mabiszra = 5 [(oracall_field_type) = "NUMBER(12,4)"];
+	string elmaradt_dij_hatra = 6 [(oracall_field_type) = "NUMBER(12,4)"];
 	int32 elozmeny_sz = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double elmaradt_dij_ra = 8 [(oracall_field_type) = "NUMBER(12,4)"];
+	string elmaradt_dij_ra = 8 [(oracall_field_type) = "NUMBER(12,4)"];
 	string ado_elvar = 9 [(oracall_field_type) = "NUMBER"];
 	string ado_besum = 10 [(oracall_field_type) = "NUMBER"];
 	string e_ado = 11 [(oracall_field_type) = "NUMBER"];
@@ -2628,7 +2628,7 @@ message BrunoOwner_DbGapDij_DijRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_GAP_DIJ.DIJ_REC_TYPE";
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 evesdij = 2 [(oracall_field_type) = "NUMBER(9)"];
-	float egyseg = 3 [(oracall_field_type) = "NUMBER(6,3)"];
+	string egyseg = 3 [(oracall_field_type) = "NUMBER(6,3)"];
 	int32 ed_azon = 4 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_GAP_TART.EREDM_REC_TYPE
@@ -2642,7 +2642,7 @@ message BrunoOwner_DbGapTart_EredmRecType {
 message BrunoOwner_DbGapTart_KockBrecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_GAP_TART.KOCK_BREC_TYPE";
 	int32 f_honapok = 1 [(oracall_field_type) = "NUMBER(3)"];
-	double f_eurotax = 2 [(oracall_field_type) = "NUMBER(15,12)"];
+	string f_eurotax = 2 [(oracall_field_type) = "NUMBER(15,12)"];
 	google.protobuf.Timestamp f_hatalytol = 3 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 4 [(oracall_field_type) = "DATE"];
 }
@@ -2665,12 +2665,12 @@ message BrunoOwner_DbGapTart_ParamType {
 // BRUNO_OWNER.DB_GAP_TART.REC_TYPE
 message BrunoOwner_DbGapTart_RecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_GAP_TART.REC_TYPE";
-	float f_kargyak = 1 [(oracall_field_type) = "NUMBER(6,4)"];
-	float f_torles = 2 [(oracall_field_type) = "NUMBER(6,4)"];
-	double f_max_szolg = 3 [(oracall_field_type) = "NUMBER(11,2)"];
-	float f_max_szolg_vetelre_sz = 4 [(oracall_field_type) = "NUMBER(6,4)"];
+	string f_kargyak = 1 [(oracall_field_type) = "NUMBER(6,4)"];
+	string f_torles = 2 [(oracall_field_type) = "NUMBER(6,4)"];
+	string f_max_szolg = 3 [(oracall_field_type) = "NUMBER(11,2)"];
+	string f_max_szolg_vetelre_sz = 4 [(oracall_field_type) = "NUMBER(6,4)"];
 	int32 f_max_onreszre = 5 [(oracall_field_type) = "NUMBER(9)"];
-	float f_max_onresz_kar_sz = 6 [(oracall_field_type) = "NUMBER(6,4)"];
+	string f_max_onresz_kar_sz = 6 [(oracall_field_type) = "NUMBER(6,4)"];
 	google.protobuf.Timestamp f_hatalytol = 7 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 8 [(oracall_field_type) = "DATE"];
 }
@@ -2681,8 +2681,8 @@ message BrunoOwner_DbGfb_RecKedv {
 	string f_jel = 2 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 f_ssz = 3 [(oracall_field_type) = "NUMBER(3)"];
 	string f_modkod = 4 [(oracall_field_type) = "VARCHAR2(6)"];
-	float f_szazalek = 5 [(oracall_field_type) = "NUMBER(6,2)"];
-	double f_ertek = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_szazalek = 5 [(oracall_field_type) = "NUMBER(6,2)"];
+	string f_ertek = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_GFB_BE.REC_VI
 message BrunoOwner_DbGfbBe_RecVi {
@@ -2765,7 +2765,7 @@ message BrunoOwner_DbGfbDij_DijparamRecType {
 message BrunoOwner_DbGfbDij_DijRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_GFB_DIJ.DIJ_REC_TYPE";
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
-	double evesdij = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string evesdij = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	string egyseg = 3 [(oracall_field_type) = "NUMBER"];
 }
 // BRUNO_OWNER.DB_GFB_DIJ.GFB_ELET_REC_TYPE
@@ -2777,8 +2777,8 @@ message BrunoOwner_DbGfbDij_GfbEletRecType {
 	int32 f_ssz = 4 [(oracall_field_type) = "NUMBER(3)"];
 	string f_dijfizgyak = 5 [(oracall_field_type) = "VARCHAR2(1)"];
 	string f_dijosztaly = 6 [(oracall_field_type) = "VARCHAR2(3)"];
-	double f_alldijsum = 7 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbesum = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_bonusz = 9 [(oracall_field_type) = "VARCHAR2(3)"];
 	string f_tarifa = 10 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 f_meret = 11 [(oracall_field_type) = "NUMBER(9)"];
@@ -2806,7 +2806,7 @@ message BrunoOwner_DbGfbDij_KothetoKedvRecType {
 	string kotheto = 2 [(oracall_field_type) = "VARCHAR2(1)"];
 	string szazalek = 3 [(oracall_field_type) = "NUMBER"];
 	string auto = 4 [(oracall_field_type) = "VARCHAR2(1)"];
-	double ertek = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string ertek = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_GFB_DIJ.PARTNER_R_TYPE
 message BrunoOwner_DbGfbDij_PartnerRType {
@@ -2910,8 +2910,8 @@ message BrunoOwner_DbGyakvalt_KotvenyRecTyp {
 	string dijfizmodnev = 15 [(oracall_field_type) = "VARCHAR2(80)"];
 	string dijkod = 16 [(oracall_field_type) = "CHAR(2)"];
 	string dijkodnev = 17 [(oracall_field_type) = "VARCHAR2(80)"];
-	double alldijsum = 18 [(oracall_field_type) = "NUMBER(12,2)"];
-	double gyakdij = 19 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alldijsum = 18 [(oracall_field_type) = "NUMBER(12,2)"];
+	string gyakdij = 19 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 pn_kod = 20 [(oracall_field_type) = "NUMBER(3)"];
 	string pn_rnev = 21 [(oracall_field_type) = "VARCHAR2(3)"];
 	string pn_nev = 22 [(oracall_field_type) = "VARCHAR2(25)"];
@@ -3286,8 +3286,8 @@ message BrunoOwner_DbJutalekSzamfejt_JutalekRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_JUTALEK_SZAMFEJT.JUTALEK_REC_TYPE";
 	int32 jutkeret = 1 [(oracall_field_type) = "NUMBER(9)"];
 	int32 jutdarab = 2 [(oracall_field_type) = "NUMBER(9)"];
-	float szazalek = 3 [(oracall_field_type) = "NUMBER(7,3)"];
-	float jutdb = 4 [(oracall_field_type) = "NUMBER(7,3)"];
+	string szazalek = 3 [(oracall_field_type) = "NUMBER(7,3)"];
+	string jutdb = 4 [(oracall_field_type) = "NUMBER(7,3)"];
 	string priv_szorzo = 5 [(oracall_field_type) = "NUMBER"];
 	int32 jutalap_korr = 6 [(oracall_field_type) = "NUMBER(9)"];
 	string korr_szorzo = 7 [(oracall_field_type) = "NUMBER"];
@@ -3338,7 +3338,7 @@ message BrunoOwner_DbJutDeviza_OutputArfolyam {
 	google.protobuf.Timestamp f_banknap = 1 [(oracall_field_type) = "DATE"];
 	int32 f_penznem = 2 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_egyseg = 3 [(oracall_field_type) = "NUMBER(6)"];
-	double f_arfolyam = 4 [(oracall_field_type) = "NUMBER(12,5)"];
+	string f_arfolyam = 4 [(oracall_field_type) = "NUMBER(12,5)"];
 }
 // BRUNO_OWNER.DB_JUT_PONTOK.JOGOSULT_REC_TYPE
 message BrunoOwner_DbJutPontok_JogosultRecType {
@@ -3477,8 +3477,8 @@ message BrunoOwner_DbKarIrat_MegterulType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KAR_IRAT.MEGTERUL_TYPE";
 	int32 kar_sorszam = 1 [(oracall_field_type) = "NUMBER(9)"];
 	google.protobuf.Timestamp fiz_hatarido = 2 [(oracall_field_type) = "DATE"];
-	double kosszeg = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	double megterules = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string kosszeg = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string megterules = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_KAR_KARMEN.BEJEGYZES_TYPE
 message BrunoOwner_DbKarKarmen_BejegyzesType {
@@ -3529,7 +3529,7 @@ message BrunoOwner_DbKarKarmen_KifizType {
 	int32 f_rosszeg = 1 [(oracall_field_type) = "NUMBER(9)"];
 	string f_ugyfelnev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_fizmod = 3 [(oracall_field_type) = "VARCHAR2(1)"];
-	float f_reszarany = 4 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_reszarany = 4 [(oracall_field_type) = "NUMBER(6,3)"];
 	string f_szamla = 5 [(oracall_field_type) = "VARCHAR2(24)"];
 	string f_irszam = 6 [(oracall_field_type) = "VARCHAR2(5)"];
 	string f_helykieg = 7 [(oracall_field_type) = "VARCHAR2(20)"];
@@ -3571,7 +3571,7 @@ message BrunoOwner_DbKarKontakt_PanaszRecTyp {
 	string jogasz = 9 [(oracall_field_type) = "VARCHAR2(1000)"];
 	string kifizetes = 10 [(oracall_field_type) = "VARCHAR2(1000)"];
 	string kifiz_tipus = 11 [(oracall_field_type) = "CHAR(1)"];
-	double osszeg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string osszeg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp utalas = 13 [(oracall_field_type) = "DATE"];
 }
 // BRUNO_OWNER.DB_KAR_KONYVEL.KAR_FUGGO_KIFIZ_TYPE
@@ -3711,7 +3711,7 @@ message BrunoOwner_DbKarMmb_KarmenKifizRecTyp {
 	int32 f_rosszeg = 1 [(oracall_field_type) = "NUMBER(9)"];
 	string f_ugyfelnev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_fizmod = 3 [(oracall_field_type) = "VARCHAR2(1)"];
-	float f_reszarany = 4 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_reszarany = 4 [(oracall_field_type) = "NUMBER(6,3)"];
 	string f_szamla = 5 [(oracall_field_type) = "VARCHAR2(24)"];
 	string f_irszam = 6 [(oracall_field_type) = "VARCHAR2(5)"];
 	string f_helykieg = 7 [(oracall_field_type) = "VARCHAR2(20)"];
@@ -3728,9 +3728,9 @@ message BrunoOwner_DbKarMmb_KarokRek {
 	int32 kar_ev = 1 [(oracall_field_type) = "NUMBER(4)"];
 	int32 kar_id = 2 [(oracall_field_type) = "NUMBER(9)"];
 	google.protobuf.Timestamp kardat = 3 [(oracall_field_type) = "DATE"];
-	double tartalek = 4 [(oracall_field_type) = "NUMBER(12,2)"];
-	double netto_kif = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double men_kif = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string tartalek = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string netto_kif = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string men_kif = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_KAR_MMB.KIFIZ_CSOP_TYP
 message BrunoOwner_DbKarMmb_KifizCsopTyp {
@@ -3837,7 +3837,7 @@ message BrunoOwner_DbKarMmb_TlkCsopTyp {
 	int32 f_haztartasi_ingo = 11 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_lakasok_db = 12 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_ertektargy = 13 [(oracall_field_type) = "NUMBER(3)"];
-	float f_kieg_uveg = 14 [(oracall_field_type) = "NUMBER(6,2)"];
+	string f_kieg_uveg = 14 [(oracall_field_type) = "NUMBER(6,2)"];
 }
 // BRUNO_OWNER.DB_KAR_MMB.TYPE_KAR_132
 message BrunoOwner_DbKarMmb_TypeKar_132 {
@@ -3893,15 +3893,15 @@ message BrunoOwner_DbKarMmb_VagyonCsopTyp {
 	int32 f_m2 = 2 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_biztossz = 3 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_evesdij = 4 [(oracall_field_type) = "NUMBER(9)"];
-	float f_alap = 5 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_betlop = 6 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_vizkar = 7 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_uveg = 8 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_arviz = 9 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_kieg_uveg = 10 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_fust_korom = 11 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_beazas = 12 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_all_risk = 13 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_alap = 5 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_betlop = 6 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_vizkar = 7 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_uveg = 8 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_arviz = 9 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_kieg_uveg = 10 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_fust_korom = 11 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_beazas = 12 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_all_risk = 13 [(oracall_field_type) = "NUMBER(6,3)"];
 }
 // BRUNO_OWNER.DB_KAR_MMB.VEZENYLO_BEJ_TYP
 message BrunoOwner_DbKarMmb_VezenyloBejTyp {
@@ -4007,13 +4007,13 @@ message BrunoOwner_DbKarOnline_ElozmenykarRt {
 	string karosult_rendszam = 4 [(oracall_field_type) = "VARCHAR2(20)"];
 	google.protobuf.Timestamp kardat = 5 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp bejdat = 6 [(oracall_field_type) = "DATE"];
-	double kifizetes = 7 [(oracall_field_type) = "NUMBER(12,2)"];
-	double tartalek = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string kifizetes = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string tartalek = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string karhelyzet = 9 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp karhelyzet_dat = 10 [(oracall_field_type) = "DATE"];
 	string karhelyzet_tsz = 11 [(oracall_field_type) = "VARCHAR2(10)"];
 	string peres = 12 [(oracall_field_type) = "VARCHAR2(1)"];
-	double visszker_tartalek = 13 [(oracall_field_type) = "NUMBER(12,2)"];
+	string visszker_tartalek = 13 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_KAR_ONLINE.GEPJARMU_RT
 message BrunoOwner_DbKarOnline_GepjarmuRt {
@@ -4162,23 +4162,23 @@ message BrunoOwner_DbKarRegressz_VrKamatType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KAR_REGRESSZ.VR_KAMAT_TYPE";
 	google.protobuf.Timestamp f_hatalytol = 1 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 2 [(oracall_field_type) = "DATE"];
-	float f_kamatlab = 3 [(oracall_field_type) = "NUMBER(4,2)"];
-	double f_osszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_kamatlab = 3 [(oracall_field_type) = "NUMBER(4,2)"];
+	string f_osszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_KAR_REGRESSZ_NAPLO.REG_JARULEK_REC_TYPE
 message BrunoOwner_DbKarRegresszNaplo_RegJarulekRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KAR_REGRESSZ_NAPLO.REG_JARULEK_REC_TYPE";
 	string f_jarulek_tipus = 1 [(oracall_field_type) = "VARCHAR2(1)"];
-	double f_osszeg = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_KAR_REGRESSZ_NAPLO.REG_KAMAT_REC_TYPE
 message BrunoOwner_DbKarRegresszNaplo_RegKamatRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KAR_REGRESSZ_NAPLO.REG_KAMAT_REC_TYPE";
 	google.protobuf.Timestamp f_hatalytol = 1 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 2 [(oracall_field_type) = "DATE"];
-	double f_toke = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	float f_kamatlab = 4 [(oracall_field_type) = "NUMBER(4,2)"];
-	double f_osszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_toke = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_kamatlab = 4 [(oracall_field_type) = "NUMBER(4,2)"];
+	string f_osszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 6 [(oracall_field_type) = "NUMBER(3)"];
 	string f_atszamol = 7 [(oracall_field_type) = "VARCHAR2(1)"];
 }
@@ -4262,7 +4262,7 @@ message BrunoOwner_DbKarVezenylo4_HitelezoTyp {
 	string f_kedvezmenyezett = 1 [(oracall_field_type) = "VARCHAR2(40)"];
 	google.protobuf.Timestamp f_hatalytol = 2 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 3 [(oracall_field_type) = "DATE"];
-	double f_hitelosszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_hitelosszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_hitel_szam = 5 [(oracall_field_type) = "VARCHAR2(40)"];
 }
 // BRUNO_OWNER.DB_KAR_VEZENYLO4.KAR_HELY_REC
@@ -4385,7 +4385,7 @@ message BrunoOwner_DbKarVezenylo4_TlkCsopTyp {
 	int32 f_haztartasi_ingo = 11 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_lakasok_db = 12 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_ertektargy = 13 [(oracall_field_type) = "NUMBER(3)"];
-	float f_kieg_uveg = 14 [(oracall_field_type) = "NUMBER(6,2)"];
+	string f_kieg_uveg = 14 [(oracall_field_type) = "NUMBER(6,2)"];
 	string f_csak_kozos_kpv = 15 [(oracall_field_type) = "VARCHAR2(1)"];
 }
 // BRUNO_OWNER.DB_KAR_VEZENYLO4.TYPE_OUTPUT_058
@@ -4394,7 +4394,7 @@ message BrunoOwner_DbKarVezenylo4_TypeOutput_058 {
 	string f_hitel_szam = 1 [(oracall_field_type) = "VARCHAR2(40)"];
 	string hitel_igenylo_nev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	string hitelezo_nev = 3 [(oracall_field_type) = "VARCHAR2(40)"];
-	double f_hitelosszeg = 4 [(oracall_field_type) = "NUMBER(15,2)"];
+	string f_hitelosszeg = 4 [(oracall_field_type) = "NUMBER(15,2)"];
 	string f_modkod = 5 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_penznem = 6 [(oracall_field_type) = "VARCHAR2(3)"];
 	string f_nev = 7 [(oracall_field_type) = "VARCHAR2(40)"];
@@ -4414,15 +4414,15 @@ message BrunoOwner_DbKarVezenylo4_VagyonCsopTyp {
 	int32 f_m2 = 2 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_biztossz = 3 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_evesdij = 4 [(oracall_field_type) = "NUMBER(9)"];
-	float f_alap = 5 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_betlop = 6 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_vizkar = 7 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_uveg = 8 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_arviz = 9 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_kieg_uveg = 10 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_fust_korom = 11 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_beazas = 12 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_all_risk = 13 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_alap = 5 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_betlop = 6 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_vizkar = 7 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_uveg = 8 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_arviz = 9 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_kieg_uveg = 10 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_fust_korom = 11 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_beazas = 12 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_all_risk = 13 [(oracall_field_type) = "NUMBER(6,3)"];
 }
 // BRUNO_OWNER.DB_KAR_VEZENYLO4.VEZENYLO_BEJ_RT_2
 message BrunoOwner_DbKarVezenylo4_VezenyloBejRt_2 {
@@ -4689,21 +4689,21 @@ message BrunoOwner_DbKkta2_HibaRt {
 // BRUNO_OWNER.DB_KKTA2.KARKIF_RT
 message BrunoOwner_DbKkta2_KarkifRt {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KKTA2.KARKIF_RT";
-	double osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 	string penznem = 2 [(oracall_field_type) = "VARCHAR2(3)"];
 	google.protobuf.Timestamp datum = 3 [(oracall_field_type) = "DATE"];
 }
 // BRUNO_OWNER.DB_KKTA2.KIFIZ_RT
 message BrunoOwner_DbKkta2_KifizRt {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KKTA2.KIFIZ_RT";
-	double osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 napszam = 2 [(oracall_field_type) = "PL/SQL PLS INTEGER"];
 	int32 csomag_azon = 3 [(oracall_field_type) = "PL/SQL PLS INTEGER"];
 }
 // BRUNO_OWNER.DB_KKTA2.MEZO_RT
 message BrunoOwner_DbKkta2_MezoRt {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KKTA2.MEZO_RT";
-	double szam = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string szam = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 	string szoveg = 2 [(oracall_field_type) = "VARCHAR2(12)"];
 	int32 csomag_azon = 3 [(oracall_field_type) = "PL/SQL PLS INTEGER"];
 }
@@ -4721,8 +4721,8 @@ message BrunoOwner_DbKkta2_TorlendokRt {
 message BrunoOwner_DbKkta2Spec_GfbDijosztalyRt {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KKTA2_SPEC.GFB_DIJOSZTALY_RT";
 	string f_jelleg = 1 [(oracall_field_type) = "CHAR(2)"];
-	double f_tol = 2 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_ig = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_tol = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_ig = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_kkta_kod = 4 [(oracall_field_type) = "VARCHAR2(2)"];
 }
 // BRUNO_OWNER.DB_KOCK.REC_BIZT
@@ -4734,7 +4734,7 @@ message BrunoOwner_DbKock_RecBizt {
 // BRUNO_OWNER.DB_KOCK.REC_CSOP
 message BrunoOwner_DbKock_RecCsop {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_KOCK.REC_CSOP";
-	float f_szorzo = 1 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_szorzo = 1 [(oracall_field_type) = "NUMBER(6,3)"];
 	int32 f_biztossz = 2 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_kockossz = 3 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_ugyazon = 4 [(oracall_field_type) = "NUMBER(9)"];
@@ -4790,7 +4790,7 @@ message BrunoOwner_DbKockhely_SzerzRecTyp {
 	google.protobuf.Timestamp btkezd = 3 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp evfordulo = 4 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp kockvege = 5 [(oracall_field_type) = "DATE"];
-	double dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_KOCKHELY_ALBETET.ADATOK_REC_TYP
 message BrunoOwner_DbKockhelyAlbetet_AdatokRecTyp {
@@ -4827,7 +4827,7 @@ message BrunoOwner_DbKonyvel_AdatRecType {
 	int32 gstock = 5 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp dijbeido = 6 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp banknap = 7 [(oracall_field_type) = "DATE"];
-	double dijbe = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijbe = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 penznem = 9 [(oracall_field_type) = "NUMBER(3)"];
 	string bizaz = 10 [(oracall_field_type) = "VARCHAR2(40)"];
 	string bizjel = 11 [(oracall_field_type) = "CHAR(1)"];
@@ -5056,7 +5056,7 @@ message BrunoOwner_DbLakasForms_FejRecTyp {
 	google.protobuf.Timestamp kockezd = 15 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp btkezd = 16 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp evfordulo = 17 [(oracall_field_type) = "DATE"];
-	double alldijsum = 18 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alldijsum = 18 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 penznem = 19 [(oracall_field_type) = "NUMBER(3)"];
 	string penznem_rnev = 20 [(oracall_field_type) = "VARCHAR2(3)"];
 	int32 szerzodo_ugyazon = 21 [(oracall_field_type) = "NUMBER(9)"];
@@ -5077,9 +5077,9 @@ message BrunoOwner_DbLakasKozos_EletTortRecTyp {
 	string dfgyaknev = 5 [(oracall_field_type) = "VARCHAR2(12)"];
 	string dfmodnev = 6 [(oracall_field_type) = "VARCHAR2(7)"];
 	string dijkod = 7 [(oracall_field_type) = "CHAR(2)"];
-	double alapdij = 8 [(oracall_field_type) = "NUMBER(12,2)"];
-	double alldijsum = 9 [(oracall_field_type) = "NUMBER(12,2)"];
-	double gyakdij = 10 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alapdij = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alldijsum = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string gyakdij = 10 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_LAKAS_KOZOS.HIBA_REC_TYP
 message BrunoOwner_DbLakasKozos_HibaRecTyp {
@@ -5106,9 +5106,9 @@ message BrunoOwner_DbLakasKozos_ModTortRecTyp {
 	string nev = 8 [(oracall_field_type) = "VARCHAR2(40)"];
 	google.protobuf.Timestamp tdatum = 9 [(oracall_field_type) = "DATE"];
 	string tnev = 10 [(oracall_field_type) = "VARCHAR2(40)"];
-	double alapdij = 11 [(oracall_field_type) = "NUMBER(12,2)"];
-	double alldijsum = 12 [(oracall_field_type) = "NUMBER(12,2)"];
-	double gyakdij = 13 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alapdij = 11 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alldijsum = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string gyakdij = 13 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_LAKAS_KOZOS.MOZGAS_REC_TYP
 message BrunoOwner_DbLakasKozos_MozgasRecTyp {
@@ -5149,9 +5149,9 @@ message BrunoOwner_DbLakasKozos_RabiztRecTyp {
 message BrunoOwner_DbLakasKozos_ReszmodMeghatRecTyp {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_LAKAS_KOZOS.RESZMOD_MEGHAT_REC_TYP";
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
-	double evesdij = 2 [(oracall_field_type) = "NUMBER(12,2)"];
-	double biztsum = 3 [(oracall_field_type) = "NUMBER(15,2)"];
-	double netto_evesdij = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string evesdij = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string biztsum = 3 [(oracall_field_type) = "NUMBER(15,2)"];
+	string netto_evesdij = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_LAKAS_KOZOS.TODO_REC_TYP
 message BrunoOwner_DbLakasKozos_TodoRecTyp {
@@ -5165,7 +5165,7 @@ message BrunoOwner_DbLakasKozos_TodoRecTyp {
 // BRUNO_OWNER.DB_LISTA.SZDIJ_REC_TYP
 message BrunoOwner_DbLista_SzdijRecTyp {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_LISTA.SZDIJ_REC_TYP";
-	double osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp ugyfel_feladas_datum = 2 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp banknap = 3 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp tranzakcio_datum = 4 [(oracall_field_type) = "DATE"];
@@ -5207,7 +5207,7 @@ message BrunoOwner_DbMabisz_KarRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MABISZ.KAR_REC_TYPE";
 	string karszam = 1 [(oracall_field_type) = "VARCHAR2(20)"];
 	google.protobuf.Timestamp karido = 2 [(oracall_field_type) = "DATE"];
-	double kar_osszeg = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string kar_osszeg = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	string szerzodes_kategoria = 4 [(oracall_field_type) = "VARCHAR2(1)"];
 	string kar_pozicio = 5 [(oracall_field_type) = "VARCHAR2(50)"];
 	string bno = 6 [(oracall_field_type) = "VARCHAR2(20)"];
@@ -5246,8 +5246,8 @@ message BrunoOwner_DbMabiszMq_KockhelyRecTyp {
 	string ajto = 12 [(oracall_field_type) = "VARCHAR2(12)"];
 	string egyeb_cim = 13 [(oracall_field_type) = "VARCHAR2(100)"];
 	string hrsz = 14 [(oracall_field_type) = "VARCHAR2(50)"];
-	double gps_lat = 15 [(oracall_field_type) = "NUMBER(9,6)"];
-	double gps_long = 16 [(oracall_field_type) = "NUMBER(9,6)"];
+	string gps_lat = 15 [(oracall_field_type) = "NUMBER(9,6)"];
+	string gps_long = 16 [(oracall_field_type) = "NUMBER(9,6)"];
 }
 // BRUNO_OWNER.DB_MABISZ_MQ.LAKAS_KAR_REC_TYP
 message BrunoOwner_DbMabiszMq_LakasKarRecTyp {
@@ -5276,7 +5276,7 @@ message BrunoOwner_DbMabiszMq_MotorKarRecTyp {
 	string szerzodes_kategoria = 1 [(oracall_field_type) = "VARCHAR2(1)"];
 	string karszam = 2 [(oracall_field_type) = "VARCHAR2(20)"];
 	google.protobuf.Timestamp karido = 3 [(oracall_field_type) = "DATE"];
-	double kar_osszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string kar_osszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	string kar_pozicio = 5 [(oracall_field_type) = "VARCHAR2(50)"];
 	string serules = 6 [(oracall_field_type) = "VARCHAR2(50)"];
 	string kontakt = 7 [(oracall_field_type) = "VARCHAR2(250)"];
@@ -5357,13 +5357,13 @@ message BrunoOwner_DbMcsb_EletRecTyp {
 	int64 baleset_bo = 27 [(oracall_field_type) = "NUMBER(12)"];
 	int32 alapdij = 28 [(oracall_field_type) = "NUMBER(9)"];
 	int32 alapdij2 = 29 [(oracall_field_type) = "NUMBER(9)"];
-	float kedv_csomag = 30 [(oracall_field_type) = "NUMBER(6,3)"];
-	float kedv_kulon = 31 [(oracall_field_type) = "NUMBER(6,3)"];
-	float kedv_kupon = 32 [(oracall_field_type) = "NUMBER(6,3)"];
-	float kedv_ekomm = 33 [(oracall_field_type) = "NUMBER(6,3)"];
-	float kedv_dijfizgyak = 34 [(oracall_field_type) = "NUMBER(6,3)"];
-	float kedv_dijfizmod = 35 [(oracall_field_type) = "NUMBER(6,3)"];
-	float pdij_dijfizgyak = 36 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kedv_csomag = 30 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kedv_kulon = 31 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kedv_kupon = 32 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kedv_ekomm = 33 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kedv_dijfizgyak = 34 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kedv_dijfizmod = 35 [(oracall_field_type) = "NUMBER(6,3)"];
+	string pdij_dijfizgyak = 36 [(oracall_field_type) = "NUMBER(6,3)"];
 	int32 kedv_csomag_ft = 37 [(oracall_field_type) = "NUMBER(9)"];
 	int32 kedv_kulon_ft = 38 [(oracall_field_type) = "NUMBER(9)"];
 	int32 kedv_kupon_ft = 39 [(oracall_field_type) = "NUMBER(9)"];
@@ -5427,7 +5427,7 @@ message BrunoOwner_DbMcsb_KotvenyRecTyp {
 	string dijfizmodnev = 14 [(oracall_field_type) = "VARCHAR2(10)"];
 	string dijkod = 15 [(oracall_field_type) = "CHAR(2)"];
 	string dijnev = 16 [(oracall_field_type) = "VARCHAR2(40)"];
-	double alldijsum = 17 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alldijsum = 17 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 penznem = 18 [(oracall_field_type) = "NUMBER(3)"];
 	string penznem_rnev = 19 [(oracall_field_type) = "VARCHAR2(3)"];
 	string szerzodo_nev = 20 [(oracall_field_type) = "VARCHAR2(40)"];
@@ -5440,16 +5440,16 @@ message BrunoOwner_DbMcsb_ReszlRecTyp {
 	string tar_code = 3 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 epulet_azon = 4 [(oracall_field_type) = "NUMBER(9)"];
 	int64 biztossz = 5 [(oracall_field_type) = "NUMBER(12)"];
-	double dijtetel = 6 [(oracall_field_type) = "NUMBER(12,6)"];
-	float lakottsag_korr = 7 [(oracall_field_type) = "NUMBER(6,3)"];
+	string dijtetel = 6 [(oracall_field_type) = "NUMBER(12,6)"];
+	string lakottsag_korr = 7 [(oracall_field_type) = "NUMBER(6,3)"];
 	int64 alapdij = 8 [(oracall_field_type) = "NUMBER(12)"];
-	float biztossz_korr = 9 [(oracall_field_type) = "NUMBER(6,3)"];
-	float onresz_korr = 10 [(oracall_field_type) = "NUMBER(6,3)"];
+	string biztossz_korr = 9 [(oracall_field_type) = "NUMBER(6,3)"];
+	string onresz_korr = 10 [(oracall_field_type) = "NUMBER(6,3)"];
 	int64 alapdij2 = 11 [(oracall_field_type) = "NUMBER(12)"];
-	float kedv_csomag = 12 [(oracall_field_type) = "NUMBER(6,3)"];
-	float kedv_kulon = 13 [(oracall_field_type) = "NUMBER(6,3)"];
-	float kedv_ekomm = 14 [(oracall_field_type) = "NUMBER(6,3)"];
-	double kp_szorzo = 15 [(oracall_field_type) = "NUMBER(9,6)"];
+	string kedv_csomag = 12 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kedv_kulon = 13 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kedv_ekomm = 14 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kp_szorzo = 15 [(oracall_field_type) = "NUMBER(9,6)"];
 	int64 evesdij = 16 [(oracall_field_type) = "NUMBER(12)"];
 	int64 gyak_dij = 17 [(oracall_field_type) = "NUMBER(12)"];
 }
@@ -5579,7 +5579,7 @@ message BrunoOwner_DbMfoAeg_ListaRecTyp {
 message BrunoOwner_DbMfoAeg_MkReszlRecTyp {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MFO_AEG.MK_RESZL_REC_TYP";
 	int32 biztossz = 1 [(oracall_field_type) = "NUMBER(9)"];
-	double dijtetel = 2 [(oracall_field_type) = "NUMBER(9,5)"];
+	string dijtetel = 2 [(oracall_field_type) = "NUMBER(9,5)"];
 	int32 evesdij = 3 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_MFO_AEG.MODUL_REC_TYP
@@ -5596,7 +5596,7 @@ message BrunoOwner_DbMfoAeg_ReszlRecTyp {
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	string modnev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 biztossz = 3 [(oracall_field_type) = "NUMBER(9)"];
-	double dijtetel = 4 [(oracall_field_type) = "NUMBER(9,5)"];
+	string dijtetel = 4 [(oracall_field_type) = "NUMBER(9,5)"];
 	int32 evesdij = 5 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_MFO_AEG.WORK_REC_TYP
@@ -5616,7 +5616,7 @@ message BrunoOwner_DbMfoAeg_WorkRecTyp {
 message BrunoOwner_DbMmb2Ablak_Ad01RecTyp {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MMB2ABLAK.AD01_REC_TYP";
 	string f_megnevezes = 1 [(oracall_field_type) = "VARCHAR2(100)"];
-	double f_biztossz = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_biztossz = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_MMB2ABLAK.AEGON_AUTOHIBA_REC_TYP
 message BrunoOwner_DbMmb2Ablak_AegonAutohibaRecTyp {
@@ -5703,15 +5703,15 @@ message BrunoOwner_DbMmb2Ablak_DmAkciokAlapadatok {
 	string f_allapot = 1 [(oracall_field_type) = "VARCHAR2(2)"];
 	string f_ugyfelnev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	google.protobuf.Timestamp f_kov_fordulo = 3 [(oracall_field_type) = "DATE"];
-	double f_alldijsum = 4 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_alldijsum_kov_fordulo = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum_kov_fordulo = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_MMB2ABLAK.DM_AKCIOK_REC_TYPE
 message BrunoOwner_DbMmb2Ablak_DmAkciokRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MMB2ABLAK.DM_AKCIOK_REC_TYPE";
 	string f_statusz = 1 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp f_hataly = 2 [(oracall_field_type) = "DATE"];
-	double f_alldijsum_diff = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum_diff = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_tipus = 4 [(oracall_field_type) = "VARCHAR2(2)"];
 	string f_akcio_nev = 5 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_torzsszam = 6 [(oracall_field_type) = "VARCHAR2(10)"];
@@ -5740,7 +5740,7 @@ message BrunoOwner_DbMmb2Ablak_FelhatRecType {
 	string szamlaszam = 1 [(oracall_field_type) = "VARCHAR2(24)"];
 	google.protobuf.Timestamp erv_kezd = 2 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp erv_vege = 3 [(oracall_field_type) = "DATE"];
-	double limit = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string limit = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	string banknev = 5 [(oracall_field_type) = "VARCHAR2(40)"];
 	string bankcim = 6 [(oracall_field_type) = "VARCHAR2(52)"];
 	google.protobuf.Timestamp hataly = 7 [(oracall_field_type) = "DATE"];
@@ -5816,20 +5816,20 @@ message BrunoOwner_DbMmb2Ablak_Leker_47_5Rt {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MMB2ABLAK.LEKER_47_5_RT";
 	google.protobuf.Timestamp tol = 1 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp ig = 2 [(oracall_field_type) = "DATE"];
-	double dijelvar = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	double dijbefiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
-	double egyenleg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double gongyolt_egyenleg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijelvar = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijbefiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string gongyolt_egyenleg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_MMB2ABLAK.LEKER_47_6_RT
 message BrunoOwner_DbMmb2Ablak_Leker_47_6Rt {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MMB2ABLAK.LEKER_47_6_RT";
 	google.protobuf.Timestamp tol = 1 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp ig = 2 [(oracall_field_type) = "DATE"];
-	double dijelvar = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	double dijbefiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
-	double egyenleg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double gongyolt_egyenleg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijelvar = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijbefiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string gongyolt_egyenleg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	string bonusz = 7 [(oracall_field_type) = "VARCHAR2(3)"];
 	string extra_partner_kedv = 8 [(oracall_field_type) = "VARCHAR2(1)"];
 	string partner_kedv = 9 [(oracall_field_type) = "VARCHAR2(1)"];
@@ -5848,20 +5848,20 @@ message BrunoOwner_DbMmb2Ablak_Leker_47DataRec {
 	string szerzodo = 8 [(oracall_field_type) = "VARCHAR2(40)"];
 	string dijfizmod = 9 [(oracall_field_type) = "CHAR(1)"];
 	google.protobuf.Timestamp dijrend = 10 [(oracall_field_type) = "DATE"];
-	double egyenleg = 11 [(oracall_field_type) = "NUMBER(12,2)"];
-	double r_befiz = 12 [(oracall_field_type) = "NUMBER(12,2)"];
-	double s_dijelvar = 13 [(oracall_field_type) = "NUMBER(12,2)"];
-	double s_dijbefiz = 14 [(oracall_field_type) = "NUMBER(12,2)"];
-	double s_egyenleg = 15 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 11 [(oracall_field_type) = "NUMBER(12,2)"];
+	string r_befiz = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string s_dijelvar = 13 [(oracall_field_type) = "NUMBER(12,2)"];
+	string s_dijbefiz = 14 [(oracall_field_type) = "NUMBER(12,2)"];
+	string s_egyenleg = 15 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_MMB2ABLAK.LEKER_47_TETEL_REC
 message BrunoOwner_DbMmb2Ablak_Leker_47TetelRec {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MMB2ABLAK.LEKER_47_TETEL_REC";
 	google.protobuf.Timestamp tol = 1 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp ig = 2 [(oracall_field_type) = "DATE"];
-	double dijelvar = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	double dijbefiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
-	double egyenleg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijelvar = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijbefiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_MMB2ABLAK.LOG_REC_TYP
 message BrunoOwner_DbMmb2Ablak_LogRecTyp {
@@ -5932,7 +5932,7 @@ message BrunoOwner_DbMmb2Ablak_SzamvitelTetelRecTyp {
 	string f_azonosito = 2 [(oracall_field_type) = "VARCHAR2(100)"];
 	string f_megnevezes = 3 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_idoszak = 4 [(oracall_field_type) = "VARCHAR2(30)"];
-	double f_brosszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_brosszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_MMB2ABLAK.TYPE_AKR_JUTALEK
 message BrunoOwner_DbMmb2Ablak_TypeAkrJutalek {
@@ -6036,14 +6036,14 @@ message BrunoOwner_DbMmb2Ablak_UpsellBovitType {
 message BrunoOwner_DbMmb2Ablak_UpsellModulokType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MMB2ABLAK.UPSELL_MODULOK_TYPE";
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
-	double f_biztossz = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_biztossz = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_MMB2ABLAK.UPSELL_TYPE
 message BrunoOwner_DbMmb2Ablak_UpsellType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_MMB2ABLAK.UPSELL_TYPE";
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_modnev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
-	double f_biztossz = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_biztossz = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_hatalytol = 4 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 5 [(oracall_field_type) = "DATE"];
 }
@@ -6063,12 +6063,12 @@ message BrunoOwner_DbMmb2Ablak_VagyonAkcioLeker {
 	int32 f_oput_azon = 3 [(oracall_field_type) = "NUMBER(9)"];
 	string f_allapot = 4 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp f_hataly = 5 [(oracall_field_type) = "DATE"];
-	double f_alldijsum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_szuldat = 7 [(oracall_field_type) = "DATE"];
 	string f_ptk = 8 [(oracall_field_type) = "VARCHAR2(1)"];
 	string f_nem = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	string f_adoszam = 10 [(oracall_field_type) = "VARCHAR2(8)"];
-	double f_alldijsum_diff = 11 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum_diff = 11 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_rendszam = 12 [(oracall_field_type) = "VARCHAR2(11)"];
 	int32 f_gyartev = 13 [(oracall_field_type) = "NUMBER(4)"];
 	int32 f_sbl_azon = 14 [(oracall_field_type) = "NUMBER(6)"];
@@ -6207,7 +6207,7 @@ message BrunoOwner_DbOcr_OcrRekType {
 	string f_postaszam = 3 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_befazon = 4 [(oracall_field_type) = "VARCHAR2(24)"];
 	string f_hibajel = 5 [(oracall_field_type) = "CHAR(1)"];
-	double f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_postahiv = 7 [(oracall_field_type) = "VARCHAR2(4)"];
 	google.protobuf.Timestamp f_dijbeido = 8 [(oracall_field_type) = "DATE"];
 	string f_tipuskod = 9 [(oracall_field_type) = "VARCHAR2(2)"];
@@ -6311,11 +6311,11 @@ message BrunoOwner_DbOke_BiztKedvezRecTyp {
 // BRUNO_OWNER.DB_OKE.DIJTETEL_REC_TYP
 message BrunoOwner_DbOke_DijtetelRecTyp {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_OKE.DIJTETEL_REC_TYP";
-	float alap = 1 [(oracall_field_type) = "NUMBER(6,4)"];
-	float betlop = 2 [(oracall_field_type) = "NUMBER(6,4)"];
-	float vizkar = 3 [(oracall_field_type) = "NUMBER(6,4)"];
-	float uveg = 4 [(oracall_field_type) = "NUMBER(6,4)"];
-	float dijtetel = 5 [(oracall_field_type) = "NUMBER(6,4)"];
+	string alap = 1 [(oracall_field_type) = "NUMBER(6,4)"];
+	string betlop = 2 [(oracall_field_type) = "NUMBER(6,4)"];
+	string vizkar = 3 [(oracall_field_type) = "NUMBER(6,4)"];
+	string uveg = 4 [(oracall_field_type) = "NUMBER(6,4)"];
+	string dijtetel = 5 [(oracall_field_type) = "NUMBER(6,4)"];
 }
 // BRUNO_OWNER.DB_OKE.ELET_REC_TYP
 message BrunoOwner_DbOke_EletRecTyp {
@@ -6476,10 +6476,10 @@ message BrunoOwner_DbOke_KtvRecTyp {
 message BrunoOwner_DbOke_MkReszlRecTyp {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_OKE.MK_RESZL_REC_TYP";
 	int32 biztossz = 1 [(oracall_field_type) = "NUMBER(9)"];
-	double dijtetel = 2 [(oracall_field_type) = "NUMBER(9,4)"];
+	string dijtetel = 2 [(oracall_field_type) = "NUMBER(9,4)"];
 	int32 alapdij = 3 [(oracall_field_type) = "NUMBER(9)"];
 	int32 evesdij = 4 [(oracall_field_type) = "NUMBER(9)"];
-	double netto_dij = 5 [(oracall_field_type) = "NUMBER(15,5)"];
+	string netto_dij = 5 [(oracall_field_type) = "NUMBER(15,5)"];
 }
 // BRUNO_OWNER.DB_OKE.MODULOK_REC_TYP
 message BrunoOwner_DbOke_ModulokRecTyp {
@@ -6539,7 +6539,7 @@ message BrunoOwner_DbOke_ReszlRecTyp {
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	string modnev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 biztossz = 3 [(oracall_field_type) = "NUMBER(9)"];
-	double dijtetel = 4 [(oracall_field_type) = "NUMBER(9,4)"];
+	string dijtetel = 4 [(oracall_field_type) = "NUMBER(9,4)"];
 	int32 alapdij = 5 [(oracall_field_type) = "NUMBER(9)"];
 	int32 evesdij = 6 [(oracall_field_type) = "NUMBER(9)"];
 	string netto_dij = 7 [(oracall_field_type) = "NUMBER"];
@@ -6628,7 +6628,7 @@ message BrunoOwner_DbPgfb_RecKedv {
 	int32 f_ssz = 3 [(oracall_field_type) = "NUMBER(3)"];
 	string f_modkod = 4 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_szazalek = 5 [(oracall_field_type) = "NUMBER"];
-	double f_ertek = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_ertek = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_PGFB.REC_U_ELET
 message BrunoOwner_DbPgfb_RecUElet {
@@ -6653,7 +6653,7 @@ message BrunoOwner_DbPgfbDij_KothetoKedvRecType {
 	string kotheto = 2 [(oracall_field_type) = "VARCHAR2(1)"];
 	string szazalek = 3 [(oracall_field_type) = "NUMBER"];
 	string auto = 4 [(oracall_field_type) = "VARCHAR2(1)"];
-	double ertek = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string ertek = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_PGW.TETEL_RT
 message BrunoOwner_DbPgw_TetelRt {
@@ -6661,7 +6661,7 @@ message BrunoOwner_DbPgw_TetelRt {
 	int32 szerz_azon = 1 [(oracall_field_type) = "NUMBER(9)"];
 	string irany = 2 [(oracall_field_type) = "VARCHAR2(10)"];
 	string devizanem = 3 [(oracall_field_type) = "VARCHAR2(3)"];
-	double osszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string osszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp erteknap = 5 [(oracall_field_type) = "DATE"];
 	string statusz = 6 [(oracall_field_type) = "VARCHAR2(10)"];
 	string jogcim = 7 [(oracall_field_type) = "VARCHAR2(10)"];
@@ -6749,13 +6749,6 @@ message BrunoOwner_DbSoap_TRequest {
 	string namespace = 2 [(oracall_field_type) = "VARCHAR2(256)"];
 	string body = 3 [(oracall_field_type) = "VARCHAR2(32767)"];
 	string envelope_tag = 4 [(oracall_field_type) = "VARCHAR2(30)"];
-}
-// BRUNO_OWNER.DB_SOAP.T_RESPONSE
-message BrunoOwner_DbSoap_TResponse {
-	option (oracall_object_type) = "BRUNO_OWNER.DB_SOAP.T_RESPONSE";
-	string doc = 1 [(oracall_field_type) = "PUBLIC.XMLTYPE"];
-	string envelope_tag = 2 [(oracall_field_type) = "VARCHAR2(30)"];
-	int32 status_code = 3 [(oracall_field_type) = "NUMBER(3)"];
 }
 // BRUNO_OWNER.DB_SPL.VR_CIMZETT_TYP
 message BrunoOwner_DbSpl_VrCimzettTyp {
@@ -7253,9 +7246,9 @@ message BrunoOwner_DbSplLev_VrKifizetes {
 // BRUNO_OWNER.DB_SPL_LEV.VR_KOTVENY_JELLEMZO
 message BrunoOwner_DbSplLev_VrKotvenyJellemzo {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPL_LEV.VR_KOTVENY_JELLEMZO";
-	double f_darab = 1 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_darab = 1 [(oracall_field_type) = "NUMBER(12,3)"];
 	int32 f_arfolyam = 2 [(oracall_field_type) = "NUMBER(9)"];
-	double f_ertek = 3 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_ertek = 3 [(oracall_field_type) = "NUMBER(12,3)"];
 }
 // BRUNO_OWNER.DB_SPL_LEV.VR_OSSZESITETT_ADAT
 message BrunoOwner_DbSplLev_VrOsszesitettAdat {
@@ -7312,7 +7305,7 @@ message BrunoOwner_DbSplLev_VrSzamlaSor {
 	string f_megnevezes = 4 [(oracall_field_type) = "VARCHAR2(40)"];
 	google.protobuf.Timestamp f_idoszak_kezdet = 5 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_idoszak_veg = 6 [(oracall_field_type) = "DATE"];
-	double f_brutto_ertek = 7 [(oracall_field_type) = "NUMBER(11,2)"];
+	string f_brutto_ertek = 7 [(oracall_field_type) = "NUMBER(11,2)"];
 }
 // BRUNO_OWNER.DB_SPL_LEV.VR_SZERZ_KOLTSEG
 message BrunoOwner_DbSplLev_VrSzerzKoltseg {
@@ -7387,20 +7380,20 @@ message BrunoOwner_DbSpool_TypSzerzElterRec {
 // BRUNO_OWNER.DB_SPOOL2.R_EGYENLEG_OSSZEG
 message BrunoOwner_DbSpool2_REgyenlegOsszeg {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOL2.R_EGYENLEG_OSSZEG";
-	double f_indulo = 1 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_eloiras = 2 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_befolyt = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_egyenleg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_indulo = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_eloiras = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_befolyt = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_egyenleg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_dij_tol = 5 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_dij_ig = 6 [(oracall_field_type) = "DATE"];
-	double f_mabisz = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_mabisz = 7 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_mabisz_tol = 8 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_mabisz_ig = 9 [(oracall_field_type) = "DATE"];
-	double f_elmaradt = 10 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_elmaradt = 10 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_elm_azon = 11 [(oracall_field_type) = "NUMBER(9)"];
 	google.protobuf.Timestamp f_elm_tol = 12 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_elm_ig = 13 [(oracall_field_type) = "DATE"];
-	double f_balado = 14 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_balado = 14 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_balado_tol = 15 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_balado_ig = 16 [(oracall_field_type) = "DATE"];
 	string f_boca_azon = 17 [(oracall_field_type) = "NUMBER"];
@@ -7449,7 +7442,7 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_005 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_005";
 	google.protobuf.Timestamp f_utalas = 1 [(oracall_field_type) = "DATE"];
 	string f_szamla = 2 [(oracall_field_type) = "VARCHAR2(24)"];
-	double osszeg = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string osszeg = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_ugyfelnev = 4 [(oracall_field_type) = "VARCHAR2(75)"];
 	string f_irszam = 5 [(oracall_field_type) = "VARCHAR2(5)"];
 	string cim = 6 [(oracall_field_type) = "VARCHAR2(69)"];
@@ -7640,13 +7633,13 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_025 {
 message BrunoOwner_DbSpoolsys2_TypeOutput_026 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_026";
 	string f_allapot = 1 [(oracall_field_type) = "CHAR(2)"];
-	double f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_astock = 3 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_btkezd = 4 [(oracall_field_type) = "DATE"];
-	double f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dijeloir = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_dijfizgyak = 9 [(oracall_field_type) = "CHAR(1)"];
 	google.protobuf.Timestamp f_dijfizkezd = 10 [(oracall_field_type) = "DATE"];
 	string f_dijfizmod = 11 [(oracall_field_type) = "CHAR(1)"];
@@ -7654,14 +7647,14 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_026 {
 	string f_dijkod = 13 [(oracall_field_type) = "CHAR(2)"];
 	google.protobuf.Timestamp f_dijrend = 14 [(oracall_field_type) = "DATE"];
 	int32 f_dijtartoz = 15 [(oracall_field_type) = "NUMBER(9)"];
-	double f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_fstock = 17 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_kockezd = 18 [(oracall_field_type) = "DATE"];
 	string f_modkod = 19 [(oracall_field_type) = "VARCHAR2(6)"];
 	google.protobuf.Timestamp f_szerkot = 20 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szerlejar = 21 [(oracall_field_type) = "DATE"];
 	int32 f_vartdij = 22 [(oracall_field_type) = "NUMBER(9)"];
-	double egyenleg = 23 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 23 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_modnev = 24 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_modrnev = 25 [(oracall_field_type) = "VARCHAR2(8)"];
 	string f_ktikod = 26 [(oracall_field_type) = "VARCHAR2(7)"];
@@ -7703,8 +7696,8 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_028 {
 	int32 f_kifizaz = 11 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_kifizszam = 12 [(oracall_field_type) = "NUMBER(9)"];
 	string f_fizmod = 13 [(oracall_field_type) = "CHAR(1)"];
-	double f_rosszeg = 14 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_rkk = 15 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rosszeg = 14 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rkk = 15 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_reszarany = 16 [(oracall_field_type) = "NUMBER"];
 	string f_szamla = 17 [(oracall_field_type) = "VARCHAR2(24)"];
 	string f_irszam = 18 [(oracall_field_type) = "VARCHAR2(5)"];
@@ -7749,7 +7742,7 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_033 {
 // BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_034
 message BrunoOwner_DbSpoolsys2_TypeOutput_034 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_034";
-	double adoeloleg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string adoeloleg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_035
 message BrunoOwner_DbSpoolsys2_TypeOutput_035 {
@@ -7773,7 +7766,7 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_037 {
 // BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_038
 message BrunoOwner_DbSpoolsys2_TypeOutput_038 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_038";
-	double f_ertek = 1 [(oracall_field_type) = "NUMBER(12,5)"];
+	string f_ertek = 1 [(oracall_field_type) = "NUMBER(12,5)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_039
 message BrunoOwner_DbSpoolsys2_TypeOutput_039 {
@@ -7831,7 +7824,7 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_045 {
 message BrunoOwner_DbSpoolsys2_TypeOutput_046 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_046";
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
-	double tajekoztat_ktsg = 2 [(oracall_field_type) = "NUMBER(12,5)"];
+	string tajekoztat_ktsg = 2 [(oracall_field_type) = "NUMBER(12,5)"];
 	google.protobuf.Timestamp utolso_elszamdatum = 3 [(oracall_field_type) = "DATE"];
 	string szerzodo_nev = 4 [(oracall_field_type) = "VARCHAR2(40)"];
 	int64 szerzodo_oputazon = 5 [(oracall_field_type) = "NUMBER(10)"];
@@ -7923,9 +7916,9 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_053 {
 message BrunoOwner_DbSpoolsys2_TypeOutput_054 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS2.TYPE_OUTPUT_054";
 	int32 f_sorszam = 1 [(oracall_field_type) = "NUMBER(9)"];
-	double f_rosszeg = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rosszeg = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_kifizaz = 3 [(oracall_field_type) = "NUMBER(9)"];
-	double f_rkk = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rkk = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_kifizszam = 5 [(oracall_field_type) = "NUMBER(9)"];
 	google.protobuf.Timestamp f_vdatum = 6 [(oracall_field_type) = "DATE"];
 	string f_allapot = 7 [(oracall_field_type) = "CHAR(2)"];
@@ -7994,7 +7987,7 @@ message BrunoOwner_DbSpoolsys3_KarRecTyp {
 	string bm_erinto = 12 [(oracall_field_type) = "CHAR(1)"];
 	string kar_allapot = 13 [(oracall_field_type) = "CHAR(2)"];
 	string kar_all_nev = 14 [(oracall_field_type) = "VARCHAR2(80)"];
-	double ossz_kifiz = 15 [(oracall_field_type) = "NUMBER(12,2)"];
+	string ossz_kifiz = 15 [(oracall_field_type) = "NUMBER(12,2)"];
 	string kar_helyszin = 16 [(oracall_field_type) = "VARCHAR2(255)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.RNDSZ_KAR_REC_TYPE
@@ -8062,7 +8055,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_002 {
 	google.protobuf.Timestamp f_szerlejar = 7 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_btkezd = 8 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szervege = 9 [(oracall_field_type) = "DATE"];
-	double elemidij = 10 [(oracall_field_type) = "NUMBER(12,2)"];
+	string elemidij = 10 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_sajataz = 11 [(oracall_field_type) = "VARCHAR2(24)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_002_2
@@ -8077,7 +8070,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_002_2 {
 	google.protobuf.Timestamp f_szerlejar = 7 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_btkezd = 8 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szervege = 9 [(oracall_field_type) = "DATE"];
-	double elemidij = 10 [(oracall_field_type) = "NUMBER(12,2)"];
+	string elemidij = 10 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_sajataz = 11 [(oracall_field_type) = "VARCHAR2(24)"];
 	string evfordulo_szov = 12 [(oracall_field_type) = "VARCHAR2(20)"];
 }
@@ -8099,7 +8092,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_005 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_005";
 	google.protobuf.Timestamp f_utalas = 1 [(oracall_field_type) = "DATE"];
 	string f_szamla = 2 [(oracall_field_type) = "VARCHAR2(24)"];
-	double osszeg = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string osszeg = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_ugyfelnev = 4 [(oracall_field_type) = "VARCHAR2(75)"];
 	string f_irszam = 5 [(oracall_field_type) = "VARCHAR2(5)"];
 	string cim = 6 [(oracall_field_type) = "VARCHAR2(69)"];
@@ -8327,13 +8320,13 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_025 {
 message BrunoOwner_DbSpoolsys3_TypeOutput_026 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026";
 	string f_allapot = 1 [(oracall_field_type) = "VARCHAR2(2)"];
-	double f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_astock = 3 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_btkezd = 4 [(oracall_field_type) = "DATE"];
-	double f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dijeloir = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_dijfizgyak = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp f_dijfizkezd = 10 [(oracall_field_type) = "DATE"];
 	string f_dijfizmod = 11 [(oracall_field_type) = "CHAR(1)"];
@@ -8341,14 +8334,14 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026 {
 	string f_dijkod = 13 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp f_dijrend = 14 [(oracall_field_type) = "DATE"];
 	int32 f_dijtartoz = 15 [(oracall_field_type) = "NUMBER(9)"];
-	double f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_fstock = 17 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_kockezd = 18 [(oracall_field_type) = "DATE"];
 	string f_modkod = 19 [(oracall_field_type) = "VARCHAR2(6)"];
 	google.protobuf.Timestamp f_szerkot = 20 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szerlejar = 21 [(oracall_field_type) = "DATE"];
 	int32 f_vartdij = 22 [(oracall_field_type) = "NUMBER(9)"];
-	double egyenleg = 23 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 23 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_modnev = 24 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_modrnev = 25 [(oracall_field_type) = "VARCHAR2(8)"];
 	string f_ktikod = 26 [(oracall_field_type) = "VARCHAR2(7)"];
@@ -8367,13 +8360,13 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026 {
 message BrunoOwner_DbSpoolsys3_TypeOutput_026_4 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026_4";
 	string f_allapot = 1 [(oracall_field_type) = "VARCHAR2(2)"];
-	double f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_astock = 3 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_btkezd = 4 [(oracall_field_type) = "DATE"];
-	double f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dijeloir = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_dijfizgyak = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp f_dijfizkezd = 10 [(oracall_field_type) = "DATE"];
 	string f_dijfizmod = 11 [(oracall_field_type) = "CHAR(1)"];
@@ -8381,7 +8374,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_4 {
 	string f_dijkod = 13 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp f_dijrend = 14 [(oracall_field_type) = "DATE"];
 	int32 f_dijtartoz = 15 [(oracall_field_type) = "NUMBER(9)"];
-	double f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_fstock = 17 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_kockezd = 18 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_kockezd_karmen = 19 [(oracall_field_type) = "DATE"];
@@ -8389,7 +8382,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_4 {
 	google.protobuf.Timestamp f_szerkot = 21 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szerlejar = 22 [(oracall_field_type) = "DATE"];
 	int32 f_vartdij = 23 [(oracall_field_type) = "NUMBER(9)"];
-	double egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_modnev = 25 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_modrnev = 26 [(oracall_field_type) = "VARCHAR2(8)"];
 	string f_ktikod = 27 [(oracall_field_type) = "VARCHAR2(7)"];
@@ -8403,19 +8396,19 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_4 {
 	string f_ptk = 35 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 e_szerz_azon = 36 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_tartam = 37 [(oracall_field_type) = "NUMBER(3)"];
-	double f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026_5
 message BrunoOwner_DbSpoolsys3_TypeOutput_026_5 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026_5";
 	string f_allapot = 1 [(oracall_field_type) = "VARCHAR2(2)"];
-	double f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_astock = 3 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_btkezd = 4 [(oracall_field_type) = "DATE"];
-	double f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dijeloir = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_dijfizgyak = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp f_dijfizkezd = 10 [(oracall_field_type) = "DATE"];
 	string f_dijfizmod = 11 [(oracall_field_type) = "CHAR(1)"];
@@ -8423,7 +8416,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_5 {
 	string f_dijkod = 13 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp f_dijrend = 14 [(oracall_field_type) = "DATE"];
 	int32 f_dijtartoz = 15 [(oracall_field_type) = "NUMBER(9)"];
-	double f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_fstock = 17 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_kockezd = 18 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_kockezd_karmen = 19 [(oracall_field_type) = "DATE"];
@@ -8431,7 +8424,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_5 {
 	google.protobuf.Timestamp f_szerkot = 21 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szerlejar = 22 [(oracall_field_type) = "DATE"];
 	int32 f_vartdij = 23 [(oracall_field_type) = "NUMBER(9)"];
-	double egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_modnev = 25 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_modrnev = 26 [(oracall_field_type) = "VARCHAR2(8)"];
 	string f_ktikod = 27 [(oracall_field_type) = "VARCHAR2(7)"];
@@ -8445,20 +8438,20 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_5 {
 	string f_ptk = 35 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 e_szerz_azon = 36 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_tartam = 37 [(oracall_field_type) = "NUMBER(3)"];
-	double f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
 	string gfb_index_bonusz = 39 [(oracall_field_type) = "VARCHAR2(3)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026_6
 message BrunoOwner_DbSpoolsys3_TypeOutput_026_6 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026_6";
 	string f_allapot = 1 [(oracall_field_type) = "VARCHAR2(2)"];
-	double f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_astock = 3 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_btkezd = 4 [(oracall_field_type) = "DATE"];
-	double f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dijeloir = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_dijfizgyak = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp f_dijfizkezd = 10 [(oracall_field_type) = "DATE"];
 	string f_dijfizmod = 11 [(oracall_field_type) = "CHAR(1)"];
@@ -8466,7 +8459,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_6 {
 	string f_dijkod = 13 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp f_dijrend = 14 [(oracall_field_type) = "DATE"];
 	int32 f_dijtartoz = 15 [(oracall_field_type) = "NUMBER(9)"];
-	double f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_fstock = 17 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_kockezd = 18 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_kockezd_karmen = 19 [(oracall_field_type) = "DATE"];
@@ -8474,7 +8467,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_6 {
 	google.protobuf.Timestamp f_szerkot = 21 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szerlejar = 22 [(oracall_field_type) = "DATE"];
 	int32 f_vartdij = 23 [(oracall_field_type) = "NUMBER(9)"];
-	double egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_modnev = 25 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_modrnev = 26 [(oracall_field_type) = "VARCHAR2(8)"];
 	string f_ktikod = 27 [(oracall_field_type) = "VARCHAR2(7)"];
@@ -8488,23 +8481,23 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_6 {
 	string f_ptk = 35 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 e_szerz_azon = 36 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_tartam = 37 [(oracall_field_type) = "NUMBER(3)"];
-	double f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
 	string gfb_index_bonusz = 39 [(oracall_field_type) = "VARCHAR2(3)"];
 	string iglap_adhato = 40 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp iglap_hatar = 41 [(oracall_field_type) = "DATE"];
-	double f_tulfiz_torles = 42 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_tulfiz_torles = 42 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026_7
 message BrunoOwner_DbSpoolsys3_TypeOutput_026_7 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026_7";
 	string f_allapot = 1 [(oracall_field_type) = "VARCHAR2(2)"];
-	double f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_astock = 3 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_btkezd = 4 [(oracall_field_type) = "DATE"];
-	double f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dijeloir = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_dijfizgyak = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp f_dijfizkezd = 10 [(oracall_field_type) = "DATE"];
 	string f_dijfizmod = 11 [(oracall_field_type) = "CHAR(1)"];
@@ -8512,7 +8505,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_7 {
 	string f_dijkod = 13 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp f_dijrend = 14 [(oracall_field_type) = "DATE"];
 	int32 f_dijtartoz = 15 [(oracall_field_type) = "NUMBER(9)"];
-	double f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_fstock = 17 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_kockezd = 18 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_kockezd_karmen = 19 [(oracall_field_type) = "DATE"];
@@ -8520,7 +8513,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_7 {
 	google.protobuf.Timestamp f_szerkot = 21 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szerlejar = 22 [(oracall_field_type) = "DATE"];
 	int32 f_vartdij = 23 [(oracall_field_type) = "NUMBER(9)"];
-	double egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_modnev = 25 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_modrnev = 26 [(oracall_field_type) = "VARCHAR2(8)"];
 	string f_ktikod = 27 [(oracall_field_type) = "VARCHAR2(7)"];
@@ -8534,11 +8527,11 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_7 {
 	string f_ptk = 35 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 e_szerz_azon = 36 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_tartam = 37 [(oracall_field_type) = "NUMBER(3)"];
-	double f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
 	string gfb_index_bonusz = 39 [(oracall_field_type) = "VARCHAR2(3)"];
 	string iglap_adhato = 40 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp iglap_hatar = 41 [(oracall_field_type) = "DATE"];
-	double f_tulfiz_torles = 42 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_tulfiz_torles = 42 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp felmondas_hatalya = 43 [(oracall_field_type) = "DATE"];
 	string felmondas_tipusa = 44 [(oracall_field_type) = "CHAR(2)"];
 }
@@ -8546,13 +8539,13 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_7 {
 message BrunoOwner_DbSpoolsys3_TypeOutput_026_8 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_026_8";
 	string f_allapot = 1 [(oracall_field_type) = "VARCHAR2(2)"];
-	double f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_astock = 3 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_btkezd = 4 [(oracall_field_type) = "DATE"];
-	double f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbefiz = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dijeloir = 7 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 8 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_dijfizgyak = 9 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp f_dijfizkezd = 10 [(oracall_field_type) = "DATE"];
 	string f_dijfizmod = 11 [(oracall_field_type) = "CHAR(1)"];
@@ -8560,7 +8553,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_8 {
 	string f_dijkod = 13 [(oracall_field_type) = "VARCHAR2(2)"];
 	google.protobuf.Timestamp f_dijrend = 14 [(oracall_field_type) = "DATE"];
 	int32 f_dijtartoz = 15 [(oracall_field_type) = "NUMBER(9)"];
-	double f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_dijtartoz = 16 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_fstock = 17 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_kockezd = 18 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_kockezd_karmen = 19 [(oracall_field_type) = "DATE"];
@@ -8568,7 +8561,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_8 {
 	google.protobuf.Timestamp f_szerkot = 21 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szerlejar = 22 [(oracall_field_type) = "DATE"];
 	int32 f_vartdij = 23 [(oracall_field_type) = "NUMBER(9)"];
-	double egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
+	string egyenleg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_modnev = 25 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_modrnev = 26 [(oracall_field_type) = "VARCHAR2(8)"];
 	string f_ktikod = 27 [(oracall_field_type) = "VARCHAR2(7)"];
@@ -8582,11 +8575,11 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_026_8 {
 	string f_ptk = 35 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 e_szerz_azon = 36 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_tartam = 37 [(oracall_field_type) = "NUMBER(3)"];
-	double f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijhatra = 38 [(oracall_field_type) = "NUMBER(12,2)"];
 	string gfb_index_bonusz = 39 [(oracall_field_type) = "VARCHAR2(3)"];
 	string iglap_adhato = 40 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp iglap_hatar = 41 [(oracall_field_type) = "DATE"];
-	double f_tulfiz_torles = 42 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_tulfiz_torles = 42 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp felmondas_hatalya = 43 [(oracall_field_type) = "DATE"];
 	string felmondas_tipusa = 44 [(oracall_field_type) = "CHAR(2)"];
 	string lehet_levcime = 45 [(oracall_field_type) = "VARCHAR2(1)"];
@@ -8624,8 +8617,8 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_028 {
 	int32 f_kifizaz = 11 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_kifizszam = 12 [(oracall_field_type) = "NUMBER(9)"];
 	string f_fizmod = 13 [(oracall_field_type) = "CHAR(1)"];
-	double f_rosszeg = 14 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_rkk = 15 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rosszeg = 14 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rkk = 15 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_reszarany = 16 [(oracall_field_type) = "NUMBER"];
 	string f_szamla = 17 [(oracall_field_type) = "VARCHAR2(24)"];
 	string cimzett_nev = 18 [(oracall_field_type) = "VARCHAR2(75)"];
@@ -8672,7 +8665,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_033 {
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_034
 message BrunoOwner_DbSpoolsys3_TypeOutput_034 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_034";
-	double adoeloleg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string adoeloleg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_036
 message BrunoOwner_DbSpoolsys3_TypeOutput_036 {
@@ -8684,7 +8677,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_036 {
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_038
 message BrunoOwner_DbSpoolsys3_TypeOutput_038 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_038";
-	double f_ertek = 1 [(oracall_field_type) = "NUMBER(12,5)"];
+	string f_ertek = 1 [(oracall_field_type) = "NUMBER(12,5)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_041
 message BrunoOwner_DbSpoolsys3_TypeOutput_041 {
@@ -8726,7 +8719,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_045 {
 message BrunoOwner_DbSpoolsys3_TypeOutput_046 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_046";
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
-	double tajekoztat_ktsg = 2 [(oracall_field_type) = "NUMBER(12,5)"];
+	string tajekoztat_ktsg = 2 [(oracall_field_type) = "NUMBER(12,5)"];
 	google.protobuf.Timestamp utolso_elszamdatum = 3 [(oracall_field_type) = "DATE"];
 	string szerzodo_nev = 4 [(oracall_field_type) = "VARCHAR2(40)"];
 	int64 szerzodo_oputazon = 5 [(oracall_field_type) = "NUMBER(10)"];
@@ -8818,9 +8811,9 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_053 {
 message BrunoOwner_DbSpoolsys3_TypeOutput_054 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_054";
 	int32 f_sorszam = 1 [(oracall_field_type) = "NUMBER(9)"];
-	double f_rosszeg = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rosszeg = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_kifizaz = 3 [(oracall_field_type) = "NUMBER(9)"];
-	double f_rkk = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rkk = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_kifizszam = 5 [(oracall_field_type) = "NUMBER(9)"];
 	google.protobuf.Timestamp f_vdatum = 6 [(oracall_field_type) = "DATE"];
 	string f_allapot = 7 [(oracall_field_type) = "VARCHAR2(2)"];
@@ -8855,7 +8848,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_056 {
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_057
 message BrunoOwner_DbSpoolsys3_TypeOutput_057 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_057";
-	double f_osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 1 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_banknap = 2 [(oracall_field_type) = "DATE"];
 	string f_szamlaszam = 3 [(oracall_field_type) = "VARCHAR2(24)"];
 	google.protobuf.Timestamp f_feladdatum = 4 [(oracall_field_type) = "DATE"];
@@ -8866,7 +8859,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_057 {
 message BrunoOwner_DbSpoolsys3_TypeOutput_057_2 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_057_2";
 	int32 f_sorszam = 1 [(oracall_field_type) = "NUMBER(9)"];
-	double f_osszeg = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_banknap = 3 [(oracall_field_type) = "DATE"];
 	string f_szamlaszam = 4 [(oracall_field_type) = "VARCHAR2(24)"];
 	google.protobuf.Timestamp f_feladdatum = 5 [(oracall_field_type) = "DATE"];
@@ -8879,7 +8872,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_058 {
 	string f_hitel_szam = 1 [(oracall_field_type) = "VARCHAR2(40)"];
 	string hitel_igenylo_nev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	string hitelezo_nev = 3 [(oracall_field_type) = "VARCHAR2(40)"];
-	double f_hitelosszeg = 4 [(oracall_field_type) = "NUMBER(15,2)"];
+	string f_hitelosszeg = 4 [(oracall_field_type) = "NUMBER(15,2)"];
 	string f_modkod = 5 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_penznem = 6 [(oracall_field_type) = "VARCHAR2(3)"];
 	string f_nev = 7 [(oracall_field_type) = "VARCHAR2(40)"];
@@ -8901,12 +8894,12 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_059 {
 	string f_modnev = 3 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 f_negyzetm = 4 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_biztossz = 5 [(oracall_field_type) = "NUMBER(9)"];
-	float f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_dijtetel_szaz = 11 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_dijtetel_szaz = 11 [(oracall_field_type) = "NUMBER(5,2)"];
 	int32 f_eves_dij = 12 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_059_2
@@ -8917,16 +8910,16 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_059_2 {
 	string f_modnev = 3 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 f_negyzetm = 4 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_biztossz = 5 [(oracall_field_type) = "NUMBER(9)"];
-	double f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_kieg_uveg_szaz = 11 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_fust_korom_szaz = 12 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_beazas_szaz = 13 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_all_risk_szaz = 14 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_dijtetel_szaz = 15 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_kieg_uveg_szaz = 11 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_fust_korom_szaz = 12 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_beazas_szaz = 13 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_all_risk_szaz = 14 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_dijtetel_szaz = 15 [(oracall_field_type) = "NUMBER(12,3)"];
 	int32 f_eves_dij = 16 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_059_4
@@ -8937,16 +8930,16 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_059_4 {
 	string f_modnev = 3 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 f_negyzetm = 4 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_biztossz = 5 [(oracall_field_type) = "NUMBER(9)"];
-	double f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_kieg_uveg_szaz = 11 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_fust_korom_szaz = 12 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_beazas_szaz = 13 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_all_risk_szaz = 14 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_dijtetel_szaz = 15 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_kieg_uveg_szaz = 11 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_fust_korom_szaz = 12 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_beazas_szaz = 13 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_all_risk_szaz = 14 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_dijtetel_szaz = 15 [(oracall_field_type) = "NUMBER(12,3)"];
 	int32 f_eves_dij = 16 [(oracall_field_type) = "NUMBER(9)"];
 	string f_mertekegyseg = 17 [(oracall_field_type) = "VARCHAR2(40)"];
 }
@@ -8958,16 +8951,16 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_059_6 {
 	string f_modnev = 3 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 f_negyzetm = 4 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_biztossz = 5 [(oracall_field_type) = "NUMBER(9)"];
-	double f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_kieg_uveg_szaz = 11 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_fust_korom_szaz = 12 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_beazas_szaz = 13 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_all_risk_szaz = 14 [(oracall_field_type) = "NUMBER(12,3)"];
-	double f_dijtetel_szaz = 15 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_alap_szaz = 6 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_lopas_szaz = 7 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_vizkar_szaz = 8 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_uveg_szaz = 9 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_arviz_szaz = 10 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_kieg_uveg_szaz = 11 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_fust_korom_szaz = 12 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_beazas_szaz = 13 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_all_risk_szaz = 14 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_dijtetel_szaz = 15 [(oracall_field_type) = "NUMBER(12,3)"];
 	int32 f_eves_dij = 16 [(oracall_field_type) = "NUMBER(9)"];
 	string f_mertekegyseg = 17 [(oracall_field_type) = "VARCHAR2(40)"];
 }
@@ -9053,9 +9046,9 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_075 {
 	int32 tetelszam = 2 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp mod_datum = 3 [(oracall_field_type) = "DATE"];
 	string rkod = 4 [(oracall_field_type) = "VARCHAR2(45)"];
-	double tart_osszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string tart_osszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	string dkod = 6 [(oracall_field_type) = "VARCHAR2(10)"];
-	double kif_osszeg = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string kif_osszeg = 7 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_076
 message BrunoOwner_DbSpoolsys3_TypeOutput_076 {
@@ -9068,7 +9061,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_078 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_078";
 	google.protobuf.Timestamp tranz_kezdete = 1 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp tranz_vege = 2 [(oracall_field_type) = "DATE"];
-	double koltseg = 3 [(oracall_field_type) = "NUMBER(12,5)"];
+	string koltseg = 3 [(oracall_field_type) = "NUMBER(12,5)"];
 	repeated BrunoOwner_DbSpoolsys3_AtypeOutputUnit ertekesitett_alapok = 4 [(oracall_field_type) = "BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTLIST_UNIT"];
 	repeated BrunoOwner_DbSpoolsys3_AtypeOutputUnit vasarolt_alapok = 5 [(oracall_field_type) = "BRUNO_OWNER.DB_SPOOLSYS3.ATYPE_OUTLIST_UNIT"];
 }
@@ -9076,22 +9069,22 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_078 {
 message BrunoOwner_DbSpoolsys3_TypeOutput_080 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_080";
 	google.protobuf.Timestamp f_adokezd = 1 [(oracall_field_type) = "DATE"];
-	double f_fin_adotartoz = 2 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_adoelvar = 3 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_adobefiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_adobesum = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_adotartoz = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_adoelvar = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_adobefiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_adobesum = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_adorend = 6 [(oracall_field_type) = "DATE"];
-	double f_ado_egyenleg = 7 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_adoelvar_alap = 8 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_adoalap = 9 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_mabisz = 10 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_mabisz_telj = 11 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_mabisz_egyenleg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_elozm_elvar = 13 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_elozm_befiz = 14 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_gfb_egyenleg = 15 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_boca_egyenleg = 16 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_elozm_egyenleg = 17 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_ado_egyenleg = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_adoelvar_alap = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_adoalap = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_mabisz = 10 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_mabisz_telj = 11 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_mabisz_egyenleg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_elozm_elvar = 13 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_elozm_befiz = 14 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_gfb_egyenleg = 15 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_boca_egyenleg = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_elozm_egyenleg = 17 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_081
 message BrunoOwner_DbSpoolsys3_TypeOutput_081 {
@@ -9104,7 +9097,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_081 {
 	string f_modkod = 6 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_modrnev = 7 [(oracall_field_type) = "VARCHAR2(8)"];
 	google.protobuf.Timestamp f_dijrend = 8 [(oracall_field_type) = "DATE"];
-	double f_egyenleg = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_egyenleg = 9 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_ptk = 10 [(oracall_field_type) = "VARCHAR2(1)"];
 	int32 f_kar_darab = 11 [(oracall_field_type) = "NUMBER(6)"];
 	string f_rendszam = 12 [(oracall_field_type) = "VARCHAR2(11)"];
@@ -9223,12 +9216,12 @@ message BrunoOwner_DbSzerz_TypElvarReszlRec {
 	int32 f_sorrend = 1 [(oracall_field_type) = "PL/SQL BINARY INTEGER"];
 	string f_modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_ado_tipus = 3 [(oracall_field_type) = "VARCHAR2(2)"];
-	double f_elvaras_ossz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_elvaras = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_elvaras_ossz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_elvaras = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_alap_tipus = 6 [(oracall_field_type) = "VARCHAR2(2)"];
-	double f_alap_szorzo = 7 [(oracall_field_type) = "NUMBER(12,6)"];
-	double f_alap_ossz = 8 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_alap = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alap_szorzo = 7 [(oracall_field_type) = "NUMBER(12,6)"];
+	string f_alap_ossz = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alap = 9 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_alap_penznem = 10 [(oracall_field_type) = "NUMBER(3)"];
 }
 // BRUNO_OWNER.DB_SZERZ.TYP_ESED_REC
@@ -9250,7 +9243,7 @@ message BrunoOwner_DbSzerzo_SzerzoRecType {
 message BrunoOwner_DbSzerzCsop_DijOsztRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SZERZ_CSOP.DIJ_OSZT_REC_TYPE";
 	int32 szerz_azon = 1 [(oracall_field_type) = "NUMBER(9)"];
-	double dijbe = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijbe = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SZERZ_CSOP.OSZT_REC_TYPE
 message BrunoOwner_DbSzerzCsop_OsztRecType {
@@ -9258,10 +9251,10 @@ message BrunoOwner_DbSzerzCsop_OsztRecType {
 	int32 szerz_azon = 1 [(oracall_field_type) = "NUMBER(9)"];
 	string modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
 	google.protobuf.Timestamp dijrend = 3 [(oracall_field_type) = "DATE"];
-	double dij_tulfiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dij_tulfiz = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp adorend = 5 [(oracall_field_type) = "DATE"];
-	double adora = 6 [(oracall_field_type) = "NUMBER(12,2)"];
-	double dijra = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string adora = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dijra = 7 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SZERZ_CSOP.SZERZ_REC_TYPE
 message BrunoOwner_DbSzerzCsop_SzerzRecType {
@@ -9284,7 +9277,7 @@ message BrunoOwner_DbSzerzSpec_TypDijvaltRec {
 	google.protobuf.Timestamp f_hataly = 2 [(oracall_field_type) = "DATE"];
 	string f_jel = 3 [(oracall_field_type) = "VARCHAR2(1)"];
 	string f_modkod = 4 [(oracall_field_type) = "VARCHAR2(6)"];
-	double f_alldijsum = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SZERZ_SPEC.TYP_GYAKVALT_REC
 message BrunoOwner_DbSzerzSpec_TypGyakvaltRec {
@@ -9297,7 +9290,7 @@ message BrunoOwner_DbSzerzSpec_TypGyakvaltRec {
 message BrunoOwner_DbSzerzSpec_TypVagyonKedvRec {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SZERZ_SPEC.TYP_VAGYON_KEDV_REC";
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
-	double f_evesdij = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_evesdij = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_SZERZ_TORL.KOTV_TORL_REC_TYPE
 message BrunoOwner_DbSzerzTorl_KotvTorlRecType {
@@ -9335,7 +9328,7 @@ message BrunoOwner_DbTlb_ReszRecType {
 	int32 f_ssz = 4 [(oracall_field_type) = "NUMBER(3)"];
 	string f_modkod = 5 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 f_biztossz = 6 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijtetel = 7 [(oracall_field_type) = "NUMBER(9,2)"];
+	string f_dijtetel = 7 [(oracall_field_type) = "NUMBER(9,2)"];
 	int32 f_evesdij = 8 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_TLP.ALBETETEK_REC_TYP
@@ -9355,15 +9348,15 @@ message BrunoOwner_DbTlp_AlbetetekRecTyp {
 message BrunoOwner_DbTlp_DijtetelRecTyp {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_TLP.DIJTETEL_REC_TYP";
 	string dijtip = 1 [(oracall_field_type) = "VARCHAR2(1)"];
-	float alap = 2 [(oracall_field_type) = "NUMBER(6,3)"];
-	float betlop = 3 [(oracall_field_type) = "NUMBER(6,3)"];
-	float vizkar = 4 [(oracall_field_type) = "NUMBER(6,3)"];
-	float uveg = 5 [(oracall_field_type) = "NUMBER(6,3)"];
-	float kieg_uveg = 6 [(oracall_field_type) = "NUMBER(6,3)"];
-	float fust_korom = 7 [(oracall_field_type) = "NUMBER(6,3)"];
-	float beazas = 8 [(oracall_field_type) = "NUMBER(6,3)"];
-	float all_risk = 9 [(oracall_field_type) = "NUMBER(6,3)"];
-	float dijtetel = 10 [(oracall_field_type) = "NUMBER(6,3)"];
+	string alap = 2 [(oracall_field_type) = "NUMBER(6,3)"];
+	string betlop = 3 [(oracall_field_type) = "NUMBER(6,3)"];
+	string vizkar = 4 [(oracall_field_type) = "NUMBER(6,3)"];
+	string uveg = 5 [(oracall_field_type) = "NUMBER(6,3)"];
+	string kieg_uveg = 6 [(oracall_field_type) = "NUMBER(6,3)"];
+	string fust_korom = 7 [(oracall_field_type) = "NUMBER(6,3)"];
+	string beazas = 8 [(oracall_field_type) = "NUMBER(6,3)"];
+	string all_risk = 9 [(oracall_field_type) = "NUMBER(6,3)"];
+	string dijtetel = 10 [(oracall_field_type) = "NUMBER(6,3)"];
 }
 // BRUNO_OWNER.DB_TLP.ELET_TORT_REC_TYP
 message BrunoOwner_DbTlp_EletTortRecTyp {
@@ -9444,7 +9437,7 @@ message BrunoOwner_DbTlp_KulonUvegRecTyp {
 message BrunoOwner_DbTlp_MkReszlRecTyp {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_TLP.MK_RESZL_REC_TYP";
 	int32 biztossz = 1 [(oracall_field_type) = "NUMBER(9)"];
-	double dijtetel = 2 [(oracall_field_type) = "NUMBER(12,3)"];
+	string dijtetel = 2 [(oracall_field_type) = "NUMBER(12,3)"];
 	int32 evesdij = 3 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_TLP.MODULOK_REC_TYP
@@ -9489,7 +9482,7 @@ message BrunoOwner_DbTlp_ReszlRecTyp {
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	string modnev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	int32 biztossz = 3 [(oracall_field_type) = "NUMBER(9)"];
-	double dijtetel = 4 [(oracall_field_type) = "NUMBER(12,3)"];
+	string dijtetel = 4 [(oracall_field_type) = "NUMBER(12,3)"];
 	int32 evesdij = 5 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.DB_TLP.VNEM_REC_TYP
@@ -9511,9 +9504,9 @@ message BrunoOwner_DbUtilapu_DijparamRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_UTILAPU.DIJPARAM_REC_TYPE";
 	string f_tipus = 1 [(oracall_field_type) = "CHAR(1)"];
 	string f_kod = 2 [(oracall_field_type) = "VARCHAR2(8)"];
-	double f_kod_meredek = 3 [(oracall_field_type) = "NUMBER(9,6)"];
+	string f_kod_meredek = 3 [(oracall_field_type) = "NUMBER(9,6)"];
 	int32 f_kod_konst = 4 [(oracall_field_type) = "NUMBER(6)"];
-	double f_le_meredek = 5 [(oracall_field_type) = "NUMBER(9,6)"];
+	string f_le_meredek = 5 [(oracall_field_type) = "NUMBER(9,6)"];
 	int32 f_le_konst = 6 [(oracall_field_type) = "NUMBER(6)"];
 	string f_mod_jel = 7 [(oracall_field_type) = "CHAR(1)"];
 	string f_uanyag = 8 [(oracall_field_type) = "CHAR(1)"];
@@ -9552,16 +9545,16 @@ message BrunoOwner_DbUtitarsDijszam_DijRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_UTITARS_DIJSZAM.DIJ_REC_TYPE";
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 evesdij = 2 [(oracall_field_type) = "NUMBER(9)"];
-	float egyseg = 3 [(oracall_field_type) = "NUMBER(6,3)"];
+	string egyseg = 3 [(oracall_field_type) = "NUMBER(6,3)"];
 }
 // BRUNO_OWNER.DB_UTITARS_DIJSZAM.EVSZ_REC_TYPE
 message BrunoOwner_DbUtitarsDijszam_EvszRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_UTITARS_DIJSZAM.EVSZ_REC_TYPE";
-	float evsz_1 = 1 [(oracall_field_type) = "NUMBER(5,2)"];
-	float evsz_2 = 2 [(oracall_field_type) = "NUMBER(5,2)"];
-	float evsz_3 = 3 [(oracall_field_type) = "NUMBER(5,2)"];
-	float evsz_4 = 4 [(oracall_field_type) = "NUMBER(5,2)"];
-	float evsz_5 = 5 [(oracall_field_type) = "NUMBER(5,2)"];
+	string evsz_1 = 1 [(oracall_field_type) = "NUMBER(5,2)"];
+	string evsz_2 = 2 [(oracall_field_type) = "NUMBER(5,2)"];
+	string evsz_3 = 3 [(oracall_field_type) = "NUMBER(5,2)"];
+	string evsz_4 = 4 [(oracall_field_type) = "NUMBER(5,2)"];
+	string evsz_5 = 5 [(oracall_field_type) = "NUMBER(5,2)"];
 }
 // BRUNO_OWNER.DB_UTITARS_DIJSZAM.EXTRA_REC_TYPE
 message BrunoOwner_DbUtitarsDijszam_ExtraRecType {
@@ -9569,14 +9562,14 @@ message BrunoOwner_DbUtitarsDijszam_ExtraRecType {
 	int32 ertek = 1 [(oracall_field_type) = "NUMBER(9)"];
 	int32 szazalek = 2 [(oracall_field_type) = "NUMBER(9)"];
 	string kod = 3 [(oracall_field_type) = "VARCHAR2(6)"];
-	double dij = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string dij = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_UTITARS_DIJSZAM.TSZ_REC_TYPE
 message BrunoOwner_DbUtitarsDijszam_TszRecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_UTITARS_DIJSZAM.TSZ_REC_TYPE";
-	float tsz_1 = 1 [(oracall_field_type) = "NUMBER(5,2)"];
-	float tsz_2 = 2 [(oracall_field_type) = "NUMBER(5,2)"];
-	float tsz_3 = 3 [(oracall_field_type) = "NUMBER(5,2)"];
+	string tsz_1 = 1 [(oracall_field_type) = "NUMBER(5,2)"];
+	string tsz_2 = 2 [(oracall_field_type) = "NUMBER(5,2)"];
+	string tsz_3 = 3 [(oracall_field_type) = "NUMBER(5,2)"];
 }
 // BRUNO_OWNER.DB_UTITARS_IDX.KIEG_REC_TYPE
 message BrunoOwner_DbUtitarsIdx_KiegRecType {
@@ -9602,8 +9595,8 @@ message BrunoOwner_DbVagyon_VrEletKedvType {
 // BRUNO_OWNER.DB_VAGYON.VR_KEDV_TYPE
 message BrunoOwner_DbVagyon_VrKedvType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_VAGYON.VR_KEDV_TYPE";
-	float pk_szaz = 1 [(oracall_field_type) = "NUMBER(7,2)"];
-	double pk_ertek = 2 [(oracall_field_type) = "NUMBER(12,2)"];
+	string pk_szaz = 1 [(oracall_field_type) = "NUMBER(7,2)"];
+	string pk_ertek = 2 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_VAGYON_DIJ.VR_HR_TYPE
 message BrunoOwner_DbVagyonDij_VrHrType {
@@ -9619,8 +9612,8 @@ message BrunoOwner_DbVagyonDij_VrHrType {
 message BrunoOwner_DbVagyonDij_VrKedvType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_VAGYON_DIJ.VR_KEDV_TYPE";
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
-	float f_szaz = 2 [(oracall_field_type) = "NUMBER(7,2)"];
-	double f_ertek = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_szaz = 2 [(oracall_field_type) = "NUMBER(7,2)"];
+	string f_ertek = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_egyedi = 4 [(oracall_field_type) = "VARCHAR2(1)"];
 }
 // BRUNO_OWNER.DB_VAGYON_DIJ.VR_MEZOG_ONRESZ_TYPE
@@ -9628,8 +9621,8 @@ message BrunoOwner_DbVagyonDij_VrMezogOnreszType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_VAGYON_DIJ.VR_MEZOG_ONRESZ_TYPE";
 	string f_kockazat = 1 [(oracall_field_type) = "VARCHAR2(1)"];
 	string f_megnev = 2 [(oracall_field_type) = "VARCHAR2(80)"];
-	float f_onresz_szaz_absz = 3 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_onresz_szaz_levon = 4 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_onresz_szaz_absz = 3 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_onresz_szaz_levon = 4 [(oracall_field_type) = "NUMBER(5,2)"];
 }
 // BRUNO_OWNER.DB_VAGYON_DIJ.VR_MEZOG_TYPE
 message BrunoOwner_DbVagyonDij_VrMezogType {
@@ -9646,19 +9639,19 @@ message BrunoOwner_DbVagyonDij_VrSpecType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_VAGYON_DIJ.VR_SPEC_TYPE";
 	string f_tipus = 1 [(oracall_field_type) = "VARCHAR2(1)"];
 	string f_nev = 2 [(oracall_field_type) = "VARCHAR2(2000)"];
-	double f_dijtetel = 3 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijtetel = 3 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_db = 4 [(oracall_field_type) = "NUMBER(6)"];
-	double f_dij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_limit_kar = 6 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_limit_ev = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_limit_kar = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_limit_ev = 7 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_VAGYON_DIJ.VR_VAGYON_KEDV_TYPE
 message BrunoOwner_DbVagyonDij_VrVagyonKedvType {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_VAGYON_DIJ.VR_VAGYON_KEDV_TYPE";
 	int32 f_pk_kod = 1 [(oracall_field_type) = "NUMBER(3)"];
 	string f_pk_nev = 2 [(oracall_field_type) = "VARCHAR2(100)"];
-	float f_pk_szaz = 3 [(oracall_field_type) = "NUMBER(7,2)"];
-	double f_pk_ertek = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_pk_szaz = 3 [(oracall_field_type) = "NUMBER(7,2)"];
+	string f_pk_ertek = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.DB_VAGYON_DIJ.VR_VAGYON_TYPE
 message BrunoOwner_DbVagyonDij_VrVagyonType {
@@ -9682,8 +9675,8 @@ message BrunoOwner_DbVagyonLemond_LemondRecTyp {
 	string modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	string modnev = 2 [(oracall_field_type) = "VARCHAR2(40)"];
 	string lemondhato = 3 [(oracall_field_type) = "VARCHAR2(1)"];
-	double biztossz = 4 [(oracall_field_type) = "NUMBER(15,2)"];
-	double evesdij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string biztossz = 4 [(oracall_field_type) = "NUMBER(15,2)"];
+	string evesdij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	string lemond = 6 [(oracall_field_type) = "VARCHAR2(1)"];
 	string megjegyzes = 7 [(oracall_field_type) = "VARCHAR2(1000)"];
 }
@@ -9995,7 +9988,7 @@ message BrunoOwner_KlFut_EletRecType {
 	google.protobuf.Timestamp hataly = 1 [(oracall_field_type) = "DATE"];
 	string jel = 2 [(oracall_field_type) = "CHAR(1)"];
 	int32 ssz = 3 [(oracall_field_type) = "NUMBER(3)"];
-	double alldijsum = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string alldijsum = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.KL_FUT.RESZLET_REC_TYPE
 message BrunoOwner_KlFut_ReszletRecType {
@@ -10004,7 +9997,7 @@ message BrunoOwner_KlFut_ReszletRecType {
 	string jel = 2 [(oracall_field_type) = "CHAR(1)"];
 	int32 ssz = 3 [(oracall_field_type) = "NUMBER(3)"];
 	string modkod = 4 [(oracall_field_type) = "VARCHAR2(6)"];
-	double evesdij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string evesdij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	string elem_egyseg = 6 [(oracall_field_type) = "NUMBER"];
 }
 // BRUNO_OWNER.ML_IGFB3_MONITORING.AJ_REC_TYP
@@ -10050,7 +10043,7 @@ message BrunoOwner_RAkrSzerzHitel_Rowtype {
 	google.protobuf.Timestamp f_datum = 5 [(oracall_field_type) = "DATE"];
 	int32 f_dazon = 6 [(oracall_field_type) = "NUMBER(6)"];
 	string f_aktualis = 7 [(oracall_field_type) = "CHAR(1)"];
-	double f_hitelosszeg = 8 [(oracall_field_type) = "NUMBER(15,2)"];
+	string f_hitelosszeg = 8 [(oracall_field_type) = "NUMBER(15,2)"];
 	int32 f_sorszam = 9 [(oracall_field_type) = "NUMBER(9)"];
 	string f_hitel_szam = 10 [(oracall_field_type) = "VARCHAR2(40)"];
 	google.protobuf.Timestamp f_torleszt_kezd = 11 [(oracall_field_type) = "DATE"];
@@ -10220,7 +10213,7 @@ message BrunoOwner_TySzvEloirasRec {
 	int32 f_verzio = 3 [(oracall_field_type) = "NUMBER(6)"];
 	string f_tipus = 4 [(oracall_field_type) = "VARCHAR2(4)"];
 	string f_mozgtip = 5 [(oracall_field_type) = "VARCHAR2(4)"];
-	double f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 7 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_kdatum = 8 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_esedekes = 9 [(oracall_field_type) = "DATE"];
@@ -10242,7 +10235,7 @@ message BrunoOwner_TySzvEloirasReszletRec {
 	string f_modkod = 3 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_ado_tipus = 4 [(oracall_field_type) = "VARCHAR2(2)"];
 	string f_mozgtip = 5 [(oracall_field_type) = "VARCHAR2(4)"];
-	double f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 7 [(oracall_field_type) = "NUMBER(3)"];
 }
 // BRUNO_OWNER.TY_WSC_REQ
@@ -10327,7 +10320,7 @@ message BrunoOwner_TAkrKotvenyKieg_Rowtype {
 	string f_allapot = 9 [(oracall_field_type) = "CHAR(2)"];
 	int32 f_biztossz = 10 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_alapdij = 11 [(oracall_field_type) = "NUMBER(9)"];
-	double f_szorzo = 12 [(oracall_field_type) = "NUMBER(9,6)"];
+	string f_szorzo = 12 [(oracall_field_type) = "NUMBER(9,6)"];
 	int32 f_kikor = 13 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_torles_datum = 14 [(oracall_field_type) = "DATE"];
 	string f_kengszam = 15 [(oracall_field_type) = "VARCHAR2(10)"];
@@ -10407,7 +10400,7 @@ message BrunoOwner_TAkrVvtReszletezo_Rowtype {
 	int32 f_ssz = 4 [(oracall_field_type) = "NUMBER(3)"];
 	string f_modkod = 5 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 f_biztossz = 6 [(oracall_field_type) = "NUMBER(9)"];
-	float f_dijtetel = 7 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_dijtetel = 7 [(oracall_field_type) = "NUMBER(6,3)"];
 	int32 f_evesdij = 8 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.T_AMORTIZACIO_DEF%ROWTYPE
@@ -10417,9 +10410,9 @@ message BrunoOwner_TAmortizacioDef_Rowtype {
 	string f_tipus = 2 [(oracall_field_type) = "CHAR(1)"];
 	google.protobuf.Timestamp f_hatalytol = 3 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 4 [(oracall_field_type) = "DATE"];
-	double f_tol = 5 [(oracall_field_type) = "NUMBER(9,3)"];
-	double f_ig = 6 [(oracall_field_type) = "NUMBER(9,3)"];
-	float f_ertek = 7 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_tol = 5 [(oracall_field_type) = "NUMBER(9,3)"];
+	string f_ig = 6 [(oracall_field_type) = "NUMBER(9,3)"];
+	string f_ertek = 7 [(oracall_field_type) = "NUMBER(6,3)"];
 }
 // BRUNO_OWNER.T_BM_VALASZ_SZEMELY%ROWTYPE
 message BrunoOwner_TBmValaszSzemely_Rowtype {
@@ -10513,12 +10506,12 @@ message BrunoOwner_TCsbReszletezo_Rowtype {
 	string f_modkod = 5 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_dij_tipus = 6 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_biztossz = 7 [(oracall_field_type) = "NUMBER(9)"];
-	float f_alap = 8 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_alap = 8 [(oracall_field_type) = "NUMBER(5,2)"];
 	int32 f_evesdij = 9 [(oracall_field_type) = "NUMBER(9)"];
-	float f_betlop = 10 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_vizkar = 11 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_uveg = 12 [(oracall_field_type) = "NUMBER(5,2)"];
-	float f_arviz = 13 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_betlop = 10 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_vizkar = 11 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_uveg = 12 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_arviz = 13 [(oracall_field_type) = "NUMBER(5,2)"];
 }
 // BRUNO_OWNER.T_ELOZMENY_KAROK%ROWTYPE
 message BrunoOwner_TElozmenyKarok_Rowtype {
@@ -10589,7 +10582,7 @@ message BrunoOwner_TFugtabla_2024_Rowtype {
 	int32 f_dazon = 4 [(oracall_field_type) = "NUMBER(6)"];
 	string f_mozgtip = 5 [(oracall_field_type) = "CHAR(4)"];
 	google.protobuf.Timestamp f_dijbeido = 6 [(oracall_field_type) = "DATE"];
-	double f_dijbe = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbe = 7 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 8 [(oracall_field_type) = "NUMBER(3)"];
 	string f_bizaz = 9 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_bizjel = 10 [(oracall_field_type) = "CHAR(1)"];
@@ -10632,7 +10625,7 @@ message BrunoOwner_TGfbElet_Rowtype {
 	string f_jel = 3 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_ssz = 4 [(oracall_field_type) = "NUMBER(3)"];
 	string f_dijfizgyak = 5 [(oracall_field_type) = "CHAR(1)"];
-	double f_alldijsum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 7 [(oracall_field_type) = "NUMBER(3)"];
 	string f_bonusz = 8 [(oracall_field_type) = "VARCHAR2(3)"];
 	string f_dijfizmod = 9 [(oracall_field_type) = "CHAR(1)"];
@@ -10651,7 +10644,7 @@ message BrunoOwner_TGfbElet_Rowtype {
 	string f_partnerp = 22 [(oracall_field_type) = "CHAR(1)"];
 	string f_korny = 23 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_ujrakot_sorszam = 24 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijbesum = 25 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbesum = 25 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.T_GFB_RESZLETEZO%ROWTYPE
 message BrunoOwner_TGfbReszletezo_Rowtype {
@@ -10661,7 +10654,7 @@ message BrunoOwner_TGfbReszletezo_Rowtype {
 	string f_modkod = 3 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_jel = 4 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_ssz = 5 [(oracall_field_type) = "NUMBER(3)"];
-	double f_evesdij = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_evesdij = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 7 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_sorrend = 8 [(oracall_field_type) = "NUMBER(3)"];
 	string f_elem_egyseg = 9 [(oracall_field_type) = "NUMBER"];
@@ -10678,9 +10671,9 @@ message BrunoOwner_TKarBejegyzes_Rowtype {
 	string f_mozgtip = 6 [(oracall_field_type) = "CHAR(4)"];
 	string f_allapot = 7 [(oracall_field_type) = "CHAR(2)"];
 	google.protobuf.Timestamp f_karnap = 8 [(oracall_field_type) = "DATE"];
-	double f_osszeg = 9 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_kosszeg = 10 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_mosszeg = 11 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_kosszeg = 10 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_mosszeg = 11 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 12 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_kstock = 13 [(oracall_field_type) = "NUMBER(6)"];
 	string f_zartip = 14 [(oracall_field_type) = "CHAR(1)"];
@@ -10691,20 +10684,20 @@ message BrunoOwner_TKarBejegyzes_Rowtype {
 	string f_modkod2 = 19 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 f_kieg_tszam = 20 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_eloleg_sorszam = 21 [(oracall_field_type) = "NUMBER(9)"];
-	double f_eloleg_osszeg = 22 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_eloleg_osszeg = 22 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_havizar = 23 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_napizar = 24 [(oracall_field_type) = "DATE"];
 	int32 f_karszakerto = 25 [(oracall_field_type) = "NUMBER(6)"];
-	float f_rfok = 26 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_rfok = 26 [(oracall_field_type) = "NUMBER(5,2)"];
 	int32 f_lezaras = 27 [(oracall_field_type) = "NUMBER(3)"];
 	string f_elszamololap = 28 [(oracall_field_type) = "CHAR(1)"];
 	string f_sztorno_ok = 29 [(oracall_field_type) = "VARCHAR2(1000)"];
 	string f_avus_ugyszam = 30 [(oracall_field_type) = "VARCHAR2(12)"];
 	string f_gyorskar = 31 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_nk_azon = 32 [(oracall_field_type) = "NUMBER(6)"];
-	double f_dosszeg = 33 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dkosszeg = 34 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dmosszeg = 35 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dosszeg = 33 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dkosszeg = 34 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dmosszeg = 35 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dpenznem = 36 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_arfolyam_dat = 37 [(oracall_field_type) = "DATE"];
 	string f_arfolyam = 38 [(oracall_field_type) = "NUMBER"];
@@ -10716,7 +10709,7 @@ message BrunoOwner_TKarBejegyzes_Rowtype {
 	string f_kulso_karrend = 44 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_eges_melyseg = 45 [(oracall_field_type) = "NUMBER(1)"];
 	int32 f_napok_szama = 46 [(oracall_field_type) = "NUMBER(6)"];
-	float f_limit_arfolyam = 47 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_limit_arfolyam = 47 [(oracall_field_type) = "NUMBER(5,2)"];
 	string f_portfolio = 48 [(oracall_field_type) = "CHAR(2)"];
 	int32 f_vnem = 49 [(oracall_field_type) = "NUMBER(3)"];
 	string f_tokes = 50 [(oracall_field_type) = "CHAR(1)"];
@@ -10769,8 +10762,8 @@ message BrunoOwner_TKarFuggo_Rowtype {
 	string f_modkod = 9 [(oracall_field_type) = "VARCHAR2(6)"];
 	google.protobuf.Timestamp f_karido = 10 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_karbeido = 11 [(oracall_field_type) = "DATE"];
-	double f_kosszeg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_uosszeg = 13 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_kosszeg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_uosszeg = 13 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 14 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_karev = 15 [(oracall_field_type) = "NUMBER(4)"];
 	string f_tipus = 16 [(oracall_field_type) = "CHAR(1)"];
@@ -10781,12 +10774,12 @@ message BrunoOwner_TKarFuggo_Rowtype {
 	string f_zartip = 21 [(oracall_field_type) = "CHAR(1)"];
 	google.protobuf.Timestamp f_havizar = 22 [(oracall_field_type) = "DATE"];
 	int32 f_kstock = 23 [(oracall_field_type) = "NUMBER(6)"];
-	double f_dkosszeg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_duosszeg = 25 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dkosszeg = 24 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_duosszeg = 25 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dpenznem = 26 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_arfolyam_dat = 27 [(oracall_field_type) = "DATE"];
 	string f_arfolyam = 28 [(oracall_field_type) = "NUMBER"];
-	double f_tart_eredeti = 29 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_tart_eredeti = 29 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_mozgas_sorszam = 30 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.T_KAR_FUGGO_CIM%ROWTYPE
@@ -10804,7 +10797,7 @@ message BrunoOwner_TKarFuggoCim_Rowtype {
 	string f_ugyfelnev = 10 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_szamla = 11 [(oracall_field_type) = "VARCHAR2(24)"];
 	string f_fizmod = 12 [(oracall_field_type) = "CHAR(1)"];
-	float f_reszarany = 13 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_reszarany = 13 [(oracall_field_type) = "NUMBER(6,3)"];
 	google.protobuf.Timestamp f_datum = 14 [(oracall_field_type) = "DATE"];
 	string f_ivk = 15 [(oracall_field_type) = "VARCHAR2(40)"];
 	string f_modosult = 16 [(oracall_field_type) = "VARCHAR2(1)"];
@@ -10883,13 +10876,13 @@ message BrunoOwner_TKarJogcim_Rowtype {
 	int32 f_jogcim = 3 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_ssz = 4 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_csop = 5 [(oracall_field_type) = "NUMBER(3)"];
-	double f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 7 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_dazon = 8 [(oracall_field_type) = "NUMBER(9)"];
 	google.protobuf.Timestamp f_datum = 9 [(oracall_field_type) = "DATE"];
 	string f_zartip = 10 [(oracall_field_type) = "CHAR(1)"];
 	google.protobuf.Timestamp f_hataly = 11 [(oracall_field_type) = "DATE"];
-	double f_dosszeg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dosszeg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dpenznem = 13 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_arfolyam_dat = 14 [(oracall_field_type) = "DATE"];
 	string f_arfolyam = 15 [(oracall_field_type) = "NUMBER"];
@@ -10900,20 +10893,20 @@ message BrunoOwner_TKarKifiz_Rowtype {
 	int32 f_kar_sorszam = 1 [(oracall_field_type) = "NUMBER(9)"];
 	string f_allapot = 2 [(oracall_field_type) = "CHAR(2)"];
 	string f_tetelall = 3 [(oracall_field_type) = "CHAR(1)"];
-	double f_rosszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_rosszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 5 [(oracall_field_type) = "NUMBER(3)"];
 	string f_ugyfelnev = 6 [(oracall_field_type) = "VARCHAR2(75)"];
 	string f_fizmod = 7 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_kifizaz = 8 [(oracall_field_type) = "NUMBER(9)"];
-	double f_mosszeg = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_mosszeg = 9 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_zartip = 10 [(oracall_field_type) = "CHAR(1)"];
 	string f_mozgtip = 11 [(oracall_field_type) = "CHAR(4)"];
 	int32 f_vdazon = 12 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_vdatum = 13 [(oracall_field_type) = "DATE"];
 	string f_reszarany = 14 [(oracall_field_type) = "NUMBER"];
 	string f_tipus = 15 [(oracall_field_type) = "CHAR(1)"];
-	double f_drosszeg = 16 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dmosszeg = 17 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_drosszeg = 16 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dmosszeg = 17 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_dpenznem = 18 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_arfolyam_dat = 19 [(oracall_field_type) = "DATE"];
 	string f_arfolyam = 20 [(oracall_field_type) = "NUMBER"];
@@ -10940,7 +10933,7 @@ message BrunoOwner_TKarKifiz_Rowtype {
 	int32 f_kifizaz1 = 41 [(oracall_field_type) = "NUMBER(9)"];
 	google.protobuf.Timestamp f_napizar = 42 [(oracall_field_type) = "DATE"];
 	string f_emelet = 43 [(oracall_field_type) = "VARCHAR2(9)"];
-	double f_tart_osszeg = 44 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_tart_osszeg = 44 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_tart_penznem = 45 [(oracall_field_type) = "NUMBER(3)"];
 	string f_hiba = 46 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_napok_szama = 47 [(oracall_field_type) = "NUMBER(6)"];
@@ -11011,14 +11004,14 @@ message BrunoOwner_TKarNaplo_Rowtype {
 	google.protobuf.Timestamp f_hatosagi_int_dat = 30 [(oracall_field_type) = "DATE"];
 	string f_feljelentes = 31 [(oracall_field_type) = "CHAR(1)"];
 	google.protobuf.Timestamp f_feljelentes_dat = 32 [(oracall_field_type) = "DATE"];
-	double f_becsult_kosszeg = 33 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_becsult_kosszeg = 33 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_szemle_dat = 34 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_szemle_dat2 = 35 [(oracall_field_type) = "DATE"];
 	int32 f_e_azon = 36 [(oracall_field_type) = "NUMBER(9)"];
 	string f_fomodkod = 37 [(oracall_field_type) = "VARCHAR2(6)"];
-	double f_kezd_tartalek = 38 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_kezd_tartalek = 38 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_kulso_karrend = 39 [(oracall_field_type) = "CHAR(1)"];
-	float f_limit_arfolyam = 40 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_limit_arfolyam = 40 [(oracall_field_type) = "NUMBER(5,2)"];
 	string f_dijhatra_levon = 41 [(oracall_field_type) = "VARCHAR2(1)"];
 	google.protobuf.Timestamp f_elvart_dijrend = 42 [(oracall_field_type) = "DATE"];
 	string f_egyeni = 43 [(oracall_field_type) = "VARCHAR2(1)"];
@@ -11111,7 +11104,7 @@ message BrunoOwner_TKoltseg_13100_Rowtype {
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 f_tartam = 2 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_t1 = 3 [(oracall_field_type) = "NUMBER(3)"];
-	float f_mp_mult = 4 [(oracall_field_type) = "NUMBER(5,2)"];
+	string f_mp_mult = 4 [(oracall_field_type) = "NUMBER(5,2)"];
 	int32 f_kezdjutmult = 5 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_hataly = 6 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 7 [(oracall_field_type) = "DATE"];
@@ -11138,17 +11131,17 @@ message BrunoOwner_TKtsgLoad_Rowtype {
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 f_tartamtol = 2 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_tartamig = 3 [(oracall_field_type) = "NUMBER(3)"];
-	float f_kezd_mult = 4 [(oracall_field_type) = "NUMBER(6,3)"];
-	float f_nyk_mult = 5 [(oracall_field_type) = "NUMBER(3,1)"];
-	float f_extra_mult = 6 [(oracall_field_type) = "NUMBER(3,1)"];
-	float f_bef_mult = 7 [(oracall_field_type) = "NUMBER(4,3)"];
-	float f_bef_mult2 = 8 [(oracall_field_type) = "NUMBER(4,3)"];
+	string f_kezd_mult = 4 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_nyk_mult = 5 [(oracall_field_type) = "NUMBER(3,1)"];
+	string f_extra_mult = 6 [(oracall_field_type) = "NUMBER(3,1)"];
+	string f_bef_mult = 7 [(oracall_field_type) = "NUMBER(4,3)"];
+	string f_bef_mult2 = 8 [(oracall_field_type) = "NUMBER(4,3)"];
 	google.protobuf.Timestamp f_hataly = 9 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatalyig = 10 [(oracall_field_type) = "DATE"];
 	int32 f_fl = 11 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_minimalis_pool = 12 [(oracall_field_type) = "NUMBER(6)"];
-	float f_init_kock_mult = 13 [(oracall_field_type) = "NUMBER(5,4)"];
-	float f_last_kock_mult = 14 [(oracall_field_type) = "NUMBER(5,4)"];
+	string f_init_kock_mult = 13 [(oracall_field_type) = "NUMBER(5,4)"];
+	string f_last_kock_mult = 14 [(oracall_field_type) = "NUMBER(5,4)"];
 	int32 f_reszvissza_ktsg = 15 [(oracall_field_type) = "NUMBER(6)"];
 }
 // BRUNO_OWNER.T_KULF_CIM%ROWTYPE
@@ -11231,7 +11224,7 @@ message BrunoOwner_TMoneta_Rowtype {
 	option (oracall_object_type) = "BRUNO_OWNER.T_MONETA%ROWTYPE";
 	string f_modkod = 1 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_tipus = 2 [(oracall_field_type) = "CHAR(1)"];
-	double f_ertek = 3 [(oracall_field_type) = "NUMBER(12,5)"];
+	string f_ertek = 3 [(oracall_field_type) = "NUMBER(12,5)"];
 	google.protobuf.Timestamp f_hataly = 4 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_hatar = 5 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_datum = 6 [(oracall_field_type) = "DATE"];
@@ -11254,9 +11247,9 @@ message BrunoOwner_TReszmod_Rowtype {
 	int32 f_szerz_azon = 1 [(oracall_field_type) = "NUMBER(9)"];
 	string f_modkod = 2 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_allapot = 3 [(oracall_field_type) = "CHAR(2)"];
-	double f_evesdij = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_evesdij = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 5 [(oracall_field_type) = "NUMBER(3)"];
-	double f_biztsum = 6 [(oracall_field_type) = "NUMBER(15,2)"];
+	string f_biztsum = 6 [(oracall_field_type) = "NUMBER(15,2)"];
 	int32 f_tartam = 7 [(oracall_field_type) = "NUMBER(6)"];
 	google.protobuf.Timestamp f_lejar = 8 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_datum = 9 [(oracall_field_type) = "DATE"];
@@ -11275,7 +11268,7 @@ message BrunoOwner_TSplBrSzla_Rowtype {
 	google.protobuf.Timestamp f_teljesites = 9 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_fizhat = 10 [(oracall_field_type) = "DATE"];
 	string f_fizmod = 11 [(oracall_field_type) = "CHAR(1)"];
-	double f_brosszeg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_brosszeg = 12 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 13 [(oracall_field_type) = "NUMBER(3)"];
 	string f_megjegyzes = 14 [(oracall_field_type) = "VARCHAR2(2000)"];
 	int32 f_regi_szla_azon = 15 [(oracall_field_type) = "NUMBER(9)"];
@@ -11292,7 +11285,7 @@ message BrunoOwner_TSplBrSzlaDijbeker_Rowtype {
 	int32 f_szla_azon = 1 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_szerz_azon = 2 [(oracall_field_type) = "NUMBER(9)"];
 	string f_tipus = 3 [(oracall_field_type) = "CHAR(1)"];
-	double f_osszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 4 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_idoszaktol = 5 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_idoszakig = 6 [(oracall_field_type) = "DATE"];
 }
@@ -11304,16 +11297,16 @@ message BrunoOwner_TSplBrSzlaEgyenleg_Rowtype {
 	int32 f_szerz_azon = 3 [(oracall_field_type) = "NUMBER(9)"];
 	google.protobuf.Timestamp f_nyitott_evford = 4 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_meddig = 5 [(oracall_field_type) = "DATE"];
-	double f_dijelvar = 6 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_dijbefiz = 7 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_fin_dijtartoz = 8 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_elm_dij = 9 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_elm_dijbefiz = 10 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_mabisz = 11 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_mabisz_telj = 12 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_balado_elvar = 13 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_balado_befiz = 14 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_egyenleg = 15 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijelvar = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_dijbefiz = 7 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_fin_dijtartoz = 8 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_elm_dij = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_elm_dijbefiz = 10 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_mabisz = 11 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_mabisz_telj = 12 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_balado_elvar = 13 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_balado_befiz = 14 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_egyenleg = 15 [(oracall_field_type) = "NUMBER(12,2)"];
 }
 // BRUNO_OWNER.T_SPL_BR_SZLA_TETEL%ROWTYPE
 message BrunoOwner_TSplBrSzlaTetel_Rowtype {
@@ -11322,7 +11315,7 @@ message BrunoOwner_TSplBrSzlaTetel_Rowtype {
 	int32 f_szla_azon = 2 [(oracall_field_type) = "NUMBER(9)"];
 	string f_tipus = 3 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_szerz_azon = 4 [(oracall_field_type) = "NUMBER(9)"];
-	double f_osszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_idoszaktol = 6 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_idoszakig = 7 [(oracall_field_type) = "DATE"];
 	string f_modkod = 8 [(oracall_field_type) = "VARCHAR2(6)"];
@@ -11361,7 +11354,7 @@ message BrunoOwner_TSzerzVerzio_Rowtype {
 	string f_jel = 6 [(oracall_field_type) = "CHAR(1)"];
 	string f_mozgtip = 7 [(oracall_field_type) = "VARCHAR2(4)"];
 	string f_modkod = 8 [(oracall_field_type) = "VARCHAR2(6)"];
-	double f_alldijsum = 9 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 9 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 10 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_evfordulo = 11 [(oracall_field_type) = "DATE"];
 	string f_dijfizgyak = 12 [(oracall_field_type) = "CHAR(1)"];
@@ -11371,7 +11364,7 @@ message BrunoOwner_TSzerzVerzio_Rowtype {
 	int32 f_fstock = 16 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_valt_sorszam = 17 [(oracall_field_type) = "NUMBER(9)"];
 	int32 f_tvalt_sorszam = 18 [(oracall_field_type) = "NUMBER(9)"];
-	double f_alldij = 19 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldij = 19 [(oracall_field_type) = "NUMBER(12,2)"];
 	google.protobuf.Timestamp f_szerlejar = 20 [(oracall_field_type) = "DATE"];
 }
 // BRUNO_OWNER.T_SZV_ELOIRAS%ROWTYPE
@@ -11382,7 +11375,7 @@ message BrunoOwner_TSzvEloiras_Rowtype {
 	int32 f_verzio = 3 [(oracall_field_type) = "NUMBER(6)"];
 	string f_tipus = 4 [(oracall_field_type) = "VARCHAR2(4)"];
 	string f_mozgtip = 5 [(oracall_field_type) = "VARCHAR2(4)"];
-	double f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 7 [(oracall_field_type) = "NUMBER(3)"];
 	google.protobuf.Timestamp f_kdatum = 8 [(oracall_field_type) = "DATE"];
 	google.protobuf.Timestamp f_esedekes = 9 [(oracall_field_type) = "DATE"];
@@ -11405,7 +11398,7 @@ message BrunoOwner_TSzvEloirasReszlet_Rowtype {
 	string f_modkod = 3 [(oracall_field_type) = "VARCHAR2(6)"];
 	string f_ado_tipus = 4 [(oracall_field_type) = "VARCHAR2(2)"];
 	string f_mozgtip = 5 [(oracall_field_type) = "VARCHAR2(4)"];
-	double f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_osszeg = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 7 [(oracall_field_type) = "NUMBER(3)"];
 }
 // BRUNO_OWNER.T_SZV_ELOIRAS_RESZLET_KIEG%ROWTYPE
@@ -11414,8 +11407,8 @@ message BrunoOwner_TSzvEloirasReszletKieg_Rowtype {
 	int64 f_sorszam = 1 [(oracall_field_type) = "NUMBER(12)"];
 	int32 f_sorrend = 2 [(oracall_field_type) = "NUMBER(6)"];
 	string f_alap_tipus = 3 [(oracall_field_type) = "VARCHAR2(1)"];
-	double f_alap_szorzo = 4 [(oracall_field_type) = "NUMBER(12,6)"];
-	double f_osszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alap_szorzo = 4 [(oracall_field_type) = "NUMBER(12,6)"];
+	string f_osszeg = 5 [(oracall_field_type) = "NUMBER(12,2)"];
 	int32 f_penznem = 6 [(oracall_field_type) = "NUMBER(3)"];
 }
 // BRUNO_OWNER.T_SZV_RESZLETEZO%ROWTYPE
@@ -11425,8 +11418,8 @@ message BrunoOwner_TSzvReszletezo_Rowtype {
 	int32 f_verzio = 2 [(oracall_field_type) = "NUMBER(6)"];
 	int32 f_sorrend = 3 [(oracall_field_type) = "NUMBER(6)"];
 	string f_modkod = 4 [(oracall_field_type) = "VARCHAR2(6)"];
-	double f_alldij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
-	double f_alldijsum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldij = 5 [(oracall_field_type) = "NUMBER(12,2)"];
+	string f_alldijsum = 6 [(oracall_field_type) = "NUMBER(12,2)"];
 	string f_biztossz = 7 [(oracall_field_type) = "NUMBER(17,2)"];
 	google.protobuf.Timestamp f_lejarat = 8 [(oracall_field_type) = "DATE"];
 }
@@ -11458,10 +11451,10 @@ message BrunoOwner_TTlbElet_Rowtype {
 	string f_dijfizgyak = 13 [(oracall_field_type) = "CHAR(1)"];
 	string f_dijfizmod = 14 [(oracall_field_type) = "CHAR(1)"];
 	int32 f_alldijsum = 15 [(oracall_field_type) = "NUMBER(9)"];
-	float f_alap = 16 [(oracall_field_type) = "NUMBER(6,2)"];
-	float f_betlop = 17 [(oracall_field_type) = "NUMBER(6,2)"];
-	float f_vizkar = 18 [(oracall_field_type) = "NUMBER(6,2)"];
-	float f_uveg = 19 [(oracall_field_type) = "NUMBER(6,2)"];
+	string f_alap = 16 [(oracall_field_type) = "NUMBER(6,2)"];
+	string f_betlop = 17 [(oracall_field_type) = "NUMBER(6,2)"];
+	string f_vizkar = 18 [(oracall_field_type) = "NUMBER(6,2)"];
+	string f_uveg = 19 [(oracall_field_type) = "NUMBER(6,2)"];
 	google.protobuf.Timestamp f_datum = 20 [(oracall_field_type) = "DATE"];
 	int32 f_tartam_engedmeny = 21 [(oracall_field_type) = "NUMBER(3)"];
 	int32 f_tartam_engedmeny_tartam = 22 [(oracall_field_type) = "NUMBER(3)"];
@@ -11480,7 +11473,7 @@ message BrunoOwner_TTlbReszletezo_Rowtype {
 	int32 f_ssz = 4 [(oracall_field_type) = "NUMBER(3)"];
 	string f_modkod = 5 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 f_biztossz = 6 [(oracall_field_type) = "NUMBER(9)"];
-	double f_dijtetel = 7 [(oracall_field_type) = "NUMBER(12,3)"];
+	string f_dijtetel = 7 [(oracall_field_type) = "NUMBER(12,3)"];
 	int32 f_evesdij = 8 [(oracall_field_type) = "NUMBER(9)"];
 }
 // BRUNO_OWNER.T_UGYFEL%ROWTYPE
@@ -11562,7 +11555,7 @@ message BrunoOwner_TUtitarsReszletezo_Rowtype {
 	int32 f_ssz = 4 [(oracall_field_type) = "NUMBER(3)"];
 	string f_modkod = 5 [(oracall_field_type) = "VARCHAR2(6)"];
 	int32 f_evesdij = 6 [(oracall_field_type) = "NUMBER(9)"];
-	float f_egyseg = 7 [(oracall_field_type) = "NUMBER(6,3)"];
+	string f_egyseg = 7 [(oracall_field_type) = "NUMBER(6,3)"];
 }
 // BRUNO_OWNER.T_VVT_BIZT%ROWTYPE
 message BrunoOwner_TVvtBizt_Rowtype {
