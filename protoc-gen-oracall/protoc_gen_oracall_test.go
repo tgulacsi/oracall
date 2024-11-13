@@ -10,6 +10,7 @@ import (
 	"flag"
 	"os"
 	"os/exec"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -50,9 +51,14 @@ func TestProtocGenOracall(t *testing.T) {
 		t.Fatalf("%q: %+v", cmd.Args, err)
 	}
 
-	cmd = exec.CommandContext(ctx, "go", "test", "-run="+*flagRun, "-connect="+*flagConnect)
+	cmd = exec.CommandContext(ctx, "go", "test", "-count=1", "-run="+*flagRun, "-connect="+*flagConnect, "-v="+strconv.FormatBool(testing.Verbose()))
 	cmd.Dir = "testdata"
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	t.Cleanup(func() {
+		exec.CommandContext(context.Background(),
+			"killall", "-9", "testdata.test",
+		).Run()
+	})
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("%q: %+v", cmd.Args, err)
 	}
@@ -60,6 +66,7 @@ func TestProtocGenOracall(t *testing.T) {
 		<-ctx.Done()
 		cmd.Process.Kill()
 	}()
+	t.Log(cmd.Args)
 	if state, err := cmd.Process.Wait(); err != nil {
 		t.Fatal(err)
 	} else if state.ExitCode() != 0 {

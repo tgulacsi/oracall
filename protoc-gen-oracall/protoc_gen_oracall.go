@@ -77,6 +77,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 		
@@ -87,11 +88,24 @@ import (
 var (
 	_ context.Context
 	_ = io.ReadAll
+	_ = strconv.FormatFloat
 	_ strings.Builder
 	_ time.Time
 	_ = timestamppb.New
 	_ godror.Number
 )
+
+func getString(d *godror.Data) string {
+	switch d.NativeTypeNum {
+	case 3004:  //godror.NativeTypeBytes 
+		return string(d.GetBytes()) 
+	case 3003: //godror.NativeTypeDouble
+		return strconv.FormatFloat(d.GetFloat64(), 'f', -1, 64)
+	default:
+		fmt.Printf("Get=%%#v, ntt=%%d\n", d.Get(), d.NativeTypeNum )
+		return fmt.Sprintf("%%v", d.Get())	
+	}
+}
 
 `, file.GoPackageName)
 
@@ -111,9 +125,10 @@ import (
 	"testing"
 	"time"
 		
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"github.com/google/go-cmp/cmp"
+	"github.com/UNO-SOFT/zlog/v2"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	godror "github.com/godror/godror"
 
@@ -124,6 +139,7 @@ var (
 	_ context.Context
 	_ = timestamppb.New
 	_ = cmp.Diff
+	_ = zlog.NewT
 
 	pjMO = protojson.MarshalOptions{Indent:"  "}
 )
@@ -557,13 +573,7 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 			if getValue == "" {
 				switch f.NativeType {
 				case "string":
-					getValue = `var v string
-					if d.NativeTypeNum == 3004 {  //godror.NativeTypeBytes 
-					v = string(d.GetBytes()) 
-					} else { 
-						v = fmt.Sprintf("%v", d.Get())	
-					}
-					`
+					getValue = "v := getString(&d)"
 				case "*timestamppb.Timestamp":
 					getValue = "v := timestamppb.New(d.GetTime())"
 				default:
@@ -657,6 +667,8 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 	fmt.Fprintf(tW, `func TestToFromObject_%s(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	logger := zlog.NewT(t).SLog()
+	godror.SetLogger(logger.With("lib", "godror"))
 	tx, err := getTx(ctx, t)
 	if err != nil { t.Fatal(err) }
 	defer tx.Rollback()
@@ -667,7 +679,7 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 	obj, err := want.ToObject(ctx, tx)
 	if err != nil { 
 		var ec interface{ Code() int }
-		if errors.As(err, &ec) && ec.Code() == 21062 {
+		if errors.As(err, &ec) && ec.Code() == 21602 {
 			t.Skipf("ToObject: %%+v", err)
 			return
 		} 
