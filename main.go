@@ -381,7 +381,6 @@ func Main() error {
 		if parseErr != nil {
 			return fmt.Errorf("%s: %w", dsn, parseErr)
 		}
-		P.StandaloneConnection = false
 		db = sql.OpenDB(godror.NewConnector(P))
 		defer db.Close()
 		db.SetMaxIdleConns(0)
