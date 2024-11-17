@@ -10064,7 +10064,6 @@ message BrunoOwner_RAkrUgyszer_Rowtype {
 	string f_a06_nyil = 4 [(oracall_field_type) = "CHAR(1)"];
 	string f_a07_nyil = 5 [(oracall_field_type) = "CHAR(1)"];
 	string f_szerepkor = 6 [(oracall_field_type) = "VARCHAR2(1)"];
-	string f_uftip_egyedi = 7 [(oracall_field_type) = "VARCHAR2(81)"];
 }
 // BRUNO_OWNER.TEST_CWO_REC_T
 message BrunoOwner_TestCwoRecT {

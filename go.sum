@@ -28,6 +28,8 @@ github.com/godror/godror v0.24.5-0.20210513180552-aa94a9a08b6a h1:o+kP2CLffWD2T+
 github.com/godror/godror v0.24.5-0.20210513180552-aa94a9a08b6a/go.mod h1:wZv/9vPiUib6tkoDl+AZ/QLf5YZgMravZ7jxH2eQWAE=
 github.com/godror/godror v0.45.2-0.20241113063029-2c7d8bb93771 h1:25MH8RpS0ZV9mAT6y2an2D0MtXG+MX0chpTKL7Vr8EA=
 github.com/godror/godror v0.45.2-0.20241113063029-2c7d8bb93771/go.mod h1:44hxVDzvFSwc+yGyRM+riCLNAY5SwZkUfLzVTh5MXCg=
+github.com/godror/godror v0.45.2-0.20241117112255-78c90939f99d h1:KjC3RU+mwX8kAYjhKexP9tm/1vdTtFeA30Ry8SJobcA=
+github.com/godror/godror v0.45.2-0.20241117112255-78c90939f99d/go.mod h1:44hxVDzvFSwc+yGyRM+riCLNAY5SwZkUfLzVTh5MXCg=
 github.com/godror/knownpb v0.1.2 h1:icMyYsYVpGmzhoVA01xyd0o4EaubR31JPK1UxQWe4kM=
 github.com/godror/knownpb v0.1.2/go.mod h1:zs9hH+lwj7mnPHPnKCcxdOGz38Axa9uT+97Ng+Nnu5s=
 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=

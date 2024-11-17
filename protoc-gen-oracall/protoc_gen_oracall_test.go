@@ -21,7 +21,7 @@ var (
 )
 
 func TestProtocGenOracall(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "install", "-v")
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr

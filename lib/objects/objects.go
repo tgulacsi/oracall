@@ -218,7 +218,7 @@ SELECT 'B' as orign, B.attr_no, B.attr_name, B.attr_type_owner, B.attr_type_name
 		tblQry = `
 SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.data_type, NULL, B.data_length, B.data_precision, B.data_scale, NULL as coll_type, NULL AS index_by
   FROM all_tab_cols B 
-  WHERE INSTR(B.column_name, '$') = 0 AND
+  WHERE INSTR(B.column_name, '$') = 0 AND B.virtual_column <> 'YES' AND B.user_generated <> 'YES' AND
         B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND
         :package IS NULL AND
         B.table_name = REGEXP_REPLACE(:name, '%ROWTYPE$') 

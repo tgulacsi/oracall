@@ -7,7 +7,7 @@ require (
 	github.com/antzucaro/matchr v0.0.0-20221106193745-7bed6ef61ef9
 	github.com/fatih/structs v1.1.0
 	github.com/go-stack/stack v1.8.1
-	github.com/godror/godror v0.45.2-0.20241113063029-2c7d8bb93771
+	github.com/godror/godror v0.45.2-0.20241117112255-78c90939f99d
 	github.com/google/go-cmp v0.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/kylelemons/godebug v1.1.0
@@ -51,6 +51,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 )
 
-// replace github.com/godror/godror => ../../godror/godror
+replace github.com/godror/godror => ../../godror/godror
 
 //replace github.com/UNO-SOFT/zlog => ../../UNO-SOFT/zlog
