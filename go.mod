@@ -51,6 +51,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 )
 
-replace github.com/godror/godror => ../../godror/godror
+// replace github.com/godror/godror => ../../godror/godror
 
 //replace github.com/UNO-SOFT/zlog => ../../UNO-SOFT/zlog

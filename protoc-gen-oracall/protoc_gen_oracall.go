@@ -320,9 +320,7 @@ func fakeData(t *testing.T, dest any, fieldType string) {
 					case "google.protobuf.Timestamp":
 						nativeType = "*timestamppb.Timestamp"
 					default:
-						if strings.HasPrefix(nativeType, "objects.") {
-							nativeType = strings.TrimPrefix(nativeType, "objects.")
-						}
+						nativeType = strings.TrimPrefix(nativeType, "objects.")
 					}
 				}
 				m.Fields = append(m.Fields, nameType{
@@ -755,7 +753,7 @@ func iterCustomOptions(extTypes *protoregistry.Types, options protoreflect.Proto
 	options.(interface{ Reset() }).Reset()
 	err = proto.UnmarshalOptions{Resolver: extTypes}.Unmarshal(b, options)
 	if err != nil {
-		return fmt.Errorf("Unmarshal: %w", err)
+		return fmt.Errorf("unmarshal: %w", err)
 	}
 
 	// Use protobuf reflection to iterate over all the extension fields,

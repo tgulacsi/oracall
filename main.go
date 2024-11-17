@@ -522,7 +522,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
                        owner = :owner AND table_name = :pkg
 				 ORDER BY attr_no`
 				if attrStmt, err = cx.PrepareContext(grpCtx, qry); err != nil {
-					logger.Error("qry", qry, "error", err)
+					logger.Error("Prepare", "qry", qry, "error", err)
 				} else {
 					defer attrStmt.Close()
 					if rows, err := attrStmt.QueryContext(grpCtx,
@@ -544,7 +544,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 			qry, pattern, pattern, godror.FetchArraySize(1024), godror.PrefetchCount(1025),
 		)
 		if err != nil {
-			logger.Error("qry", qry, "error", err)
+			logger.Error("Query", "qry", qry, "error", err)
 			return fmt.Errorf("%s: %w", qry, err)
 		}
 		defer rows.Close()

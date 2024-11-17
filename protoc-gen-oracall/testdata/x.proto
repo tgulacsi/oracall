@@ -7269,31 +7269,31 @@ message BrunoOwner_DbSplLev_VrOsszesitettAdat {
 // BRUNO_OWNER.DB_SPL_LEV.VR_PENZALAP
 message BrunoOwner_DbSplLev_VrPenzalap {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPL_LEV.VR_PENZALAP";
-	string f_magyar_p_eszkoz_darab = 1 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_magyar_p_eszkoz_arfolyam = 2 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_magyar_p_eszkoz_ertek = 3 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_magyar_allamkotv_darab = 4 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_magyar_allamkotv_arfolyam = 5 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_magyar_allamkotv_ertek = 6 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_vegyes_k_eszkoz_darab = 7 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_vegyes_k_eszkoz_arfolyam = 8 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_vegyes_k_eszkoz_ertek = 9 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_kulfoldi_allamkotv_darab = 10 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_kulfoldi_allamkotv_arfolyam = 11 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_kulfoldi_allamkotv_ertek = 12 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_magyar_reszveny_darab = 13 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_magyar_reszveny_arfolyam = 14 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_magyar_reszveny_ertek = 15 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_kulfoldi_reszveny_darab = 16 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_kulfoldi_reszveny_arfolyam = 17 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_kulfoldi_reszveny_ertek = 18 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_moneymaxx_expressz_darab = 19 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_moneymaxx_expressz_arfolyam = 20 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_moneymaxx_expressz_ertek = 21 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_ingatlanalap_darab = 22 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_ingatlanalap_arfolyam = 23 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_ingatlanalap_ertek = 24 [(oracall_field_type) = "NUMBER(24,12)"];
-	string f_egyenleg = 25 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_p_eszkoz_darab = 1 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_p_eszkoz_arfolyam = 2 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_p_eszkoz_ertek = 3 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_allamkotv_darab = 4 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_allamkotv_arfolyam = 5 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_allamkotv_ertek = 6 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_vegyes_k_eszkoz_darab = 7 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_vegyes_k_eszkoz_arfolyam = 8 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_vegyes_k_eszkoz_ertek = 9 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_kulfoldi_allamkotv_darab = 10 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_kulfoldi_allamkotv_arfolyam = 11 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_kulfoldi_allamkotv_ertek = 12 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_reszveny_darab = 13 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_reszveny_arfolyam = 14 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_magyar_reszveny_ertek = 15 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_kulfoldi_reszveny_darab = 16 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_kulfoldi_reszveny_arfolyam = 17 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_kulfoldi_reszveny_ertek = 18 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_moneymaxx_expressz_darab = 19 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_moneymaxx_expressz_arfolyam = 20 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_moneymaxx_expressz_ertek = 21 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_ingatlanalap_darab = 22 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_ingatlanalap_arfolyam = 23 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_ingatlanalap_ertek = 24 [(oracall_field_type) = "NUMBER(24,12)"];
+	// string f_egyenleg = 25 [(oracall_field_type) = "NUMBER(24,12)"];
 	string f_penzalap_ertek = 26 [(oracall_field_type) = "NUMBER(24,12)"];
 }
 // BRUNO_OWNER.DB_SPL_LEV.VR_SZAMLA_SOR
@@ -7827,7 +7827,7 @@ message BrunoOwner_DbSpoolsys2_TypeOutput_046 {
 	string tajekoztat_ktsg = 2 [(oracall_field_type) = "NUMBER(12,5)"];
 	google.protobuf.Timestamp utolso_elszamdatum = 3 [(oracall_field_type) = "DATE"];
 	string szerzodo_nev = 4 [(oracall_field_type) = "VARCHAR2(40)"];
-	int64 szerzodo_oputazon = 5 [(oracall_field_type) = "NUMBER(10)"];
+	// int64 szerzodo_oputazon = 5 [(oracall_field_type) = "NUMBER(10)"];
 	string biztositott1_nev = 6 [(oracall_field_type) = "VARCHAR2(40)"];
 	string biztositott2_nev = 7 [(oracall_field_type) = "VARCHAR2(40)"];
 	string level_nev = 8 [(oracall_field_type) = "VARCHAR2(40)"];
@@ -8746,6 +8746,7 @@ message BrunoOwner_DbSpoolsys3_TypeOutput_046 {
 	int32 ingatlanalap = 26 [(oracall_field_type) = "NUMBER(3)"];
 	BrunoOwner_DbSplLev_VrPenzalap rec_penzalap = 27 [(oracall_field_type) = "BRUNO_OWNER.DB_SPL_LEV.VR_PENZALAP"];
 }
+
 // BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_047
 message BrunoOwner_DbSpoolsys3_TypeOutput_047 {
 	option (oracall_object_type) = "BRUNO_OWNER.DB_SPOOLSYS3.TYPE_OUTPUT_047";
