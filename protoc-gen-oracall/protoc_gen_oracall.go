@@ -101,6 +101,8 @@ func getString(d *godror.Data) string {
 		return string(d.GetBytes()) 
 	case 3003: //godror.NativeTypeDouble
 		return strconv.FormatFloat(d.GetFloat64(), 'f', -1, 64)
+	case 3000:
+		return strconv.FormatInt(d.GetInt64(), 10)
 	default:
 		fmt.Printf("Get=%#v, ntt=%d\n", d.Get(), d.NativeTypeNum )
 		return fmt.Sprintf("%v", d.Get())	
@@ -682,6 +684,7 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 	fmt.Fprintf(w, "\treturn nil\n}\n")
 
 	fmt.Fprintf(tW, `func TestToFromObject_%s(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	logger := zlog.NewT(t).SLog()
