@@ -64,14 +64,15 @@ func (tt *Types) Names(ctx context.Context, only ...string) ([]string, error) {
 UNION ALL
 SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A
   ORDER BY 2, 1`
-	rows, err := tt.db.QueryContext(ctx, qry, godror.PrefetchCount(1025), godror.FetchArraySize(1024))
+	rows, err := tt.db.QueryContext(ctx, qry,
+		godror.PrefetchCount(1025), godror.FetchArraySize(1024))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", qry, err)
 	}
 	defer rows.Close()
 	logger := zlog.SFromContext(ctx)
 	grp, grpCtx := errgroup.WithContext(ctx)
-	grp.SetLimit(8)
+	grp.SetLimit(4)
 	for rows.Next() {
 		t := Type{Owner: tt.currentSchema}
 		if err := rows.Scan(&t.Name, &t.Package, &t.TypeCode); err != nil {
@@ -179,12 +180,15 @@ SELECT owner, :type AS type_name, NULL AS package_name, '%ROWTYPE' AS typecode
 
 		t = &Type{}
 		if err := tt.db.QueryRowContext(ctx, qry,
-			sql.Named("owner", owner), sql.Named("package", pkg), sql.Named("type", typ),
+			sql.Named("owner", owner),
+			sql.Named("package", pkg),
+			sql.Named("type", typ),
 		).Scan(
 			&t.Owner, &t.Name, &t.Package, &t.TypeCode,
 		); err != nil {
-			return nil, fmt.Errorf("%q: %s [%q, %q]: %w: %w", name, qry, pkg, typ, err, errUnknownType)
+			return nil, fmt.Errorf("get basic type info %q: %s [%q, %q]: %w: %w", name, qry, pkg, typ, err, errUnknownType)
 		}
+
 		name = t.name(".")
 		tt.m[name] = t
 	}
@@ -218,7 +222,9 @@ SELECT 'B' as orign, B.attr_no, B.attr_name, B.attr_type_owner, B.attr_type_name
 		tblQry = `
 SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.data_type, NULL, B.data_length, B.data_precision, B.data_scale, NULL as coll_type, NULL AS index_by
   FROM all_tab_cols B 
-  WHERE INSTR(B.column_name, '$') = 0 AND B.virtual_column <> 'YES' AND B.user_generated <> 'YES' AND
+  WHERE INSTR(B.column_name, '$') = 0 AND 
+        B.virtual_column = 'NO' AND 
+        --B.hidden_column = 'NO' AND
         B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND
         :package IS NULL AND
         B.table_name = REGEXP_REPLACE(:name, '%ROWTYPE$') 
@@ -242,7 +248,10 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 	var qry string
 	var errs []error
 	for _, qry = range qrys {
-		rows, err := tt.db.QueryContext(ctx, qry, sql.Named("package", t.Package), sql.Named("owner", t.Owner), sql.Named("name", t.Name))
+		rows, err := tt.db.QueryContext(ctx, qry,
+			sql.Named("owner", t.Owner),
+			sql.Named("package", t.Package),
+			sql.Named("name", t.Name))
 		if err != nil {
 			return t, fmt.Errorf("%s: %w", qry, err)
 		}
@@ -254,7 +263,9 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 			if err := rows.Scan(
 				// SELECT B.attr_type_owner, B.attr_type_name, B.attr_type_package, B.length, B.precision, B.scale, NULL as coll_type, NULL AS index_by
 				&orig, &attrNo, &attrName,
-				&s.Owner, &s.Name, &s.Package, &s.Length, &s.Precision, &s.Scale, &collType, &s.IndexBy,
+				&s.Owner, &s.Name, &s.Package,
+				&s.Length, &s.Precision, &s.Scale,
+				&collType, &s.IndexBy,
 			); err != nil {
 				return t, fmt.Errorf("%s: %w", qry, err)
 			}
@@ -299,7 +310,7 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 	logger.Debug("resolved", "type", t, "rows", i, "isColl", t.IsColl(), "elem", t.Elem)
 	if !t.Valid() {
 		return t, fmt.Errorf("could not resolve %s (%s owner=%q pkg=%q name=%q; rowcount=%d): %#v: %w",
-			name, qry, t.Package, t.Owner, t.Name, i, t, errors.Join(errs...))
+			name, qry, t.Owner, t.Package, t.Name, i, t, errors.Join(errs...))
 	}
 	tt.m[name] = t
 
@@ -451,8 +462,8 @@ func (t Type) protoTypeName() string {
 			if t.Scale.Int32 == 0 {
 				if t.Precision.Int32 < 10 {
 					return "int32"
-				} else if t.Precision.Int32 < 20 {
-					return "int64"
+					// } else if t.Precision.Int32 < 19 {
+					// 	return "int64"
 				}
 			}
 		}

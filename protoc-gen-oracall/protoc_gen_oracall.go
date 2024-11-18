@@ -422,8 +422,8 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 					if scaleS == "0" || scaleS == "" {
 						if prec < 10 {
 							fun, conv = "Int64", "int64(%s)"
-						} else if prec < 20 {
-							fun = "Int64"
+							// } else if prec < 19 {
+							// 	fun = "Int64"
 						}
 					} else if _, err := strconv.Atoi(scaleS); err != nil {
 						panic(fmt.Errorf("parse %q as scale from %q: %w", scaleS, f.DBType, err))
@@ -563,8 +563,8 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 					if scaleS == "0" || scaleS == "" {
 						if prec < 10 {
 							fun, conv = "Int64", "int32"
-						} else if prec < 20 {
-							fun = "Int64"
+							// } else if prec < 19 {
+							// 	fun = "Int64"
 						}
 					} else if _, err := strconv.Atoi(scaleS); err != nil {
 						panic(fmt.Errorf("parse %q as scale from %q: %w", scaleS, f.DBType, err))

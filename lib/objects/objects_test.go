@@ -26,9 +26,9 @@ import (
 func TestReadTypes(t *testing.T) {
 	logger := zlog.NewT(t).SLog()
 	ctx := zlog.NewSContext(context.Background(), logger)
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	db, err := sql.Open("godror", os.Getenv("BRUNO_OWNER_ID"))
+	db, err := sql.Open("godror", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,4 +86,17 @@ plugins:
 	if b, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("%q\n%s\n%+v", cmd.Args, string(b), err)
 	}
+}
+
+func nvl[T comparable](a T, b ...T) T {
+	var z T
+	if a != z {
+		return a
+	}
+	for _, a := range b {
+		if a != z {
+			return a
+		}
+	}
+	return a
 }
