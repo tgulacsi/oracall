@@ -194,6 +194,8 @@ func fakeData(t *testing.T, dest any, fieldType string) {
 				}
 			} else {
 				if strings.HasSuffix(fieldType, "ROWID") {
+					// https://github.com/oracle/odpi/issues/187
+					// *x = "AAAkvKAAeAACtIDAA"
 					*x = ""
 				} else {
 					*x = "-16" 
