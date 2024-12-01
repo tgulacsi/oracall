@@ -6,11 +6,11 @@ package objects
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/godror/godror"
+	"github.com/UNO-SOFT/zlog/v2"
 )
 
 type Function struct {
@@ -33,7 +33,8 @@ type FuncArg struct {
 	InOut InOut
 }
 
-func NewPackage(ctx context.Context, db godror.Querier, pkg string) ([]Function, error) {
+func (tt *Types) NewPackage(ctx context.Context, db querier, pkg string) ([]Function, error) {
+	logger := zlog.SFromContext(ctx)
 	pkg = strings.ToUpper(pkg)
 	const qry = `SELECT object_name, subprogram_id, argument_name, 
 		in_out, data_type, data_length, data_precision, data_scale,
@@ -52,31 +53,40 @@ func NewPackage(ctx context.Context, db godror.Querier, pkg string) ([]Function,
 	var F Function
 	for rows.Next() {
 		var (
-			obj, inOut, dataType                       string
-			typeOwner, typeName, typeSubname, typeLink string
-			typeObjectType, plsType                    string
-			arg                                        Argument
-			subID                                      int32
-			length, precision, scale                   sql.NullInt32
+			obj, inOut string
+			arg        Argument
+			subID      int32
+			tParams    TypeParams
 		)
 		if err = rows.Scan(
 			&obj, &subID, &arg.Name,
-			&inOut, &dataType, &length, &precision, &scale,
-			&typeOwner, &typeName, &typeSubname, &typeLink,
-			&typeObjectType, &plsType,
+			&inOut, &tParams.DataType, &tParams.Length, &tParams.Precision, &tParams.Scale,
+			&tParams.Owner, &tParams.Name, &tParams.Subname, &tParams.Link,
+			&tParams.ObjectType, &tParams.PlsType,
 		); err != nil {
 			return funcs, fmt.Errorf("scan %s: %w", qry, err)
 		}
 		if lastID != subID {
-			if lastID != 0 {
+			if lastID != 0 && F.Name != "" {
 				funcs = append(funcs, F)
 			}
 			F = Function{Package: pkg, Name: obj}
 			lastID = subID
 		}
+		if arg.Type, err = tt.FromParams(ctx, tParams); err != nil {
+			if errors.Is(err, ErrNotSupported) {
+				logger.Warn("not supported", "pkg", pkg, "fun", obj, "arg", arg.Name, "type", tParams)
+				F.Name = ""
+				continue
+			}
+			return funcs, fmt.Errorf("resolve %+v: %w", tParams, err)
+		}
 		F.Arguments = append(F.Arguments, FuncArg{
 			Argument: arg, InOut: newInOut(inOut),
 		})
+	}
+	if F.Name != "" {
+		funcs = append(funcs, F)
 	}
 	return funcs, rows.Close()
 }
@@ -101,3 +111,4 @@ func newInOut(s string) InOut {
 		panic(fmt.Errorf("unknown InOut string %q", s))
 	}
 }
+func (x InOut) String() string { return string(x) }

@@ -26,9 +26,12 @@ import (
 func TestReadPackages(t *testing.T) {
 	logger := zlog.NewT(t).SLog()
 	ctx := zlog.NewSContext(context.Background(), logger)
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
 	db, err := sql.Open("godror", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tt, err := objects.NewTypes(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +39,15 @@ func TestReadPackages(t *testing.T) {
 	const qry = `SELECT object_name FROM user_objects 
 		WHERE object_type = 'PACKAGE' AND 
 			object_name IN (
-				'DB_MMB2ABLAK', 'DB_SPOOLSYS3',
+ 'DB_ANYR',
+ 'DB_CASCO_LEKER',
+ 'DB_PGW_WS',
+ 'DB_WEB_GDPR',
+ 'DB_KAR_VEZENYLO4', 'DB_KAR_ONLINE', 'DB_KAR_MMB', 
+ 'DB_KUT_WS',
+ 'DB_MMB2ABLAK',
+ 'DB_SAM',
+ 'DB_SPOOLSYS3',
 				'DB_WEB', 'DB_WEB_PORTAL', 'DB_UPORTAL'
 			)`
 	rows, err := db.QueryContext(ctx, qry)
@@ -44,17 +55,35 @@ func TestReadPackages(t *testing.T) {
 		t.Fatalf("%s: %+v", err, qry)
 	}
 	defer rows.Close()
+	pkgs := make([]string, 0, 16)
 	for rows.Next() {
 		var pkg string
 		if err = rows.Scan(&pkg); err != nil {
-			t.Errorf("scan %s: %+v", qry, err)
-			continue
+			t.Fatalf("scan %s: %+v", qry, err)
 		}
-		funcs, err := objects.NewPackage(ctx, db, pkg)
-		if err != nil {
-			t.Fatalf("%s: %+v", pkg, err)
-		}
-		t.Logf("%s: %+v", pkg, funcs)
+		pkgs = append(pkgs, pkg)
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatalf("%s: %+v", qry, err)
+	}
+
+	for _, pkg := range pkgs {
+		pkg := pkg
+		t.Run(pkg, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			defer cancel()
+			funcs, err := tt.NewPackage(ctx, db, pkg)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					t.Skip(err)
+				}
+				t.Fatalf("%s: %+v", pkg, err)
+			}
+			for _, f := range funcs {
+				t.Logf("%+v", f)
+			}
+		})
 	}
 }
 
