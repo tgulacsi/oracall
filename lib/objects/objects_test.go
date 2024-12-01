@@ -23,6 +23,41 @@ import (
 
 //go:generate go install github.com/bufbuild/buf/cmd/buf@latest
 
+func TestReadPackages(t *testing.T) {
+	logger := zlog.NewT(t).SLog()
+	ctx := zlog.NewSContext(context.Background(), logger)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	db, err := sql.Open("godror", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const qry = `SELECT object_name FROM user_objects 
+		WHERE object_type = 'PACKAGE' AND 
+			object_name IN (
+				'DB_MMB2ABLAK', 'DB_SPOOLSYS3',
+				'DB_WEB', 'DB_WEB_PORTAL', 'DB_UPORTAL'
+			)`
+	rows, err := db.QueryContext(ctx, qry)
+	if err != nil {
+		t.Fatalf("%s: %+v", err, qry)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var pkg string
+		if err = rows.Scan(&pkg); err != nil {
+			t.Errorf("scan %s: %+v", qry, err)
+			continue
+		}
+		funcs, err := objects.NewPackage(ctx, db, pkg)
+		if err != nil {
+			t.Fatalf("%s: %+v", pkg, err)
+		}
+		t.Logf("%s: %+v", pkg, funcs)
+	}
+}
+
 func TestReadTypes(t *testing.T) {
 	logger := zlog.NewT(t).SLog()
 	ctx := zlog.NewSContext(context.Background(), logger)
