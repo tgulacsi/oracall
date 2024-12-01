@@ -22,6 +22,27 @@ import (
 )
 
 type (
+<<<<<<< HEAD
+=======
+	Type struct {
+		Elem *Type
+		// SELECT A.package_name, A.type_name, A.typecode, B.attr_type_owner, B.attr_type_name, B.attr_type_package, B.length, B.precision, B.scale, NULL AS index_by
+		Owner, Package, Name        string
+		TypeCode, CollType, IndexBy string
+		Arguments                   []Argument
+		TypeParams
+	}
+	TypeParams struct {
+		DataType, PlsType                      string
+		Owner, Name, Subname, Link, ObjectType string
+		Length, Precision, Scale               sql.NullInt32
+	}
+	Argument struct {
+		Type *Type
+		Name string
+	}
+
+>>>>>>> 4d22bf5 (objects: read functions)
 	Types struct {
 		db            querier `json:"-"`
 		m             map[string]*Type
@@ -324,6 +345,45 @@ SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A
 
 var errUnknownType = errors.New("unknown type")
 
+func (tt *Types) FromParams(ctx context.Context, params TypeParams) (*Type, error) {
+	logger := zlog.SFromContext(ctx)
+	logger.Info("Resolve", "params", params)
+	var k, name string
+	switch params.DataType {
+	case "BINARY_INTEGER", "CLOB", "DATE", "PL/SQL BOOLEAN":
+		k = params.DataType
+	case "CHAR", "VARCHAR2":
+		if params.Length.Int32 == 0 {
+			params.Length.Int32 = 32767
+		}
+		k = fmt.Sprintf("%s(%d)", params.DataType, params.Length.Int32)
+	case "NUMBER":
+		if params.Precision.Int32 == 0 {
+			k = "NUMBER"
+		} else if params.Scale.Int32 == 0 {
+			k = fmt.Sprintf("NUMBER(%d)", params.Precision.Int32)
+		} else {
+			k = fmt.Sprintf("NUMBER(%d,%d)", params.Precision.Int32, params.Scale.Int32)
+		}
+	case "PL/SQL RECORD", "PL/SQL TABLE", "REF CURSOR":
+		name = params.Owner + "." + params.Name + "." + params.Subname
+	case "TABLE":
+		name = params.Owner + "." + params.Name
+	default:
+		return nil, fmt.Errorf("unknown DataType=%q", params.DataType)
+	}
+	if k != "" {
+		tt.mu.Lock()
+		t := tt.m[k]
+		if t == nil {
+			t = &Type{Name: k, TypeParams: params}
+			tt.m[k] = t
+		}
+		tt.mu.Unlock()
+		return t, nil
+	}
+	return tt.Get(ctx, name)
+}
 func (tt *Types) Get(ctx context.Context, name string) (*Type, error) {
 	tt.mu.Lock()
 	defer tt.mu.Unlock()
@@ -344,6 +404,22 @@ func (tt *Types) get(ctx context.Context, name string) (*Type, error) {
 	_ = logger
 	t := tt.m[name]
 	if t == nil || t.TypeCode == "" {
+		if strings.Count(name, ".") < 2 {
+			const qry = `SELECT table_owner||'.'||table_name||(
+			CASE WHEN db_link IS NULL THEN NULL ELSE '@'||db_link END
+		) FROM user_synonyms WHERE synonym_name = :1`
+			var nm string
+			if err := tt.db.QueryRowContext(ctx, qry,
+				strings.TrimPrefix(name, tt.currentSchema+"."),
+			).Scan(&nm); err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, fmt.Errorf("%s [%q]: %w", qry, name, err)
+				}
+			} else if nm != "" {
+				name = nm
+			}
+		}
+
 		const qry = `SELECT A.owner, A.type_name, NULL AS package_name, A.typecode
   FROM all_types A
   WHERE owner IN (COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')), COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))) AND
