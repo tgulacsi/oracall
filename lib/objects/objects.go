@@ -5,10 +5,12 @@
 package objects
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"slices"
 	"strings"
@@ -18,31 +20,17 @@ import (
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/godror/godror"
+	oracall "github.com/tgulacsi/oracall/lib"
 	"golang.org/x/sync/errgroup"
 )
 
 type (
-<<<<<<< HEAD
-=======
-	Type struct {
-		Elem *Type
-		// SELECT A.package_name, A.type_name, A.typecode, B.attr_type_owner, B.attr_type_name, B.attr_type_package, B.length, B.precision, B.scale, NULL AS index_by
-		Owner, Package, Name        string
-		TypeCode, CollType, IndexBy string
-		Arguments                   []Argument
-		TypeParams
-	}
 	TypeParams struct {
 		DataType, PlsType                      string
 		Owner, Name, Subname, Link, ObjectType string
 		Length, Precision, Scale               sql.NullInt32
 	}
-	Argument struct {
-		Type *Type
-		Name string
-	}
 
->>>>>>> 4d22bf5 (objects: read functions)
 	Types struct {
 		db            querier `json:"-"`
 		m             map[string]*Type
@@ -163,7 +151,7 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				t := &Type{
 					Owner: tm.Owner, Package: tm.Package, Name: tm.Name,
 					TypeCode: tm.TypeCode, CollType: tm.CollType, IndexBy: tm.IndexBy,
-					Length: tm.Length, Precision: tm.Precision, Scale: tm.Scale,
+					TypeParams: TypeParams{Length: tm.Length, Precision: tm.Precision, Scale: tm.Scale},
 				}
 				if tm.ElemTypeIdx != 0 {
 					t.Elem = allTypes[tm.ElemTypeIdx]
@@ -247,6 +235,39 @@ func NewTypes(ctx context.Context, db querier) (*Types, error) {
 		}
 	}
 	return &Types{db: db, m: make(map[string]*Type), currentSchema: currentSchema}, nil
+}
+
+func (tt *Types) WriteFuncs(ctx context.Context, w io.Writer, funcs []Function) error {
+	bw := bufio.NewWriter(w)
+	for _, f := range funcs {
+		var streamQual string
+		if false { //f.HasCursorOut() {
+			streamQual = "stream "
+		}
+		fmt.Fprintf(bw, "rpc %[1]s (%[1]s_Input) returns (%[2]s%[1]s_Output) {%[3]s}\n",
+			oracall.CamelCase(f.Package)+"_"+oracall.CamelCase(f.Name),
+			streamQual,
+			"", // tags
+		)
+	}
+	return bw.Flush()
+}
+
+func (tt *Types) WritePB(ctx context.Context, w io.Writer) error {
+	bw := bufio.NewWriter(w)
+	bw.WriteString(`
+` + ProtoImports.String() + `
+` + ProtoExtends.String() + `
+`)
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	for nm, x := range tt.m {
+		if err := x.WriteProtobufMessageType(ctx, bw); err != nil {
+			return fmt.Errorf("WriteProtobufMessageType(%q): %w", nm, err)
+		}
+	}
+
+	return bw.Flush()
 }
 
 func (tt *Types) Names(ctx context.Context, only ...string) ([]string, error) {

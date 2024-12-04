@@ -22,7 +22,7 @@ type (
 		Owner, Package, Name        string
 		TypeCode, CollType, IndexBy string
 		Arguments                   []Argument
-		Length, Precision, Scale    sql.NullInt32
+		TypeParams
 	}
 	Argument struct {
 		Type *Type
