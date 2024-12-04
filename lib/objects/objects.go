@@ -64,6 +64,39 @@ func NewTypes(ctx context.Context, db querier) (*Types, error) {
 	return &Types{db: db, m: make(map[string]*Type), currentSchema: currentSchema}, nil
 }
 
+func (tt *Types) WriteFuncs(ctx context.Context, w io.Writer, funcs []Function) error {
+	bw := bufio.NewWriter(w)
+	for _, f := range funcs {
+		var streamQual string
+		if false { //f.HasCursorOut() {
+			streamQual = "stream "
+		}
+		fmt.Fprintf(bw, "rpc %[1]s (%[1]s_Input) returns (%[2]s%[1]s_Output) {%[3]s}\n",
+			oracall.CamelCase(f.Package)+"_"+oracall.CamelCase(f.Name),
+			streamQual,
+			"", // tags
+		)
+	}
+	return bw.Flush()
+}
+
+func (tt *Types) WritePB(ctx context.Context, w io.Writer) error {
+	bw := bufio.NewWriter(w)
+	bw.WriteString(`
+` + ProtoImports.String() + `
+` + ProtoExtends.String() + `
+`)
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	for nm, x := range tt.m {
+		if err := x.WriteProtobufMessageType(ctx, bw); err != nil {
+			return fmt.Errorf("WriteProtobufMessageType(%q): %w", nm, err)
+		}
+	}
+
+	return bw.Flush()
+}
+
 func (tt *Types) Names(ctx context.Context, only ...string) ([]string, error) {
 	const qry = `SELECT A.type_name, NULL AS package_name, A.typecode FROM user_types A
 UNION ALL

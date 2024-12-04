@@ -13,6 +13,7 @@ import (
 	"flag"
 	"os"
 	"os/exec"
+	"sync"
 	"testing"
 	"time"
 
@@ -67,9 +68,13 @@ func TestReadPackages(t *testing.T) {
 		t.Fatalf("%s: %+v", qry, err)
 	}
 
+	var wg sync.WaitGroup
+	funcsCh := make(chan []objects.Function, 1)
 	for _, pkg := range pkgs {
 		pkg := pkg
+		wg.Add(1)
 		t.Run(pkg, func(t *testing.T) {
+			defer wg.Done()
 			t.Parallel()
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 			defer cancel()
@@ -83,8 +88,34 @@ func TestReadPackages(t *testing.T) {
 			for _, f := range funcs {
 				t.Logf("%+v", f)
 			}
+			funcsCh <- funcs
 		})
 	}
+	t.Run("wait", func(t *testing.T) { t.Parallel(); wg.Wait(); close(funcsCh) })
+
+	t.Run("funcs.proto", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		buf.WriteString(`
+syntax = "proto3";
+
+package objects;
+option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
+
+`)
+		bw := bufio.NewWriter(&buf)
+		if err = tt.WritePB(ctx, bw); err != nil {
+			t.Fatal(err)
+		}
+		for funcs := range funcsCh {
+			if err := tt.WriteFuncs(ctx, bw, funcs); err != nil {
+				t.Fatal(err)
+			}
+		}
+		bw.Flush()
+		os.MkdirAll("testdata", 0755)
+		os.WriteFile("testdata/funcs.proto", buf.Bytes(), 0664)
+	})
 }
 
 func TestReadTypes(t *testing.T) {
@@ -92,7 +123,8 @@ func TestReadTypes(t *testing.T) {
 	ctx := zlog.NewSContext(context.Background(), logger)
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	db, err := sql.Open("godror", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
+	db, err := sql.Open("godror",
+		nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,13 +144,9 @@ syntax = "proto3";
 package objects;
 option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 
-` + objects.ProtoImports.String() + `
-` + objects.ProtoExtends.String() + `
 `)
-	bw := bufio.NewWriter(&buf)
 	for _, nm := range names {
-		x, err := types.Get(ctx, nm)
-		t.Logf("%s: %v", nm, x)
+		_, err := types.Get(ctx, nm)
 		if err != nil {
 			if errors.Is(err, objects.ErrNotSupported) {
 				t.Logf("%+v", err)
@@ -127,9 +155,10 @@ option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 				t.Fatalf("%s: %+v", nm, err)
 			}
 		}
-		if err = x.WriteProtobufMessageType(ctx, bw); err != nil {
-			t.Fatal(nm, err)
-		}
+	}
+	bw := bufio.NewWriter(&buf)
+	if err = types.WritePB(ctx, bw); err != nil {
+		t.Fatal(err)
 	}
 	bw.Flush()
 	os.MkdirAll("testdata", 0755)
