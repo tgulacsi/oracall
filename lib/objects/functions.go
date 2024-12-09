@@ -5,11 +5,9 @@
 package objects
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/UNO-SOFT/zlog/v2"
@@ -87,12 +85,14 @@ func (t Type) GenProto() ProtoType {
 	if t.IsColl() && t.Elem != nil {
 		return t.Elem.GenProto()
 	}
-	exts := []ProtoExtension{{Name: protoExtendTypeName, Value: t.name(".")}}
+	exts := []ProtoExtension{
+		{Name: protoExtendTypeName, Value: t.name(".")},
+	}
 	if !t.composite() {
 		return ProtoType{Simple: t.protoType(), Extensions: exts}
 	}
 	msg := ProtoMessage{
-		Name:       oracall.CamelCase(t.name("__")),
+		Name:       t.ProtoMessageName(),
 		Fields:     make([]ProtoField, len(t.Arguments)),
 		Extensions: exts,
 	}
@@ -100,17 +100,6 @@ func (t Type) GenProto() ProtoType {
 		msg.Fields[i] = A.GenProto(i + 1)
 	}
 	return ProtoType{Message: &msg, Extensions: exts}
-}
-
-func (tt *Types) WritePackage(ctx context.Context, w io.Writer, pkg Package) error {
-	bw := bufio.NewWriter(w)
-	if err := tt.WriteInOuts(ctx, bw, pkg.Funcs); err != nil {
-		return err
-	}
-	fmt.Fprintf(bw, "service %s {\n", oracall.CamelCase(pkg.Name))
-	err := tt.WriteRPC(ctx, bw, pkg.Funcs)
-	bw.WriteString("}\n")
-	return err
 }
 
 func (tt *Types) NewPackage(ctx context.Context, db querier, pkg string) (Package, error) {
@@ -172,58 +161,6 @@ func (tt *Types) NewPackage(ctx context.Context, db querier, pkg string) (Packag
 		P.Funcs = append(P.Funcs, F)
 	}
 	return P, rows.Close()
-}
-
-func (tt *Types) WriteInOuts(ctx context.Context, w io.Writer, funcs []Function) error {
-	bw := bufio.NewWriter(w)
-	for _, f := range funcs {
-		if err := f.writeInOut(bw); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (tt *Types) WriteRPC(ctx context.Context, w io.Writer, funcs []Function) error {
-	bw := bufio.NewWriter(w)
-	for _, f := range funcs {
-		var streamQual string
-		if false { //f.HasCursorOut() {
-			streamQual = "stream "
-		}
-		fmt.Fprintf(bw, "rpc %[1]s (%[1]s_Input) returns (%[2]s%[1]s_Output) {%[3]s}\n",
-			oracall.CamelCase(f.Package)+"_"+oracall.CamelCase(f.Name),
-			streamQual,
-			"", // tags
-		)
-	}
-	return bw.Flush()
-}
-
-func (f Function) writeInOut(bw *bufio.Writer) error {
-	for _, output := range []bool{false, true} {
-		nm := "Input"
-		if output {
-			nm = "Output"
-		}
-		args := make([]Argument, 0, len(f.Arguments))
-		args = args[:0]
-		for _, a := range f.Arguments {
-			if output && a.InOut.IsOut() || !output && a.InOut.IsIn() {
-				A := a.Argument
-				if output && A.Name == "" {
-					A.Name = "RET"
-				}
-				args = append(args, A)
-			}
-		}
-		fmt.Fprintf(bw, "message %s_%s_%s {\n", oracall.CamelCase(f.Package), oracall.CamelCase(f.Name), nm)
-		if err := writeArguments(bw, args); err != nil {
-			return err
-		}
-		bw.WriteString("}\n")
-	}
-	return nil
 }
 
 type InOut uint8
