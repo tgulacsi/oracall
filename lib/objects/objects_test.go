@@ -27,7 +27,9 @@ import (
 func TestReadPackages(t *testing.T) {
 	logger := zlog.NewT(t).SLog()
 	ctx := zlog.NewSContext(context.Background(), logger)
-	db, err := sql.Open("godror", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
+	db, err := sql.Open("godror", nvl(
+		os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID"),
+	))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +71,7 @@ func TestReadPackages(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	funcsCh := make(chan []objects.Function, 1)
+	funcsCh := make(chan objects.Package, 1)
 	for _, pkg := range pkgs {
 		pkg := pkg
 		wg.Add(1)
@@ -78,17 +80,14 @@ func TestReadPackages(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 			defer cancel()
-			funcs, err := tt.NewPackage(ctx, db, pkg)
+			P, err := tt.NewPackage(ctx, db, pkg)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					t.Skip(err)
 				}
 				t.Fatalf("%s: %+v", pkg, err)
 			}
-			for _, f := range funcs {
-				t.Logf("%+v", f)
-			}
-			funcsCh <- funcs
+			funcsCh <- P
 		})
 	}
 	t.Run("wait", func(t *testing.T) { t.Parallel(); wg.Wait(); close(funcsCh) })
@@ -102,19 +101,21 @@ syntax = "proto3";
 package objects;
 option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 
+` + objects.ProtoImports.String() + `
+` + objects.ProtoExtends.String() + `
 `)
+		var svcs objects.Protobuf
+		for pkg := range funcsCh {
+			svcs.Services = append(svcs.Services, pkg.GenProto())
+		}
 		bw := bufio.NewWriter(&buf)
-		if err = tt.WritePB(ctx, bw); err != nil {
-			t.Fatal(err)
-		}
-		for funcs := range funcsCh {
-			if err := tt.WriteFuncs(ctx, bw, funcs); err != nil {
-				t.Fatal(err)
-			}
-		}
+		svcs.Print(bw)
 		bw.Flush()
 		os.MkdirAll("testdata", 0755)
 		os.WriteFile("testdata/funcs.proto", buf.Bytes(), 0664)
+		if b, err := exec.CommandContext(ctx, "buf", "format", "-w", "testdata/funcs.proto").CombinedOutput(); err != nil {
+			t.Fatalf("buf format: %s: %+v", string(b), err)
+		}
 	})
 }
 

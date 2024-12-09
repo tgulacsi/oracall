@@ -64,22 +64,6 @@ func NewTypes(ctx context.Context, db querier) (*Types, error) {
 	return &Types{db: db, m: make(map[string]*Type), currentSchema: currentSchema}, nil
 }
 
-func (tt *Types) WriteFuncs(ctx context.Context, w io.Writer, funcs []Function) error {
-	bw := bufio.NewWriter(w)
-	for _, f := range funcs {
-		var streamQual string
-		if false { //f.HasCursorOut() {
-			streamQual = "stream "
-		}
-		fmt.Fprintf(bw, "rpc %[1]s (%[1]s_Input) returns (%[2]s%[1]s_Output) {%[3]s}\n",
-			oracall.CamelCase(f.Package)+"_"+oracall.CamelCase(f.Name),
-			streamQual,
-			"", // tags
-		)
-	}
-	return bw.Flush()
-}
-
 func (tt *Types) WritePB(ctx context.Context, w io.Writer) error {
 	bw := bufio.NewWriter(w)
 	bw.WriteString(`
@@ -455,27 +439,8 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 	// logger := zlog.SFromContext(ctx)
 	fmt.Fprintf(bw, "// %s\nmessage %s {\n\toption (oracall_object_type) = %q;\n", t.name("."), t.ProtoMessageName(), t.OraType())
 	if t.Arguments != nil {
-		var i int
-		for _, a := range t.Arguments {
-			name := a.Name
-			s := a.Type
-			oraType := s.OraType()
-			var rule string
-			// logger.Debug("attr", "t", t.Name, "a", a.Name, "type", fmt.Sprintf("%#v", s), "isColl", s.IsColl(), "elem", s.Elem)
-			if s.IsColl() {
-				rule = "repeated "
-				if !isSimpleType(s.Name) && s.Elem != nil {
-					s = s.Elem
-				}
-			} else if s.Elem != nil {
-				rule = "repeated "
-				s = s.Elem
-				if name == "" {
-					name = "record"
-				}
-			}
-			i++
-			fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n", rule, s.protoType(), strings.ToLower(name), i, oraType)
+		if err := writeArguments(bw, t.Arguments); err != nil {
+			return err
 		}
 	} else if s := t.Elem; s != nil {
 		// fmt.Fprintf(bw, "\trepeated %s = %d;  //b %s\n", s.protoType(), 1, s.name("."))
@@ -510,7 +475,8 @@ func (t Type) OraType() string {
 }
 
 func (t Type) protoType() string {
-	if t.Name == "XMLTYPE" && (t.Owner == "PUBLIC" || t.Owner == "SYS") {
+	if (t.Name == "XMLTYPE" || t.Name == "JSON_ARRAY_T") &&
+		(t.Owner == "PUBLIC" || t.Owner == "SYS") {
 		return "string"
 	}
 	if t.composite() {
@@ -524,7 +490,9 @@ func (t Type) protoType() string {
 
 func isSimpleType(s string) bool {
 	switch s {
-	case "XMLTYPE", "PUBLIC.XMLTYPE", "RAW", "LONG RAW", "BLOB",
+	case "XMLTYPE", "PUBLIC.XMLTYPE",
+		"JSON_ARRAY_T", "PUBLIC.JSON_ARRAY_T",
+		"RAW", "LONG RAW", "BLOB",
 		"VARCHAR2", "CHAR", "LONG", "CLOB", "PL/SQL ROWID",
 		"BOOLEAN", "PL/SQL BOOLEAN",
 		"DATE", "TIMESTAMP",
@@ -537,16 +505,22 @@ func isSimpleType(s string) bool {
 	}
 }
 func (t Type) protoTypeName() string {
-	switch t.Name {
+	nm := t.Name
+	if pre, post, ok := strings.Cut(nm, "("); ok && strings.HasSuffix(post, ")") {
+		nm = pre
+	}
+	switch nm {
 	case "RAW", "LONG RAW", "BLOB":
 		return "bytes"
-	case "VARCHAR2", "CHAR", "LONG", "CLOB", "PL/SQL ROWID", "XMLTYPE", "PUBLIC.XMLTYPE":
+	case "VARCHAR2", "CHAR", "LONG", "CLOB", "PL/SQL ROWID",
+		"XMLTYPE", "PUBLIC.XMLTYPE",
+		"JSON_ARRAY_T", "PUBLIC.JSON_ARRAY_Y":
 		return "string"
 	case "BOOLEAN", "PL/SQL BOOLEAN":
 		return "bool"
 	case "DATE", "TIMESTAMP":
 		return "google.protobuf.Timestamp"
-	case "PL/SQL PLS INTEGER", "PL/SQL BINARY INTEGER":
+	case "BINARY_INTEGER", "PL/SQL PLS INTEGER", "PL/SQL BINARY INTEGER":
 		return "int32"
 	case "BINARY_DOUBLE":
 		return "double"
@@ -562,8 +536,10 @@ func (t Type) protoTypeName() string {
 		}
 		return "string"
 	}
+	fmt.Printf("protoTypeName(%q)\n", t.Name)
 	return ""
 }
+
 func (t *Type) Valid() bool {
 	return t != nil && t.Name != "" && (isSimpleType(t.Name) || t.Elem != nil || t.Arguments != nil)
 }
@@ -571,47 +547,29 @@ func (t *Type) Valid() bool {
 func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
 	return fmt.Errorf("not implemented")
 }
-
-var ProtoImports = protoImports{
-	"google/protobuf/timestamp.proto",
-	"google/protobuf/descriptor.proto",
-}
-
-type protoImport string
-
-func (p protoImport) String() string {
-	return fmt.Sprintf("import %q;\n", string(p))
-}
-
-type protoImports []protoImport
-
-func (p protoImports) String() string {
-	var buf strings.Builder
-	for _, s := range p {
-		buf.WriteString(s.String())
+func writeArguments(bw *bufio.Writer, args []Argument) error {
+	var i int
+	for _, a := range args {
+		name := a.Name
+		s := a.Type
+		oraType := s.OraType()
+		var rule string
+		// logger.Debug("attr", "t", t.Name, "a", a.Name, "type", fmt.Sprintf("%#v", s), "isColl", s.IsColl(), "elem", s.Elem)
+		if s.IsColl() {
+			rule = "repeated "
+			if !isSimpleType(s.Name) && s.Elem != nil {
+				s = s.Elem
+			}
+		} else if s.Elem != nil {
+			rule = "repeated "
+			s = s.Elem
+			if name == "" {
+				name = "record"
+			}
+		}
+		i++
+		fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n",
+			rule, s.protoType(), strings.ToLower(name), i, oraType)
 	}
-	return buf.String()
-}
-
-const (
-	MessageTypeExtension = 79396128
-	FieldTypeExtension   = 79396128
-)
-
-// a number between 1 and 536,870,911 with the following restrictions:
-// The given number must be unique among all fields for that message.
-// Field numbers 19,000 to 19,999 are reserved for the Protocol Buffers implementation. The protocol buffer compiler will complain if you use one of these reserved field numbers in your message.
-var ProtoExtends = protoExtends{
-	`extend google.protobuf.MessageOptions {
-  string oracall_object_type = 79396128;
-}`,
-	`extend google.protobuf.FieldOptions {
-  string oracall_field_type = 79396128;
-}`,
-}
-
-type protoExtends []string
-
-func (p protoExtends) String() string {
-	return strings.Join(p, "\n")
+	return nil
 }
