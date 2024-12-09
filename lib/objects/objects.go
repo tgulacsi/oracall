@@ -72,12 +72,11 @@ func (tt *Types) WritePB(ctx context.Context, w io.Writer) error {
 `)
 	tt.mu.Lock()
 	defer tt.mu.Unlock()
-	for nm, x := range tt.m {
-		if err := x.WriteProtobufMessageType(ctx, bw); err != nil {
-			return fmt.Errorf("WriteProtobufMessageType(%q): %w", nm, err)
+	for _, x := range tt.m {
+		if m := x.GenProto().Message; m != nil {
+			m.Print(bw)
 		}
 	}
-
 	return bw.Flush()
 }
 
