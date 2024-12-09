@@ -271,6 +271,35 @@ func (x *%s) Scan(v any) error {
 	return bw.Flush()
 }
 
+func writeArguments(bw *bufio.Writer, args []Argument) error {
+	var i int
+	for _, a := range args {
+		name := a.Name
+		if strings.HasSuffix(name, "#") {
+			name = name[:len(name)-1] + "_hidden"
+		}
+		s := a.Type
+		oraType := s.OraType()
+		var rule string
+		if s.IsColl() {
+			rule = "repeated "
+			if !isSimpleType(s.Name) && s.Elem != nil {
+				s = s.Elem
+			}
+		} else if s.Elem != nil {
+			rule = "repeated "
+			s = s.Elem
+			if name == "" {
+				name = "record"
+			}
+		}
+		i++
+		fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n",
+			rule, s.protoType(), strings.ToLower(name), i, oraType)
+	}
+	return nil
+}
+
 func (t Type) dataGetter(dataName string) string {
 	switch t.protoType() {
 	case "bool":

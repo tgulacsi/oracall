@@ -20,7 +20,6 @@ import (
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/godror/godror"
-	oracall "github.com/tgulacsi/oracall/lib"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -235,22 +234,6 @@ func NewTypes(ctx context.Context, db querier) (*Types, error) {
 		}
 	}
 	return &Types{db: db, m: make(map[string]*Type), currentSchema: currentSchema}, nil
-}
-
-func (tt *Types) WriteFuncs(ctx context.Context, w io.Writer, funcs []Function) error {
-	bw := bufio.NewWriter(w)
-	for _, f := range funcs {
-		var streamQual string
-		if false { //f.HasCursorOut() {
-			streamQual = "stream "
-		}
-		fmt.Fprintf(bw, "rpc %[1]s (%[1]s_Input) returns (%[2]s%[1]s_Output) {%[3]s}\n",
-			oracall.CamelCase(f.Package)+"_"+oracall.CamelCase(f.Name),
-			streamQual,
-			"", // tags
-		)
-	}
-	return bw.Flush()
 }
 
 func (tt *Types) WritePB(ctx context.Context, w io.Writer) error {
@@ -627,46 +610,3 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 	return t, nil
 }
 
-var ProtoImports = protoImports{
-	"google/protobuf/timestamp.proto",
-	"google/protobuf/descriptor.proto",
-}
-
-type protoImport string
-
-func (p protoImport) String() string {
-	return fmt.Sprintf("import %q;\n", string(p))
-}
-
-type protoImports []protoImport
-
-func (p protoImports) String() string {
-	var buf strings.Builder
-	for _, s := range p {
-		buf.WriteString(s.String())
-	}
-	return buf.String()
-}
-
-const (
-	MessageTypeExtension = 79396128
-	FieldTypeExtension   = 79396128
-)
-
-// a number between 1 and 536,870,911 with the following restrictions:
-// The given number must be unique among all fields for that message.
-// Field numbers 19,000 to 19,999 are reserved for the Protocol Buffers implementation. The protocol buffer compiler will complain if you use one of these reserved field numbers in your message.
-var ProtoExtends = protoExtends{
-	`extend google.protobuf.MessageOptions {
-  string oracall_object_type = 79396128;
-}`,
-	`extend google.protobuf.FieldOptions {
-  string oracall_field_type = 79396128;
-}`,
-}
-
-type protoExtends []string
-
-func (p protoExtends) String() string {
-	return strings.Join(p, "\n")
-}
