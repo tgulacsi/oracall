@@ -5,11 +5,14 @@
 package source
 
 import (
+	"context"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/kylelemons/godebug/diff"
 )
 
@@ -18,6 +21,11 @@ func TestParseDocs(t *testing.T) {
 		Want   map[string]string
 		Source string
 	}
+
+	logger := zlog.NewT(t).SLog()
+	ctx := zlog.NewSContext(context.Background(), logger)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
 
 	for tcName, tc := range map[string]testCase{
 		"nil": testCase{
@@ -353,7 +361,7 @@ END DB_web_dbx;`,
 		},
 	} {
 
-		docs, err := parseDocs(tc.Source)
+		docs, err := parseDocs(ctx, tc.Source)
 		if err != nil {
 			t.Errorf("%q. %v", tcName, err)
 			continue

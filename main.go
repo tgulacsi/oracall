@@ -734,7 +734,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 					}
 					replMu.Lock()
 					bb := buf.String()
-					funDocs, annots, docsErr := source.Parse(bb)
+					funDocs, annots, docsErr := source.Parse(ctx, bb)
 					if len(annots) != 0 {
 						for _, a := range annots {
 							a.Package = ua.PackageName
