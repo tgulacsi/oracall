@@ -37,24 +37,29 @@ func TestLex(t *testing.T) {
 		if err != nil {
 			t.Errorf("%q: %+v", di.Name(), err)
 		}
-		l := lex(ctx, "docs", string(b))
-		for {
-			item := l.nextItem()
-			// logger.Debug("parseDocs", "item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
-			switch item.typ {
-			case itemError:
-				t.Fatal(errors.New(item.val))
-			case itemEOF:
-				return
-			case itemSep:
-				t.Log("<sep>" + item.String() + "</sep>")
-			case itemComment:
-				t.Log("<comment>" + item.String() + "</comment>\n")
-			case itemText:
-				t.Log("<text>" + item.val + "</text>\n")
-			case itemString:
-				t.Log("<string>" + item.String() + "</string>\n")
-			}
+		nm := di.Name()
+		t.Run(nm, func(t *testing.T) { testLexString(ctx, t, string(b)) })
+	}
+}
+
+func testLexString(ctx context.Context, t *testing.T, text string) {
+	l := lex(ctx, t.Name(), text)
+	for {
+		item := l.nextItem()
+		// logger.Debug("parseDocs", "item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
+		switch item.typ {
+		case itemError:
+			t.Fatal(errors.New(item.val))
+		case itemEOF:
+			return
+		case itemSep:
+			t.Log("<sep>" + item.String() + "</sep>")
+		case itemComment:
+			t.Log("<comment>" + item.String() + "</comment>\n")
+		case itemText:
+			t.Log("<text>" + item.val + "</text>\n")
+		case itemString:
+			t.Log("<string>" + item.String() + "</string>\n")
 		}
 	}
 }
