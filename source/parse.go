@@ -23,7 +23,9 @@ var rDecl = regexp.MustCompile(`(FUNCTION|PROCEDURE) +([^ (;]+)`)
 func ParseDocs(ctx context.Context, src string) (docs map[string]string, err error) {
 	logger := zlog.SFromContext(ctx)
 	docs, err = parseDocs(ctx, src)
-	logger.Debug("parseDocs", "docs", len(docs), "error", err)
+	if err != nil {
+		logger.Error("parseDocs", "docs", len(docs), "error", err)
+	}
 	return docs, err
 }
 
@@ -37,7 +39,9 @@ func Parse(ctx context.Context, src string) (docs map[string]string, annotations
 		src = rAnnotation.ReplaceAllString(src, "")
 	}
 	docs, err = parseDocs(ctx, src)
-	logger.Debug("parseDocs", "docs", len(docs), "error", err)
+	if err != nil {
+		logger.Error("parseDocs", "docs", len(docs), "error", err)
+	}
 	return docs, annotations, err
 }
 
@@ -74,13 +78,13 @@ func parseAnnotations(ctx context.Context, src string) ([]oracall.Annotation, er
 }
 
 func parseDocs(ctx context.Context, text string) (map[string]string, error) {
-	logger := zlog.SFromContext(ctx)
+	// logger := zlog.SFromContext(ctx)
 	m := make(map[string]string)
 	l := lex(ctx, "docs", text)
 	var buf bytes.Buffer
 	for {
 		item := l.nextItem()
-		logger.Debug("parseDocs", "item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
+		// logger.Debug("parseDocs", "item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
 		switch item.typ {
 		case itemError:
 			return m, errors.New(item.val)
@@ -106,10 +110,11 @@ func parseDocs(ctx context.Context, text string) (map[string]string, error) {
 type stateFn func(*lexer) stateFn
 
 const (
-	bcBegin = "/*"
-	bcEnd   = "*/"
-	lcBegin = "--"
-	lcEnd   = "\n"
+	bcBegin  = "/*"
+	bcEnd    = "*/"
+	lcBegin  = "--"
+	lcEnd    = "\n"
+	strBegin = "'"
 	//eol     = "\n"
 )
 
@@ -120,6 +125,8 @@ const (
 	itemEOF
 	itemText
 	itemComment
+	itemSep
+	itemString
 )
 
 func lexText(l *lexer) stateFn {
@@ -129,25 +136,21 @@ func lexText(l *lexer) stateFn {
 	}
 
 	// skip --...\n
-	lcPos := strings.Index(l.input[l.pos:], lcBegin)
-	bcPos := strings.Index(l.input[l.pos:], bcBegin)
-	var pos int
+	what, pos := findFirst(l.input[l.pos:], strBegin, lcBegin, bcBegin)
 	var next func(*lexer) stateFn
-	if lcPos >= 0 && bcPos >= 0 {
-		if lcPos < bcPos {
-			pos, next = lcPos, lexLineComment
-		} else {
-			pos, next = bcPos, lexBlockComment
-		}
-	} else if lcPos >= 0 {
-		pos, next = lcPos, lexLineComment
-	} else if bcPos >= 0 {
-		pos, next = bcPos, lexBlockComment
+	switch what {
+	case lcBegin:
+		next = lexLineComment
+	case bcBegin:
+		next = lexBlockComment
+	case strBegin:
+		next = lexString
 	}
 	if next != nil {
-		l.pos += pos + 2
-		l.logger.Debug("lexText", "lcPos", lcPos, "bcPos", bcPos, "pos", pos, "l.pos", l.pos, "l.start", l.start)
+		l.pos += pos
 		l.emit(itemText)
+		l.pos += len(what)
+		l.emit(itemSep)
 		l.start = l.pos
 		if l.start > l.pos {
 			panic(fmt.Errorf("start=%d>pos=%d [pos=%d]", l.start, l.pos, pos))
@@ -158,6 +161,25 @@ func lexText(l *lexer) stateFn {
 	//logger.Log("msg", "lexText", "start", l.start, "pos", l.pos)
 	l.emit(itemText)
 	return nil
+}
+
+func lexString(l *lexer) stateFn {
+	for {
+		i := strings.IndexByte(l.input[l.pos:], '\'')
+		if i < 0 {
+			break
+		}
+		l.pos += i
+		if len(l.input[l.pos:]) > 1 && l.input[l.pos+1] == '\'' {
+			l.pos += 1
+		} else {
+			break
+		}
+	}
+	l.emit(itemString)
+	l.pos++
+	l.emit(itemSep)
+	return lexText
 }
 
 func lexLineComment(l *lexer) stateFn {
@@ -179,6 +201,7 @@ func lexLineComment(l *lexer) stateFn {
 	}
 	return lexText
 }
+
 func lexBlockComment(l *lexer) stateFn {
 	if l.pos < 0 || len(l.input) <= l.pos {
 		l.emit(itemEOF)
@@ -191,7 +214,8 @@ func lexBlockComment(l *lexer) stateFn {
 	}
 	l.pos += end
 	l.emit(itemComment)
-	l.start += len(bcEnd)
+	l.pos += len(bcEnd)
+	l.emit(itemSep)
 	l.pos += len(bcEnd)
 	if l.start > l.pos {
 		panic("starT > pos")
@@ -205,19 +229,23 @@ type item struct {
 }
 
 func (i item) String() string {
+	repl := func(s string) string { return s }
 	switch i.typ {
 	case itemEOF:
 		return "EOF"
 	case itemError:
 		return i.val
+	case itemString:
+		repl = strings.NewReplacer("''", "'").Replace
 	}
-	if len(i.val) > 20 {
-		if len(i.val) > 40 {
-			return fmt.Sprintf("%.20q...%.20q", i.val, i.val[len(i.val)-20:])
+	val := repl(i.val)
+	if len(val) > 20 {
+		if len(val) > 40 {
+			return fmt.Sprintf("%.20s...%.20s", val, val[len(val)-20:])
 		}
-		return fmt.Sprintf("%.20q...", i.val)
+		return fmt.Sprintf("%.20s...", val)
 	}
-	return fmt.Sprintf("%q", i.val)
+	return fmt.Sprintf("%s", val)
 }
 
 // lexer holds the state of the scanner.
@@ -280,27 +308,14 @@ func lex(ctx context.Context, name, input string) *lexer {
 	return l
 }
 
-// next returns the next rune in the input.
-/*
-func (l *lexer) next() rune {
-	if l.pos >= len(l.input) {
-		l.width = 0
-		return 0x4
+func findFirst(haystack string, needles ...string) (what string, where int) {
+	end := len(haystack)
+	for _, needle := range needles {
+		pos := strings.Index(haystack[:end], needle)
+		if pos != -1 {
+			what, where = needle, pos
+			end = pos
+		}
 	}
-	var r rune
-	r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
-	l.pos += l.width
-	return r
+	return what, where
 }
-
-// error returns an error token and terminates the scan
-// by passing back a nil pointer that will be the next
-// state, terminating l.run.
-func (l *lexer) errorf(format string, args ...interface{}) stateFn {
-	l.items <- item{
-		itemError,
-		fmt.Sprintf(format, args...),
-	}
-	return nil
-}
-*/

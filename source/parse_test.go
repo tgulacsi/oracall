@@ -1,4 +1,4 @@
-// Copyright 2015, 2021 Tamás Gulácsi
+// Copyright 2015, 2024 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,6 +6,9 @@ package source
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -15,6 +18,46 @@ import (
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/kylelemons/godebug/diff"
 )
+
+func TestLex(t *testing.T) {
+	// logger := zlog.NewT(t).SLog()
+	ctx := context.Background()
+	// ctx = zlog.NewSContext(ctx, logger)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	dis, err := os.ReadDir("testdata")
+	if err != nil && len(dis) == 0 {
+		t.Fatal(err)
+	}
+	for _, di := range dis {
+		if !strings.HasSuffix(di.Name(), ".sql") {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join("testdata", di.Name()))
+		if err != nil {
+			t.Errorf("%q: %+v", di.Name(), err)
+		}
+		l := lex(ctx, "docs", string(b))
+		for {
+			item := l.nextItem()
+			// logger.Debug("parseDocs", "item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
+			switch item.typ {
+			case itemError:
+				t.Fatal(errors.New(item.val))
+			case itemEOF:
+				return
+			case itemSep:
+				t.Log("<sep>" + item.String() + "</sep>")
+			case itemComment:
+				t.Log("<comment>" + item.String() + "</comment>\n")
+			case itemText:
+				t.Log("<text>" + item.val + "</text>\n")
+			case itemString:
+				t.Log("<string>" + item.String() + "</string>\n")
+			}
+		}
+	}
+}
 
 func TestParseDocs(t *testing.T) {
 	type testCase struct {
