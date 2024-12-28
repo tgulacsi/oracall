@@ -80,26 +80,29 @@ func parseAnnotations(ctx context.Context, src string) ([]oracall.Annotation, er
 func parseDocs(ctx context.Context, text string) (map[string]string, error) {
 	// logger := zlog.SFromContext(ctx)
 	m := make(map[string]string)
-	l := lex(ctx, "docs", text)
+	l := NewLexer(ctx, "docs", text)
 	var buf bytes.Buffer
-	for {
-		item := l.nextItem()
+	var err error
+	l.Iter(func(it item) bool {
 		// logger.Debug("parseDocs", "item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
-		switch item.typ {
+		switch it.typ {
 		case itemError:
-			return m, errors.New(item.val)
+			err = errors.New(it.val)
+			return false
 		case itemEOF:
-			return m, nil
+			return false
 		case itemComment:
-			buf.WriteString(item.val)
+			buf.WriteString(it.val)
 		case itemText:
-			ss := rDecl.FindStringSubmatch(item.val)
+			ss := rDecl.FindStringSubmatch(it.val)
 			if ss != nil {
 				m[ss[2]] = buf.String()
 			}
 			buf.Reset()
 		}
-	}
+		return true
+	})
+	return m, err
 }
 
 // The lexer structure shamelessly copied from
@@ -129,6 +132,25 @@ const (
 	itemString
 )
 
+func (typ itemType) String() string {
+	switch typ {
+	case itemError:
+		return "ERROR"
+	case itemEOF:
+		return "EOF"
+	case itemText:
+		return "text"
+	case itemComment:
+		return "comment"
+	case itemSep:
+		return "sep"
+	case itemString:
+		return "string"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func lexText(l *lexer) stateFn {
 	if l.pos == len(l.input) {
 		l.emit(itemEOF)
@@ -148,7 +170,9 @@ func lexText(l *lexer) stateFn {
 	}
 	if next != nil {
 		l.pos += pos
-		l.emit(itemText)
+		if l.pos != l.start {
+			l.emit(itemText)
+		}
 		l.pos += len(what)
 		l.emit(itemSep)
 		l.start = l.pos
@@ -166,6 +190,7 @@ func lexText(l *lexer) stateFn {
 func lexString(l *lexer) stateFn {
 	for {
 		i := strings.IndexByte(l.input[l.pos:], '\'')
+		l.logger.Debug("lexString", "pos", l.pos, "i", i)
 		if i < 0 {
 			break
 		}
@@ -178,6 +203,7 @@ func lexString(l *lexer) stateFn {
 	}
 	l.emit(itemString)
 	l.pos++
+	// l.logger.Debug("lexString", "emit", "string", "pos", l.pos, "start", l.start, "length", len(l.input))
 	l.emit(itemSep)
 	return lexText
 }
@@ -245,7 +271,7 @@ func (i item) String() string {
 		}
 		return fmt.Sprintf("%.20s...", val)
 	}
-	return fmt.Sprintf("%s", val)
+	return val
 }
 
 // lexer holds the state of the scanner.
@@ -272,37 +298,60 @@ func (l *lexer) run() {
 
 // emit passes an item back to the client.
 func (l *lexer) emit(t itemType) {
-	// logger.Log("EMIT", item{typ: t, val: l.input[l.start:l.pos]})
-	l.items <- item{typ: t, val: l.input[l.start:l.pos]}
-	l.start = l.pos
+	if l.state == nil || l.items == nil {
+		return
+	}
+	l.logger.Debug("EMIT", "typ", t, "val", l.input[l.start:l.pos])
+	if l.start != l.pos {
+		l.items <- item{typ: t, val: l.input[l.start:l.pos]}
+		l.start = l.pos
+		if t == itemEOF {
+			l.start = len(l.input)
+		}
+	}
 	if l.start == len(l.input) {
+		l.logger.Debug("EOF")
 		l.items <- item{typ: itemEOF}
 		close(l.items) // No more tokens will be delivered.
+		l.state = nil
 	}
 }
 
-// nextItem returns the next item from the input.
-func (l *lexer) nextItem() item {
+// Iter iterates over the items, calling yield with all the found items.
+func (l *lexer) Iter(yield func(item) bool) {
 	for {
 		select {
-		case it := <-l.items:
-			return it
+		case it, ok := <-l.items:
+			l.logger.Debug("Iter", "it", it, "ok", ok)
+			if !ok {
+				yield(item{typ: itemEOF})
+				return
+			}
+			if !yield(it) {
+				return
+			}
 		default:
+			l.logger.Debug("Iter=default", "state", l.state != nil)
 			if l.state == nil {
-				return item{typ: itemEOF}
+				yield(item{typ: itemEOF})
+				return
 			}
 			l.state = l.state(l)
 		}
 	}
 }
 
-// lex creates a new scanner for the input string.
-func lex(ctx context.Context, name, input string) *lexer {
+// Lex creates a new scanner for the input string.
+func NewLexer(ctx context.Context, name, input string) *lexer {
+	input = strings.TrimRight(input, " \t\v")
+	if !strings.HasSuffix(input, "\n") {
+		input += "\n"
+	}
 	l := &lexer{
 		name:   name,
 		input:  input,
 		state:  lexText,
-		items:  make(chan item, 2), // Two items sufficient.
+		items:  make(chan item, 3),
 		logger: zlog.SFromContext(ctx),
 	}
 	return l

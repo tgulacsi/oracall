@@ -6,7 +6,8 @@ package source
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"iter"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/UNO-SOFT/zlog/v2"
+	"github.com/google/go-cmp/cmp"
 	"github.com/kylelemons/godebug/diff"
 )
 
@@ -40,27 +42,74 @@ func TestLex(t *testing.T) {
 		nm := di.Name()
 		t.Run(nm, func(t *testing.T) { testLexString(ctx, t, string(b)) })
 	}
+
+	logger := zlog.NewT(t).SLog()
+	ctx = zlog.NewSContext(ctx, logger)
+	for _, tC := range []struct {
+		Text string
+		Want []item
+	}{
+		{Text: "'a'", Want: []item{
+			{typ: itemSep, val: "'"},
+			{typ: itemString, val: "a"},
+			{typ: itemSep, val: "'"},
+			{typ: itemText, val: "\n"},
+		}},
+		{Text: "z/*+comment--'a'\n*/:='a';--'a'", Want: []item{
+			{typ: itemText, val: "z"},
+			{typ: itemSep, val: "/*"},
+			{typ: itemComment, val: "+comment--'a'\n"},
+			{typ: itemSep, val: "*/"},
+			{typ: itemText, val: ":="},
+			{typ: itemSep, val: "'"},
+			{typ: itemString, val: "a"},
+			{typ: itemSep, val: "'"},
+			{typ: itemText, val: ";"},
+			{typ: itemSep, val: "--"},
+			{typ: itemComment, val: "'a'"},
+		}},
+	} {
+		t.Run(tC.Text, func(t *testing.T) {
+			gotS := printItems(testLexString(ctx, t, tC.Text))
+			wantS := printItems(iterItems(tC.Want))
+			if d := cmp.Diff(gotS, wantS); d != "" {
+				t.Logf("got %s,\n\twanted %s", gotS, wantS)
+				t.Error(d)
+			}
+		})
+	}
 }
 
-func testLexString(ctx context.Context, t *testing.T, text string) {
-	l := lex(ctx, t.Name(), text)
-	for {
-		item := l.nextItem()
-		// logger.Debug("parseDocs", "item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
-		switch item.typ {
-		case itemError:
-			t.Fatal(errors.New(item.val))
-		case itemEOF:
-			return
-		case itemSep:
-			t.Log("<sep>" + item.String() + "</sep>")
-		case itemComment:
-			t.Log("<comment>" + item.String() + "</comment>\n")
-		case itemText:
-			t.Log("<text>" + item.val + "</text>\n")
-		case itemString:
-			t.Log("<string>" + item.String() + "</string>\n")
+type itemsIter iter.Seq[item]
+
+func iterItems(items []item) itemsIter {
+	return func(yield func(item) bool) {
+		for _, it := range items {
+			if !yield(it) {
+				break
+			}
 		}
+	}
+}
+
+func printItems(seq itemsIter) string {
+	var buf strings.Builder
+	for it := range seq {
+		if it.typ == itemEOF {
+			break
+		}
+		fmt.Fprintf(&buf, "<%[1]s>%[2]s</%[1]s>\n", it.typ.String(), it.String())
+	}
+	return buf.String()
+}
+
+func testLexString(ctx context.Context, t *testing.T, text string) itemsIter {
+	l := NewLexer(ctx, t.Name(), text)
+	return func(yield func(item) bool) {
+		l.Iter(func(it item) bool {
+			t.Log(it.typ, it.val)
+			return yield(it)
+		})
 	}
 }
 
