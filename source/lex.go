@@ -163,6 +163,11 @@ type Item struct {
 	typ itemType
 }
 
+func (it Item) Is(t itemType) bool          { return it.typ == t }
+func (it Item) Type() itemType              { return it.typ }
+func (it Item) Value() string               { return it.val }
+func NewItem(typ itemType, val string) Item { return Item{val: val, typ: typ} }
+
 func (i Item) String() string {
 	repl := func(s string) string { return s }
 	switch i.typ {

@@ -2,12 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package source
+package source_test
 
 import (
 	"context"
 	"fmt"
-	"iter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/go-cmp/cmp"
+	"github.com/tgulacsi/oracall/source"
 )
 
 func TestLex(t *testing.T) {
@@ -44,26 +44,26 @@ func TestLex(t *testing.T) {
 	ctx = zlog.NewSContext(ctx, logger)
 	for _, tC := range []struct {
 		Text string
-		Want []Item
+		Want []source.Item
 	}{
-		{Text: "'a'", Want: []Item{
-			{typ: ItemSep, val: "'"},
-			{typ: ItemString, val: "a"},
-			{typ: ItemSep, val: "'"},
-			{typ: ItemText, val: "\n"},
+		{Text: "'a'", Want: []source.Item{
+			source.NewItem(source.ItemSep, "'"),
+			source.NewItem(source.ItemString, "a"),
+			source.NewItem(source.ItemSep, "'"),
+			source.NewItem(source.ItemText, "\n"),
 		}},
-		{Text: "z/*+comment--'a'\n*/:='a';--'a'", Want: []Item{
-			{typ: ItemText, val: "z"},
-			{typ: ItemSep, val: "/*"},
-			{typ: ItemComment, val: "+comment--'a'\n"},
-			{typ: ItemSep, val: "*/"},
-			{typ: ItemText, val: ":="},
-			{typ: ItemSep, val: "'"},
-			{typ: ItemString, val: "a"},
-			{typ: ItemSep, val: "'"},
-			{typ: ItemText, val: ";"},
-			{typ: ItemSep, val: "--"},
-			{typ: ItemComment, val: "'a'"},
+		{Text: "z/*+comment--'a'\n*/:='a';--'a'", Want: []source.Item{
+			source.NewItem(source.ItemText, "z"),
+			source.NewItem(source.ItemSep, "/*"),
+			source.NewItem(source.ItemComment, "+comment--'a'\n"),
+			source.NewItem(source.ItemSep, "*/"),
+			source.NewItem(source.ItemText, ":="),
+			source.NewItem(source.ItemSep, "'"),
+			source.NewItem(source.ItemString, "a"),
+			source.NewItem(source.ItemSep, "'"),
+			source.NewItem(source.ItemText, ";"),
+			source.NewItem(source.ItemSep, "--"),
+			source.NewItem(source.ItemComment, "'a'"),
 		}},
 	} {
 		t.Run(tC.Text, func(t *testing.T) {
@@ -77,10 +77,8 @@ func TestLex(t *testing.T) {
 	}
 }
 
-type itemsIter iter.Seq[Item]
-
-func iterItems(items []Item) itemsIter {
-	return func(yield func(Item) bool) {
+func iterItems(items []source.Item) source.ItemsIter {
+	return func(yield func(source.Item) bool) {
 		for _, it := range items {
 			if !yield(it) {
 				break
@@ -89,22 +87,22 @@ func iterItems(items []Item) itemsIter {
 	}
 }
 
-func printItems(seq itemsIter) string {
+func printItems(seq source.ItemsIter) string {
 	var buf strings.Builder
 	for it := range seq {
-		if it.typ == ItemEOF {
+		if it.Is(source.ItemEOF) {
 			break
 		}
-		fmt.Fprintf(&buf, "<%[1]s>%[2]s</%[1]s>\n", it.typ.String(), it.String())
+		fmt.Fprintf(&buf, "<%[1]s>%[2]s</%[1]s>\n", it.Type().String(), it.String())
 	}
 	return buf.String()
 }
 
-func testLexString(ctx context.Context, t *testing.T, text string) itemsIter {
-	l := Lex(ctx, text)
-	return func(yield func(Item) bool) {
-		l(func(it Item) bool {
-			t.Log(it.typ, it.val)
+func testLexString(ctx context.Context, t *testing.T, text string) source.ItemsIter {
+	l := source.Lex(ctx, text)
+	return func(yield func(source.Item) bool) {
+		l(func(it source.Item) bool {
+			t.Log(it)
 			return yield(it)
 		})
 	}

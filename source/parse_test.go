@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package source
+package source_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/go-cmp/cmp"
+	"github.com/tgulacsi/oracall/source"
 )
 
 func TestParseDocs(t *testing.T) {
@@ -361,7 +362,7 @@ END DB_web_dbx;`,
 		},
 	} {
 
-		docs, err := parseDocs(ctx, tc.Source)
+		docs, err := source.ParseDocs(ctx, tc.Source)
 		if err != nil {
 			t.Errorf("%q. %v", tcName, err)
 			continue
