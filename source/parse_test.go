@@ -14,13 +14,15 @@ import (
 
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/go-cmp/cmp"
+	"github.com/tgulacsi/oracall/lib"
 	"github.com/tgulacsi/oracall/source"
 )
 
 func TestParseDocs(t *testing.T) {
 	type testCase struct {
-		Want   map[string]string
-		Source string
+		Want        map[string]string
+		Annotations []oracall.Annotation
+		Source      string
 	}
 
 	logger := zlog.NewT(t).SLog()
@@ -35,6 +37,20 @@ func TestParseDocs(t *testing.T) {
 		},
 		"dbx": testCase{
 			Source: `CREATE OR REPLACE PACKAGE DB_web_dbx IS
+
+  --oracall:handle NO_DATA_FOUND
+  --oracall:handle TOO_MANY_ROWS
+  --oracall:private kontakt_kut_akr_uf_tolt
+  --oracall:rename kontakt_kut_akr_uf_tolt2 => konktakt_kut_akr_uf_tolt
+  --oracall:private wa_torolt_tetelek
+  --oracall:replace wa_torolt_tetelek2 => wa_torolt_tetelek_xml
+  --oracall:rename wa_torolt_tetelek2 => wa_torolt_tetelek
+  --oracall:private adat_leker
+  --oracall:replace adat_leker_2 => adat_leker_2_xml
+  --oracall:max-table-size query_057=512
+  --oracall:max-table-size query_057_2=512
+  --oracall:replace query_078 => query_078_xml
+  --oracall:tag ugyfel_mod => xmltype:p_header_person_organization=http://Aegon.KUT.BizTalkApp.schABLAK
 
   /*
   login
@@ -359,10 +375,26 @@ END DB_web_dbx;`,
     - p_hiba_kod - Hibakód (0 ha nincs hiba)
     - p_hiba_szov - Hibaszöveg`,
 			},
+
+			Annotations: []oracall.Annotation{
+				{Type: "handle", Name: "NO_DATA_FOUND"},
+				{Type: "handle", Name: "TOO_MANY_ROWS"},
+				{Type: "private", Name: "kontakt_kut_akr_uf_tolt"},
+				{Type: "rename", Name: "kontakt_kut_akr_uf_tolt2", Other: "konktakt_kut_akr_uf_tolt"},
+				{Type: "private", Name: "wa_torolt_tetelek"},
+				{Type: "replace", Name: "wa_torolt_tetelek2", Other: "wa_torolt_tetelek_xml"},
+				{Type: "rename", Name: "wa_torolt_tetelek2", Other: "wa_torolt_tetelek"},
+				{Type: "private", Name: "adat_leker"},
+				{Type: "replace", Name: "adat_leker_2", Other: "adat_leker_2_xml"},
+				{Type: "max-table-size", Name: "query_057", Size: 512},
+				{Type: "max-table-size", Name: "query_057_2", Size: 512},
+				{Type: "replace", Name: "query_078", Other: "query_078_xml"},
+				{Type: "tag", Name: "ugyfel_mod", Other: "xmltype:p_header_person_organization=http://Aegon.KUT.BizTalkApp.schABLAK"},
+			},
 		},
 	} {
 
-		docs, err := source.ParseDocs(ctx, tc.Source)
+		docs, annotations, err := source.Parse(ctx, tc.Source)
 		if err != nil {
 			t.Errorf("%q. %v", tcName, err)
 			continue
@@ -388,6 +420,10 @@ END DB_web_dbx;`,
 			if d := cmp.Diff(w, g); d != "" {
 				t.Errorf("%q.\n%s", tcName, d)
 			}
+		}
+
+		if d := cmp.Diff(annotations, tc.Annotations); d != "" {
+			t.Errorf("%q.\n%s", tcName, d)
 		}
 	}
 }
