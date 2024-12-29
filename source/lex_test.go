@@ -47,23 +47,23 @@ func TestLex(t *testing.T) {
 		Want []Item
 	}{
 		{Text: "'a'", Want: []Item{
-			{typ: itemSep, val: "'"},
-			{typ: itemString, val: "a"},
-			{typ: itemSep, val: "'"},
-			{typ: itemText, val: "\n"},
+			{typ: ItemSep, val: "'"},
+			{typ: ItemString, val: "a"},
+			{typ: ItemSep, val: "'"},
+			{typ: ItemText, val: "\n"},
 		}},
 		{Text: "z/*+comment--'a'\n*/:='a';--'a'", Want: []Item{
-			{typ: itemText, val: "z"},
-			{typ: itemSep, val: "/*"},
-			{typ: itemComment, val: "+comment--'a'\n"},
-			{typ: itemSep, val: "*/"},
-			{typ: itemText, val: ":="},
-			{typ: itemSep, val: "'"},
-			{typ: itemString, val: "a"},
-			{typ: itemSep, val: "'"},
-			{typ: itemText, val: ";"},
-			{typ: itemSep, val: "--"},
-			{typ: itemComment, val: "'a'"},
+			{typ: ItemText, val: "z"},
+			{typ: ItemSep, val: "/*"},
+			{typ: ItemComment, val: "+comment--'a'\n"},
+			{typ: ItemSep, val: "*/"},
+			{typ: ItemText, val: ":="},
+			{typ: ItemSep, val: "'"},
+			{typ: ItemString, val: "a"},
+			{typ: ItemSep, val: "'"},
+			{typ: ItemText, val: ";"},
+			{typ: ItemSep, val: "--"},
+			{typ: ItemComment, val: "'a'"},
 		}},
 	} {
 		t.Run(tC.Text, func(t *testing.T) {
@@ -92,7 +92,7 @@ func iterItems(items []Item) itemsIter {
 func printItems(seq itemsIter) string {
 	var buf strings.Builder
 	for it := range seq {
-		if it.typ == itemEOF {
+		if it.typ == ItemEOF {
 			break
 		}
 		fmt.Fprintf(&buf, "<%[1]s>%[2]s</%[1]s>\n", it.typ.String(), it.String())

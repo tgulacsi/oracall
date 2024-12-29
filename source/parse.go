@@ -83,13 +83,13 @@ func parseDocs(ctx context.Context, text string) (map[string]string, error) {
 	for it := range Lex(ctx, text) {
 		// logger.Debug("parseDocs", "item", item, "start", l.start, "pos", l.pos, "length", len(l.input))
 		switch it.typ {
-		case itemError:
+		case ItemError:
 			return m, errors.New(it.val)
-		case itemEOF:
+		case ItemEOF:
 			return m, nil
-		case itemComment:
+		case ItemComment:
 			buf.WriteString(it.val)
-		case itemText:
+		case ItemText:
 			ss := rDecl.FindStringSubmatch(it.val)
 			if ss != nil {
 				m[ss[2]] = buf.String()

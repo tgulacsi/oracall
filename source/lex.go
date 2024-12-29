@@ -33,27 +33,27 @@ const (
 type itemType uint8
 
 const (
-	itemError itemType = iota
-	itemEOF
-	itemText
-	itemComment
-	itemSep
-	itemString
+	ItemError itemType = iota
+	ItemEOF
+	ItemText
+	ItemComment
+	ItemSep
+	ItemString
 )
 
 func (typ itemType) String() string {
 	switch typ {
-	case itemError:
+	case ItemError:
 		return "ERROR"
-	case itemEOF:
+	case ItemEOF:
 		return "EOF"
-	case itemText:
+	case ItemText:
 		return "text"
-	case itemComment:
+	case ItemComment:
 		return "comment"
-	case itemSep:
+	case ItemSep:
 		return "sep"
-	case itemString:
+	case ItemString:
 		return "string"
 	default:
 		return "UNKNOWN"
@@ -62,7 +62,7 @@ func (typ itemType) String() string {
 
 func lexText(l *lexer) stateFn {
 	if l.pos == len(l.input) {
-		l.emit(itemEOF)
+		l.emit(ItemEOF)
 		return nil
 	}
 
@@ -80,10 +80,10 @@ func lexText(l *lexer) stateFn {
 	if next != nil {
 		l.pos += pos
 		if l.pos != l.start {
-			l.emit(itemText)
+			l.emit(ItemText)
 		}
 		l.pos += len(what)
-		l.emit(itemSep)
+		l.emit(ItemSep)
 		l.start = l.pos
 		if l.start > l.pos {
 			panic(fmt.Errorf("start=%d>pos=%d [pos=%d]", l.start, l.pos, pos))
@@ -92,7 +92,7 @@ func lexText(l *lexer) stateFn {
 	}
 	l.pos = len(l.input)
 	//logger.Log("msg", "lexText", "start", l.start, "pos", l.pos)
-	l.emit(itemText)
+	l.emit(ItemText)
 	return nil
 }
 
@@ -110,25 +110,25 @@ func lexString(l *lexer) stateFn {
 			break
 		}
 	}
-	l.emit(itemString)
+	l.emit(ItemString)
 	l.pos++
 	// l.logger.Debug("lexString", "emit", "string", "pos", l.pos, "start", l.start, "length", len(l.input))
-	l.emit(itemSep)
+	l.emit(ItemSep)
 	return lexText
 }
 
 func lexLineComment(l *lexer) stateFn {
 	if l.pos < 0 || len(l.input) <= l.pos {
-		l.emit(itemEOF)
+		l.emit(ItemEOF)
 		return nil
 	}
 	end := strings.Index(l.input[l.pos:], lcEnd)
 	if end < 0 {
-		l.emit(itemError)
+		l.emit(ItemError)
 		return nil
 	}
 	l.pos += end
-	l.emit(itemComment)
+	l.emit(ItemComment)
 	l.start += len(lcEnd)
 	l.pos += len(lcEnd)
 	if l.start > l.pos {
@@ -139,18 +139,18 @@ func lexLineComment(l *lexer) stateFn {
 
 func lexBlockComment(l *lexer) stateFn {
 	if l.pos < 0 || len(l.input) <= l.pos {
-		l.emit(itemEOF)
+		l.emit(ItemEOF)
 		return nil
 	}
 	end := strings.Index(l.input[l.pos:], bcEnd)
 	if end < 0 {
-		l.emit(itemError)
+		l.emit(ItemError)
 		return nil
 	}
 	l.pos += end
-	l.emit(itemComment)
+	l.emit(ItemComment)
 	l.pos += len(bcEnd)
-	l.emit(itemSep)
+	l.emit(ItemSep)
 	l.pos += len(bcEnd)
 	if l.start > l.pos {
 		panic("starT > pos")
@@ -166,11 +166,11 @@ type Item struct {
 func (i Item) String() string {
 	repl := func(s string) string { return s }
 	switch i.typ {
-	case itemEOF:
+	case ItemEOF:
 		return "EOF"
-	case itemError:
+	case ItemError:
 		return i.val
-	case itemString:
+	case ItemString:
 		repl = strings.NewReplacer("''", "'").Replace
 	}
 	val := repl(i.val)
@@ -213,13 +213,13 @@ func (l *lexer) emit(t itemType) {
 	if l.start != l.pos {
 		l.items <- Item{typ: t, val: l.input[l.start:l.pos]}
 		l.start = l.pos
-		if t == itemEOF {
+		if t == ItemEOF {
 			l.start = len(l.input)
 		}
 	}
 	if l.start == len(l.input) {
 		l.logger.Debug("EOF")
-		l.items <- Item{typ: itemEOF}
+		l.items <- Item{typ: ItemEOF}
 		close(l.items) // No more tokens will be delivered.
 		l.state = nil
 	}
@@ -232,7 +232,7 @@ func (l *lexer) Iter(yield func(Item) bool) {
 		case it, ok := <-l.items:
 			l.logger.Debug("Iter", "it", it, "ok", ok)
 			if !ok {
-				yield(Item{typ: itemEOF})
+				yield(Item{typ: ItemEOF})
 				return
 			}
 			if !yield(it) {
@@ -241,7 +241,7 @@ func (l *lexer) Iter(yield func(Item) bool) {
 		default:
 			l.logger.Debug("Iter=default", "state", l.state != nil)
 			if l.state == nil {
-				yield(Item{typ: itemEOF})
+				yield(Item{typ: ItemEOF})
 				return
 			}
 			l.state = l.state(l)
