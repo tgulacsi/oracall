@@ -164,11 +164,20 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 		layout = time.RFC3339Nano
 	}
 	var layoutSuffix string
+	// +02:00
 	if n > 6 && (data[n-6] == '+' || data[n-6] == '-') && data[n-3] == ':' {
 		data = data[:n-6]
 		n -= 6
 		layout = layout[:len(layout)-6]
 		layoutSuffix = "Z07:00"
+	} else if // +0200
+	n > 5 && (data[n-5] == '+' || data[n-5] == '-') &&
+		// The last 4 bytes are all digits
+		bytes.IndexFunc(data[n-4:], func(r rune) bool { return !('0' <= r && r <= '9') }) < 0 {
+		data = data[:n-5]
+		n -= 5
+		layout = layout[:len(layout)-6]
+		layoutSuffix = "Z0700"
 	}
 	if n < 10 {
 		layout = "20060102"
@@ -188,15 +197,19 @@ func (dt *DateTime) UnmarshalText(data []byte) error {
 			}
 			if bytes.IndexByte(data, '.') < 0 {
 				layout = layout[:n]
-			} else if _, err := time.ParseInLocation(layout, string(data), time.Local); err != nil && strings.HasSuffix(err.Error(), `"" as "Z07:00"`) {
-				layout = strings.TrimSuffix(layout, "Z07:00")
+			} else if _, err := time.ParseInLocation(layout, string(data), time.Local); err != nil {
+				if errS := err.Error(); strings.HasSuffix(errS, `"" as "Z07:00"`) {
+					layout = strings.TrimSuffix(layout, "Z07:00")
+				} else if strings.HasSuffix(errS, `"" as Z0700"`) {
+					layout = strings.TrimSuffix(layout, `"Z0700"`)
+				}
 			}
 		}
 	}
 	if layoutSuffix != "" {
 		layout += layoutSuffix
-		data = data[:n+6]
-		n += 6
+		data = data[:n+len(layoutSuffix)]
+		n += len(layoutSuffix)
 	}
 	//fmt.Println("n:", n, "layout:", layout)
 	// Fractional seconds are handled implicitly by Parse.
