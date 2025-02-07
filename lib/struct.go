@@ -300,7 +300,7 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 
 func UnoCap(text string) string {
 	i := strings.Index(text, "_")
-	if i == 0 {
+	if i <= 0 {
 		return capitalize(text)
 	}
 	return strings.ToUpper(text[:i]) + "_" + strings.ToLower(text[i+1:])
