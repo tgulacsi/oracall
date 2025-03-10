@@ -79,7 +79,7 @@ func (dt *DateTime) Value() (driver.Value, error) {
 
 func (dt *DateTime) MarshalXML(enc *xml.Encoder, start xml.StartElement) error {
 	if dt != nil && !dt.IsZero() {
-		return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339), start)
+		return enc.EncodeElement(dt.Time.In(time.Local).Format(time.RFC3339Nano), start)
 	}
 	start.Attr = append(start.Attr,
 		xml.Attr{Name: xml.Name{Space: "http://www.w3.org/2001/XMLSchema-instance", Local: "nil"}, Value: "true"})
@@ -246,7 +246,7 @@ func (dt *DateTime) String() string {
 	if dt.IsZero() {
 		return ""
 	}
-	return dt.Time.In(time.Local).Format(time.RFC3339)
+	return dt.Time.In(time.Local).Format(time.RFC3339Nano)
 }
 
 func (dt *DateTime) ProtoMessage() {}
