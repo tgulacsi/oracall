@@ -105,6 +105,7 @@ func ForEachGroup(userArgs []UserArgument, filter func(string) bool, f func([]Us
 				if err := f(args); err != nil {
 					return err
 				}
+				args = make([]UserArgument, 0, 4)
 			}
 		}
 		args = append(args, ua)
@@ -275,6 +276,15 @@ func MakeFunction(uas []UserArgument, filter func(string) bool) Function {
 	fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
 	for i, na := range lastArgs[-1].RecordOf {
 		fun.Args[i] = *na.Argument
+	}
+
+	if !SkipMissingTableOf {
+		for _, arg := range fun.Args {
+			if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
+				logger.Warn("MakeFunction", "fun", fun.Name(), "args", fun.Args, "ret", fun.Returns)
+				panic(fmt.Errorf("MakeFunction: no table of data for %s.%s (%v): %w", fun.Name(), arg, arg, ErrMissingTableOf))
+			}
+		}
 	}
 	return fun
 }

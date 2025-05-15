@@ -544,7 +544,8 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 			}
 			dbPlus := make([]dbRow, 0, len(plus))
 			for _, p := range plus {
-				row := dbRow{Seq: seq}
+				row := row
+				row.Seq = seq
 				seq++
 				row.Argument, row.Data, row.Length, row.Prec, row.Scale, row.Charset, row.IndexBy = p.Argument, p.Data, p.Length, p.Prec, p.Scale, p.Charset, p.IndexBy
 				row.Owner, row.Name, row.Subname, row.Link = p.Owner, p.Name, p.Subname, p.Link
@@ -588,15 +589,17 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 			dbRows = append(dbRows, row)
 		}
 
+		dbRows2 := make([]dbRow, 0, len(dbRows))
 		for _, row := range dbRows {
+			dbRows2 = append(dbRows2, row)
 			plus, err := resolve(row)
 			if err != nil {
 				return dbRows, err
 			} else if len(plus) != 0 {
-				dbRows = append(dbRows, plus...)
+				dbRows2 = append(dbRows2, plus...)
 			}
 		}
-		return dbRows, nil
+		return dbRows2, nil
 	}(ctx)
 	if err != nil {
 		return functions, annotations, err
