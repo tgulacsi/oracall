@@ -46,10 +46,9 @@ import (
 // curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
 
 var (
-	dsn         string
-	verbose     zlog.VerboseVar
-	logger      = zlog.NewLogger(zlog.MaybeConsoleHandler(&verbose, os.Stderr)).SLog()
-	concurrency = 8
+	dsn     string
+	verbose zlog.VerboseVar
+	logger  = zlog.NewLogger(zlog.MaybeConsoleHandler(&verbose, os.Stderr)).SLog()
 
 	rReplace = regexp.MustCompile(`\s*=>\s*`)
 )
@@ -244,7 +243,7 @@ func Main() error {
 			sort.Slice(functions, func(i, j int) bool { return functions[i].Name() < functions[j].Name() })
 
 			var grp errgroup.Group
-			grp.SetLimit(concurrency)
+			grp.SetLimit(8)
 			if dbPath != "" {
 				grp.Go(func() error {
 					pbPath := pbPath
@@ -370,7 +369,6 @@ func Main() error {
 
 	fs = flag.NewFlagSet("oracall", flag.ContinueOnError)
 	fs.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
-	fs.IntVar(&concurrency, "concurrency", concurrency, "concurrency")
 	app := ffcli.Command{Name: "oracall", FlagSet: fs,
 		Subcommands: []*ffcli.Command{&callCmd, &genModelCmd},
 	}
@@ -474,7 +472,7 @@ func parseDB(ctx context.Context, cx *sql.DB, pattern, dumpFn string, filter fun
 
 	dbCh := make(chan dbRow)
 	grp, grpCtx := errgroup.WithContext(ctx)
-	grp.SetLimit(concurrency)
+	grp.SetLimit(8)
 	grp.Go(func() error {
 		defer close(dbCh)
 		var collStmt, attrStmt *sql.Stmt
