@@ -141,12 +141,7 @@ func Main() error {
 				}
 				functions, err = oracall.ParseCsvFile("", filter)
 			} else {
-				tx, txErr := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-				if txErr != nil {
-					return txErr
-				}
-				functions, annotations, err = parseDB(ctx, tx, pattern, *flagDump, filter)
-				tx.Rollback()
+				functions, annotations, err = parseDB(ctx, db, pattern, *flagDump, filter)
 			}
 			if err != nil {
 				return fmt.Errorf("read %s: %w", flag.Arg(0), err)
@@ -247,8 +242,8 @@ func Main() error {
 			functions = oracall.ApplyAnnotations(functions, annotations)
 			sort.Slice(functions, func(i, j int) bool { return functions[i].Name() < functions[j].Name() })
 
-			var grp errgroup.Group
-			grp.SetLimit(4)
+			grp, grpCtx := errgroup.WithContext(ctx)
+			grp.SetLimit(2)
 			if dbPath != "" {
 				grp.Go(func() error {
 					pbPath := pbPath
@@ -319,7 +314,7 @@ func Main() error {
 								"--"+*flagGenerator+"_out=:"+*flagBaseDir)
 						}
 					}
-					cmd := exec.CommandContext(ctx, "protoc", append(args, pbFn)...)
+					cmd := exec.CommandContext(grpCtx, "protoc", append(args, pbFn)...)
 					cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 					logger.Info("calling", "protoc", cmd.Args)
 					if err := cmd.Run(); err != nil {
@@ -429,11 +424,21 @@ func (t dbType) String() string {
 	return fmt.Sprintf("%s{%s}[%d](%s[%s]/%s.%s.%s@%s)", t.Argument, t.Data, t.Level, t.PLS, t.IndexBy, t.Owner, t.Name, t.Subname, t.Link)
 }
 
-func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, annotations []oracall.Annotation, err error) {
+func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, annotations []oracall.Annotation, err error) {
 	tbl, objTbl := "user_arguments", "user_objects"
 	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
 		tbl, objTbl = "all_arguments", "all_objects"
 	}
+	tx1, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return functions, annotations, err
+	}
+	defer tx1.Rollback()
+	tx2, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return functions, annotations, err
+	}
+	defer tx2.Rollback()
 	argumentsQry := `` + //nolint:gas
 		`SELECT A.*
       FROM
@@ -462,7 +467,7 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 	defer cancel()
 
 	objTimeQry := `SELECT last_ddl_time FROM ` + objTbl + ` WHERE object_name = :1 AND object_type <> 'PACKAGE BODY'`
-	objTimeStmt, err := tx.PrepareContext(ctx, objTimeQry)
+	objTimeStmt, err := tx1.PrepareContext(ctx, objTimeQry)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", objTimeQry, err)
 	}
@@ -475,8 +480,12 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 		return t, nil
 	}
 
-	dbRows, err := func(ctx context.Context) ([]dbRow, error) {
-		const collQry = `SELECT coll_type, elem_type_owner, elem_type_name, elem_type_package,
+	dbCh := make(chan dbRow)
+	grp, grpCtx := errgroup.WithContext(ctx)
+	grp.Go(func() error {
+		defer close(dbCh)
+		var collStmt, attrStmt *sql.Stmt
+		qry := `SELECT coll_type, elem_type_owner, elem_type_name, elem_type_package,
 				   length, precision, scale, character_set_name, index_by,
 				   (SELECT MIN(typecode) FROM all_plsql_types B
 				      WHERE B.owner = A.elem_type_owner AND
@@ -497,13 +506,20 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 				SELECT table_owner, table_name||NVL2(db_link, '@'||db_link, NULL)
 				  FROM user_synonyms
 				  WHERE synonym_name = :pkg)`
-		collStmt, err := tx.PrepareContext(ctx, collQry)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", collQry, err)
-		}
-		defer collStmt.Close()
+		var resolveTypeShort func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error)
+		var err error
+		if collStmt, err = tx1.PrepareContext(grpCtx, qry); err != nil {
+			logger.Error("ERROR", "qry", qry, "error", err)
+		} else {
+			defer collStmt.Close()
+			if rows, err := collStmt.QueryContext(grpCtx,
+				sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", ""),
+			); err != nil {
+				collStmt = nil
+			} else {
+				rows.Close()
 
-		const attrQry = `SELECT attr_name, attr_type_owner, attr_type_name, attr_type_package,
+				qry = `SELECT attr_name, attr_type_owner, attr_type_name, attr_type_package,
                       length, precision, scale, character_set_name, attr_no,
 				      (SELECT MIN(typecode) FROM all_plsql_types B
 				         WHERE B.owner = A.attr_type_owner AND B.type_name = A.attr_type_name AND B.package_name = A.attr_type_package) typecode
@@ -519,62 +535,35 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
                        hidden_column = 'NO' AND INSTR(column_name, '$') = 0 AND 
                        owner = :owner AND table_name = :pkg
 				 ORDER BY attr_no`
-		attrStmt, err := tx.PrepareContext(ctx, attrQry)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", attrQry, err)
-		}
-		defer attrStmt.Close()
-
-		resolveTypeShort := func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error) {
-			return resolveType(ctx, collStmt, attrStmt, typ, owner, name, sub)
-		}
-
-		var seq int
-		var resolve func(row dbRow) ([]dbRow, error)
-		resolve = func(row dbRow) ([]dbRow, error) {
-			if !(row.Data == "PL/SQL TABLE" || row.Data == "PL/SQL RECORD" || row.Data == "REF CURSOR" || row.Data == "TABLE") {
-				return nil, nil
-			}
-			plus, err := resolveTypeShort(ctx, row.Data, row.Owner, row.Name, row.Subname)
-			if err != nil {
-				return nil, err
-			}
-			if plus, err = expandArgs(ctx, plus, resolveTypeShort); err != nil {
-				return nil, err
-			}
-			dbPlus := make([]dbRow, 0, len(plus))
-			for _, p := range plus {
-				row := row
-				row.Seq = seq
-				seq++
-				row.Argument, row.Data, row.Length, row.Prec, row.Scale, row.Charset, row.IndexBy = p.Argument, p.Data, p.Length, p.Prec, p.Scale, p.Charset, p.IndexBy
-				row.Owner, row.Name, row.Subname, row.Link = p.Owner, p.Name, p.Subname, p.Link
-				row.Level = p.Level
-				dbPlus = append(dbPlus, row)
-			}
-			if len(dbPlus) != 0 {
-				for _, row := range dbPlus {
-					x, err := resolve(row)
-					if err != nil {
-						return dbPlus, err
+				if attrStmt, err = tx1.PrepareContext(grpCtx, qry); err != nil {
+					logger.Error("Prepare", "qry", qry, "error", err)
+				} else {
+					defer attrStmt.Close()
+					if rows, err := attrStmt.QueryContext(grpCtx,
+						sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", ""),
+					); err != nil {
+						attrStmt = nil
+					} else {
+						rows.Close()
+						resolveTypeShort = func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error) {
+							return resolveType(ctx, collStmt, attrStmt, typ, owner, name, sub)
+						}
 					}
-					dbPlus = append(dbPlus, x...)
 				}
 			}
-			return dbPlus, nil
 		}
 
-		qry := argumentsQry
-		rows, err := tx.QueryContext(ctx,
+		qry = argumentsQry
+		rows, err := tx2.QueryContext(grpCtx,
 			qry, pattern, pattern, godror.FetchArraySize(1024), godror.PrefetchCount(1025),
 		)
 		if err != nil {
 			logger.Error("Query", "qry", qry, "error", err)
-			return nil, fmt.Errorf("%s: %w", qry, err)
+			return fmt.Errorf("%s: %w", qry, err)
 		}
 		defer rows.Close()
 
-		var dbRows []dbRow
+		var seq int
 		for rows.Next() {
 			var row dbRow
 			if err = rows.Scan(&row.OID, &row.SubID, &row.Seq, &row.Package, &row.Object,
@@ -582,28 +571,45 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 				&row.Data, &row.Prec, &row.Scale, &row.Charset, &row.IndexBy,
 				&row.PLS, &row.Length, &row.Owner, &row.Name, &row.Subname, &row.Link,
 			); err != nil {
-				return nil, fmt.Errorf("reading row=%v: %w", rows, err)
+				return fmt.Errorf("reading row=%v: %w", rows, err)
 			}
 			row.Seq = seq
 			seq++
-			dbRows = append(dbRows, row)
-		}
-
-		dbRows2 := make([]dbRow, 0, len(dbRows))
-		for _, row := range dbRows {
-			dbRows2 = append(dbRows2, row)
-			plus, err := resolve(row)
-			if err != nil {
-				return dbRows, err
-			} else if len(plus) != 0 {
-				dbRows2 = append(dbRows2, plus...)
+			select {
+			case <-grpCtx.Done():
+				return grpCtx.Err()
+			case dbCh <- row:
+			}
+			if resolveTypeShort == nil {
+				continue
+			}
+			if row.Data == "PL/SQL TABLE" || row.Data == "PL/SQL RECORD" || row.Data == "REF CURSOR" || row.Data == "TABLE" {
+				plus, err := resolveTypeShort(grpCtx, row.Data, row.Owner, row.Name, row.Subname)
+				if err != nil {
+					return err
+				}
+				if plus, err = expandArgs(grpCtx, plus, resolveTypeShort); err != nil {
+					return err
+				}
+				for _, p := range plus {
+					row.Seq = seq
+					seq++
+					row.Argument, row.Data, row.Length, row.Prec, row.Scale, row.Charset, row.IndexBy = p.Argument, p.Data, p.Length, p.Prec, p.Scale, p.Charset, p.IndexBy
+					row.Owner, row.Name, row.Subname, row.Link = p.Owner, p.Name, p.Subname, p.Link
+					row.Level = p.Level
+					select {
+					case <-grpCtx.Done():
+						return grpCtx.Err()
+					case dbCh <- row:
+					}
+				}
 			}
 		}
-		return dbRows2, nil
-	}(ctx)
-	if err != nil {
-		return functions, annotations, err
-	}
+		if err = rows.Close(); err != nil {
+			return fmt.Errorf("walking rows: %w", err)
+		}
+		return nil
+	})
 
 	var cwMu sync.Mutex
 	var cw *csv.Writer
@@ -677,20 +683,31 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 	var docsMu sync.Mutex
 	var replMu sync.Mutex
 	docs := make(map[string]string)
-	userArgs, err := func(ctx context.Context, dbRows []dbRow) ([]oracall.UserArgument, error) {
-		var userArgs []oracall.UserArgument
+	userArgs := make(chan oracall.UserArgument, 16)
+	grp.Go(func() error {
+		defer close(userArgs)
 		var pkgTime time.Time
-
-		for _, row := range dbRows {
-			if row.Name == "" {
-				row.PLS = row.Data
-			} else {
-				row.PLS = row.Owner + "." + row.Name + "." + row.Subname
-				if row.Link != "" {
-					row.PLS += "@" + row.Link
+		ctx := grpCtx
+	Loop:
+		for {
+			var row dbRow
+			var ok bool
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case row, ok = <-dbCh:
+				if !ok {
+					break Loop
+				}
+				if row.Name == "" {
+					row.PLS = row.Data
+				} else {
+					row.PLS = row.Owner + "." + row.Name + "." + row.Subname
+					if row.Link != "" {
+						row.PLS += "@" + row.Link
+					}
 				}
 			}
-
 			var ua oracall.UserArgument
 			ua.DataType = row.Data
 			ua.InOut = row.InOut.String
@@ -706,7 +723,7 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 				})
 				cwMu.Unlock()
 				if err != nil {
-					return userArgs, fmt.Errorf("write csv: %w", err)
+					return fmt.Errorf("write csv: %w", err)
 				}
 			}
 			if !row.Package.Valid {
@@ -715,7 +732,7 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 			ua.PackageName = row.Package.String
 			if ua.PackageName != prevPackage {
 				if pkgTime, err = getObjTime(ua.PackageName); err != nil {
-					return userArgs, err
+					return err
 				}
 				prevPackage = ua.PackageName
 				if err := func() error {
@@ -724,7 +741,7 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 					buf.Reset()
 
 					logger := logger.With("package", ua.PackageName)
-					if srcErr := getSource(ctx, buf, tx, ua.PackageName); srcErr != nil {
+					if srcErr := getSource(ctx, buf, tx1, ua.PackageName); srcErr != nil {
 						logger.Error("getSource", "error", srcErr)
 						return nil
 					}
@@ -750,7 +767,7 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 					}
 					return docsErr
 				}(); err != nil {
-					return userArgs, err
+					return err
 				}
 			}
 			ua.LastDDL = pkgTime
@@ -796,17 +813,16 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 			if row.Length.Valid {
 				ua.CharLength = uint(row.Length.Int64)
 			}
-			userArgs = append(userArgs, ua)
+			userArgs <- ua
 		}
-		return userArgs, nil
-	}(ctx, dbRows)
-	if err != nil {
-		return functions, annotations, err
-	}
-
-	functions, err = oracall.MakeFunctions(userArgs, filter)
-	if err != nil {
-		return functions, annotations, err
+		return nil
+	})
+	filteredArgs := make(chan []oracall.UserArgument, 16)
+	grp.Go(func() error { oracall.FilterAndGroup(filteredArgs, userArgs, filter); return nil })
+	functions = oracall.ParseArguments(filteredArgs, filter)
+	if grpErr := grp.Wait(); grpErr != nil {
+		logger.Error("ParseArguments", "error", grpErr)
+		return functions, annotations, grpErr
 	}
 	docNames := make([]string, 0, len(docs))
 	for k := range docs {
@@ -832,9 +848,9 @@ func parseDB(ctx context.Context, tx *sql.Tx, pattern, dumpFn string, filter fun
 
 var bufPool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 1024)) }}
 
-func getSource(ctx context.Context, w io.Writer, tx *sql.Tx, packageName string) error {
+func getSource(ctx context.Context, w io.Writer, cx *sql.Tx, packageName string) error {
 	qry := "SELECT text FROM user_source WHERE name = UPPER(:1) AND type = 'PACKAGE' ORDER BY line"
-	rows, err := tx.QueryContext(ctx, qry, packageName, godror.PrefetchCount(129))
+	rows, err := cx.QueryContext(ctx, qry, packageName, godror.PrefetchCount(129))
 	if err != nil {
 		return fmt.Errorf("%s [%q]: %w", qry, packageName, err)
 	}

@@ -7,20 +7,20 @@ require (
 	github.com/antzucaro/matchr v0.0.0-20221106193745-7bed6ef61ef9
 	github.com/fatih/structs v1.1.0
 	github.com/go-stack/stack v1.8.1
-	github.com/godror/godror v0.45.2-0.20241119073016-4206888a647c
+	github.com/godror/godror v0.48.2
 	github.com/google/go-cmp v0.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/kylelemons/godebug v1.1.0
 	github.com/tgulacsi/go v0.27.5
 	golang.org/x/net v0.27.0 // indirect
-	golang.org/x/sync v0.7.0
+	golang.org/x/sync v0.12.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 )
 
 require (
 	github.com/UNO-SOFT/otel v0.8.6
-	github.com/godror/knownpb v0.1.2
+	github.com/godror/knownpb v0.2.0
 	github.com/google/renameio/v2 v2.0.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/peterbourgon/ff/v3 v3.4.0
@@ -33,6 +33,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/planetscale/vtprotobuf v0.6.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.28.0 // indirect
