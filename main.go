@@ -373,6 +373,9 @@ func Main() error {
 	}
 
 	if err := app.Parse(os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return err
 	}
 

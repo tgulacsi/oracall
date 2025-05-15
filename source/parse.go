@@ -35,12 +35,12 @@ func Parse(ctx context.Context, src string) (docs map[string]string, annotations
 	}
 	if len(annotations) != 0 {
 		logger.Debug("found", "annotations", annotations)
-		src = rAnnotation.ReplaceAllString(src, "")
+		// src = rAnnotation.ReplaceAllString(src, "")
 	}
 	return docs, annotations, err
 }
 
-var rAnnotation = regexp.MustCompile(`--oracall:(?:(replace(_json)?|rename|tag)\s+[a-zA-Z0-9_#]+\s*=>\s*.+|(handle|private)\s+[a-zA-Z0-9_#]+|max-table-size\s+[a-zA-Z0-9_$]+\s*=\s*[0-9]+)`)
+// var rAnnotation = regexp.MustCompile(`--oracall:(?:(replace(_json)?|rename|tag)\s+[a-zA-Z0-9_#]+\s*=>\s*.+|(handle|private)\s+[a-zA-Z0-9_#]+|max-table-size\s+[a-zA-Z0-9_$]+\s*=\s*[0-9]+)`)
 
 func parseDocsAnnotations(ctx context.Context, src string) (docs map[string]string, annotations []oracall.Annotation, err error) {
 	logger := zlog.SFromContext(ctx)
