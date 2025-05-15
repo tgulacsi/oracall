@@ -14,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 // UserArgument represents the required info from the user_arguments view
@@ -70,24 +68,32 @@ func ParseCsvFile(filename string, filter func(string) bool) (functions []Functi
 
 // ParseCsv parses the csv
 func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err error) {
-	userArgs := make(chan UserArgument, 16)
-	var grp errgroup.Group
-	grp.Go(func() error { return ReadCsv(userArgs, r) })
-	filteredArgs := make(chan []UserArgument, 16)
-	grp.Go(func() error { FilterAndGroup(filteredArgs, userArgs, filter); return nil })
-	functions = ParseArguments(filteredArgs, filter)
-	return functions, grp.Wait()
+	userArgs, err := ReadCsv(r)
+	if err != nil {
+		return functions, err
+	}
+	return MakeFunctions(userArgs, filter)
 }
 
-func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgument, filter func(string) bool) {
-	defer close(filteredArgs)
+func MakeFunctions(userArgs []UserArgument, filter func(string) bool) ([]Function, error) {
+	var functions []Function
+	err := ForEachGroup(userArgs, filter, func(uas []UserArgument) error {
+		if fun := MakeFunction(uas, filter); fun.name != "" {
+			functions = append(functions, fun)
+		}
+		return nil
+	})
+	return functions, err
+}
+
+func ForEachGroup(userArgs []UserArgument, filter func(string) bool, f func([]UserArgument) error) error {
 	type program struct {
 		PackageName, ObjectName string
 		ObjectID, SubprogramID  uint
 	}
 	var lastProg, zeroProg program
 	args := make([]UserArgument, 0, 4)
-	for ua := range userArgs {
+	for _, ua := range userArgs {
 		if filter != nil && !filter(ua.PackageName+"."+ua.ObjectName) {
 			continue
 		}
@@ -96,16 +102,18 @@ func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgu
 			PackageName: ua.PackageName, ObjectName: ua.ObjectName}
 		if lastProg != zeroProg && lastProg != actProg {
 			if len(args) != 0 {
-				filteredArgs <- args
-				args = make([]UserArgument, 0, cap(args))
+				if err := f(args); err != nil {
+					return err
+				}
 			}
 		}
 		args = append(args, ua)
 		lastProg = actProg
 	}
 	if len(args) != 0 {
-		filteredArgs <- args
+		return f(args)
 	}
+	return nil
 }
 
 // OpenCsv opens the filename
@@ -131,16 +139,12 @@ func MustOpenCsv(filename string) *os.File {
 }
 
 // ReadCsv reads the csv from the Reader, and sends the arguments to the given channel.
-func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
-	defer close(userArgs)
-
-	var err error
-
+func ReadCsv(r io.Reader) (userArgs []UserArgument, err error) {
 	br := bufio.NewReader(r)
 	csvr := csv.NewReader(br)
 	b, err := br.Peek(100)
 	if err != nil {
-		return fmt.Errorf("error peeking into file: %s", err)
+		return userArgs, fmt.Errorf("error peeking into file: %s", err)
 	}
 	if bytes.IndexByte(b, ';') >= 0 {
 		csvr.Comma = ';'
@@ -160,7 +164,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	}
 	// get head
 	if rec, err = csvr.Read(); err != nil {
-		return fmt.Errorf("cannot read head: %s", err)
+		return userArgs, fmt.Errorf("cannot read head: %s", err)
 	}
 	csvr.FieldsPerRecord = len(rec)
 	for i, h := range rec {
@@ -206,83 +210,73 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 			TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
 		}
 
-		userArgs <- arg
+		userArgs = append(userArgs, arg)
 	}
-	return err
+	return userArgs, err
 }
 
-func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []Function {
-	// Split args by functions
-	names := make([]string, 0, len(userArgs)/4)
-	functions := make([]Function, cap(names))
-	var row int
-	for uas := range userArgs {
-		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
-			filter != nil && !filter(ua.ObjectName) {
+func MakeFunction(uas []UserArgument, filter func(string) bool) Function {
+	if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
+		filter != nil && !filter(ua.ObjectName) {
+		return Function{}
+	}
+
+	var fun Function
+	lastArgs := make(map[int8]*Argument, 8)
+	lastArgs[-1] = &Argument{Flavor: FLAVOR_RECORD}
+	var level int8
+	for i, ua := range uas {
+		if i == 0 {
+			fun = Function{Package: ua.PackageName, name: ua.ObjectName, LastDDL: ua.LastDDL}
+		}
+
+		level = int8(ua.DataLevel)
+		typeName := ua.TypeOwner + "." + ua.TypeName + "." + ua.TypeSubname + "@" + ua.TypeLink
+		if ua.TypeSubname == "" && ua.PlsType+"@" == typeName {
+			typeName = ua.TypeOwner + "." + ua.TypeName + "%ROWTYPE"
+		}
+		arg := NewArgument(ua.ArgumentName,
+			ua.DataType,
+			ua.PlsType,
+			typeName,
+			ua.InOut,
+			0,
+			ua.CharacterSetName,
+			ua.IndexBy,
+			ua.DataPrecision,
+			ua.DataScale,
+			ua.CharLength,
+		)
+		logger.Debug("ParseArgument", "level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
+		// Possibilities:
+		// 1. SIMPLE
+		// 2. RECORD at level 0
+		// 3. TABLE OF simple
+		// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
+		if arg.Flavor != FLAVOR_SIMPLE {
+			lastArgs[level] = &arg
+		}
+		if level == 0 && fun.Returns == nil && arg.Name == "" {
+			arg.Name = "ret"
+			fun.Returns = &arg
 			continue
 		}
-
-		var fun Function
-		lastArgs := make(map[int8]*Argument, 8)
-		lastArgs[-1] = &Argument{Flavor: FLAVOR_RECORD}
-		var level int8
-		for i, ua := range uas {
-			row++
-			if i == 0 {
-				fun = Function{Package: ua.PackageName, name: ua.ObjectName, LastDDL: ua.LastDDL}
-			}
-
-			level = int8(ua.DataLevel)
-			typeName := ua.TypeOwner + "." + ua.TypeName + "." + ua.TypeSubname + "@" + ua.TypeLink
-			if ua.TypeSubname == "" && ua.PlsType+"@" == typeName {
-				typeName = ua.TypeOwner + "." + ua.TypeName + "%ROWTYPE"
-			}
-			arg := NewArgument(ua.ArgumentName,
-				ua.DataType,
-				ua.PlsType,
-				typeName,
-				ua.InOut,
-				0,
-				ua.CharacterSetName,
-				ua.IndexBy,
-				ua.DataPrecision,
-				ua.DataScale,
-				ua.CharLength,
-			)
-			logger.Debug("ParseArgument", "level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
-			// Possibilities:
-			// 1. SIMPLE
-			// 2. RECORD at level 0
-			// 3. TABLE OF simple
-			// 4. TABLE OF as level 0, RECORD as level 1 (without name), simple at level 2
-			if arg.Flavor != FLAVOR_SIMPLE {
-				lastArgs[level] = &arg
-			}
-			if level == 0 && fun.Returns == nil && arg.Name == "" {
-				arg.Name = "ret"
-				fun.Returns = &arg
-				continue
-			}
-			parent := lastArgs[level-1]
-			if parent == nil {
-				logger.Info("parent is nil", "level", level, "lastArgs", lastArgs, "fun", fun)
-				panic(fmt.Sprintf("parent is nil, at level=%d, lastArgs=%v, fun=%v", level, lastArgs, fun))
-			}
-			if parent.Flavor == FLAVOR_TABLE {
-				parent.TableOf = &arg
-			} else {
-				parent.RecordOf = append(parent.RecordOf, NamedArgument{Name: arg.Name, Argument: &arg})
-			}
+		parent := lastArgs[level-1]
+		if parent == nil {
+			logger.Info("parent is nil", "level", level, "lastArgs", lastArgs, "fun", fun)
+			panic(fmt.Sprintf("parent is nil, at level=%d, lastArgs=%v, fun=%v", level, lastArgs, fun))
 		}
-		fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
-		for i, na := range lastArgs[-1].RecordOf {
-			fun.Args[i] = *na.Argument
+		if parent.Flavor == FLAVOR_TABLE {
+			parent.TableOf = &arg
+		} else {
+			parent.RecordOf = append(parent.RecordOf, NamedArgument{Name: arg.Name, Argument: &arg})
 		}
-		functions = append(functions, fun)
-		names = append(names, fun.Name())
 	}
-	logger.Info("found", "functions", names)
-	return functions
+	fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
+	for i, na := range lastArgs[-1].RecordOf {
+		fun.Args[i] = *na.Argument
+	}
+	return fun
 }
 
 func mustBeUint(text string) uint {

@@ -403,7 +403,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return fmt.Errorf("no table of data for %s.%s (%v): %w", f.Name(), arg, arg, ErrMissingTableOf)
+			return fmt.Errorf("SaveStruct: no table of data for %s.%s (%v): %w", f.Name(), arg, arg, ErrMissingTableOf)
 		}
 		aName = capitalize(replHidden(arg.Name))
 		if got, err = arg.goType(arg.Flavor == FLAVOR_TABLE); err != nil {

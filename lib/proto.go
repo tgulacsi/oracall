@@ -162,7 +162,7 @@ var dot2D = strings.NewReplacer(".", "__")
 func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, D argDocs, args ...Argument) error {
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
-			return fmt.Errorf("no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf)
+			panic(fmt.Errorf("protoWriteMessageTyp: no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf))
 		}
 	}
 
@@ -179,7 +179,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		}
 		if arg.Flavor == FLAVOR_TABLE {
 			if arg.TableOf == nil {
-				return fmt.Errorf("no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf)
+				return fmt.Errorf("protoWriteMessageTyp2: no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf)
 			}
 			rule = "repeated "
 		}
