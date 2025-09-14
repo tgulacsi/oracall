@@ -72,7 +72,6 @@ func Main() error {
 	flagBaseDir := fs.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := fs.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := fs.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
-	flagGenerator := fs.String("protoc-gen", "go", "use protoc-gen-<generator>")
 	fs.BoolVar(&oracall.NumberAsString, "number-as-string", false, "add ,string to json tags")
 	fs.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
 	fs.Var(&verbose, "v", "verbose logging")
@@ -103,7 +102,6 @@ func Main() error {
 			if pattern == "" {
 				pattern = "%"
 			}
-			oracall.Gogo = strings.HasPrefix(*flagGenerator, "gogo")
 
 			var functions []oracall.Function
 			var err error
@@ -298,22 +296,10 @@ func Main() error {
 						return fmt.Errorf("SaveProtobuf: %w", err)
 					}
 
-					if *flagGenerator == "" {
-						return nil
-					}
-
 					args := append(make([]string, 0, 5),
 						"--proto_path="+*flagBaseDir+":.")
-					if oracall.Gogo {
-						args = append(args,
-							"--"+*flagGenerator+"_out=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,plugins=grpc:"+*flagBaseDir)
-					} else {
-						args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
-						if *flagGenerator == "go-vtproto" {
-							args = append(args,
-								"--"+*flagGenerator+"_out=:"+*flagBaseDir)
-						}
-					}
+					args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
+					// args = append(args, "--go-vtproto_out=:"+*flagBaseDir)
 					cmd := exec.CommandContext(grpCtx, "protoc", append(args, pbFn)...)
 					cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 					logger.Info("calling", "protoc", cmd.Args)
