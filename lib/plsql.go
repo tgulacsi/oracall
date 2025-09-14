@@ -567,7 +567,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				case FLAVOR_SIMPLE: // like simple, but for the arg.TableOf
 					typ = getTableType(arg.TableOf.AbsType)
 					if strings.IndexByte(typ, '/') >= 0 {
-						err = fmt.Errorf("nonsense table type of %s", arg)
+						err = fmt.Errorf("nonsense table type of %s (%s)", typ, arg)
 						return
 					}
 

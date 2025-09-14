@@ -10,7 +10,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"iter"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -130,17 +132,63 @@ func MustOpenCsv(filename string) *os.File {
 	return fh
 }
 
-// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel.
-func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
-	defer close(userArgs)
+func NewUACsvWriter(w io.Writer) (*UACsvWriter, error) {
+	cw := csv.NewWriter(w)
+	var ua UserArgument
+	rt := reflect.TypeOf(ua)
+	colNames := make([]string, 0, rt.NumField())
+	converters := make([]func(reflect.Value) string, rt.NumField())
+	for i := 0; i < rt.NumField(); i++ {
+		ft := rt.Field(i)
+		if !ft.IsExported() {
+			continue
+		}
+		name := ft.Tag.Get("sql")
+		if name == "" {
+			continue
+		}
+		colNames = append(colNames, name)
+		// fmt.Printf("%d: %q %v\n", i, name, ft.Type.Kind())
+		switch ft.Type.Kind() {
+		case reflect.Uint, reflect.Uint8:
+			converters[i] = func(v reflect.Value) string { return strconv.FormatUint(v.Uint(), 10) }
+		default:
+			converters[i] = func(v reflect.Value) string { return v.String() }
+		}
+	}
+	if err := cw.Write(colNames); err != nil {
+		return nil, err
+	}
+	return &UACsvWriter{cw: cw, converters: converters}, nil
+}
 
-	var err error
+type UACsvWriter struct {
+	cw         *csv.Writer
+	fields     []string
+	converters []func(reflect.Value) string
+}
 
+func (cw *UACsvWriter) WriteUA(ua UserArgument) error {
+	cw.fields = cw.fields[:0]
+	rv := reflect.ValueOf(ua)
+	for i, conv := range cw.converters {
+		if conv != nil {
+			cw.fields = append(cw.fields, conv(rv.Field(i)))
+		}
+	}
+	return cw.cw.Write(cw.fields)
+}
+func (cw *UACsvWriter) Flush()       { cw.cw.Flush() }
+func (cw *UACsvWriter) Error() error { return cw.cw.Error() }
+
+func NewUACsvReader(r io.Reader) iter.Seq2[UserArgument, error] {
 	br := bufio.NewReader(r)
 	csvr := csv.NewReader(br)
 	b, err := br.Peek(100)
 	if err != nil {
-		return fmt.Errorf("error peeking into file: %s", err)
+		return func(yield func(UserArgument, error) bool) {
+			yield(UserArgument{}, fmt.Errorf("error peeking into file: %s", err))
+		}
 	}
 	if bytes.IndexByte(b, ';') >= 0 {
 		csvr.Comma = ';'
@@ -151,16 +199,23 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 		rec       []string
 		csvFields = make(map[string]int, 20)
 	)
-	for _, h := range []string{"OBJECT_ID", "SUBPROGRAM_ID", "PACKAGE_NAME",
-		"OBJECT_NAME", "DATA_LEVEL", "SEQUENCE", "ARGUMENT_NAME", "IN_OUT",
-		"DATA_TYPE", "DATA_PRECISION", "DATA_SCALE", "CHARACTER_SET_NAME",
-		"INDEX_BY", "PLS_TYPE", "CHAR_LENGTH",
-		"TYPE_LINK", "TYPE_OWNER", "TYPE_NAME", "TYPE_SUBNAME"} {
-		csvFields[h] = -1
+	rt := reflect.TypeOf(UserArgument{})
+	for i := 0; i < rt.NumField(); i++ {
+		ft := rt.Field(i)
+		if !ft.IsExported() {
+			continue
+		}
+		name := ft.Tag.Get("sql")
+		if name == "" {
+			continue
+		}
+		csvFields[name] = -1
 	}
 	// get head
 	if rec, err = csvr.Read(); err != nil {
-		return fmt.Errorf("cannot read head: %s", err)
+		return func(yield func(UserArgument, error) bool) {
+			yield(UserArgument{}, fmt.Errorf("cannot read head: %s", err))
+		}
 	}
 	csvr.FieldsPerRecord = len(rec)
 	for i, h := range rec {
@@ -171,44 +226,59 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	}
 	logger.Info("field order", "fields", csvFields)
 
-	for {
-		rec, err = csvr.Read()
+	return func(yield func(UserArgument, error) bool) {
+		for pos := uint(0); ; pos++ {
+			rec, err = csvr.Read()
+			if err != nil {
+				yield(UserArgument{}, err)
+				return
+			}
+			if !yield(UserArgument{
+				ObjectID:     mustBeUint(rec[csvFields["OBJECT_ID"]]),
+				SubprogramID: mustBeUint(rec[csvFields["SUBPROGRAM_ID"]]),
+
+				PackageName: rec[csvFields["PACKAGE_NAME"]],
+				ObjectName:  rec[csvFields["OBJECT_NAME"]],
+
+				DataLevel:    mustBeUint8(rec[csvFields["DATA_LEVEL"]]),
+				Position:     pos,
+				ArgumentName: rec[csvFields["ARGUMENT_NAME"]],
+				InOut:        rec[csvFields["IN_OUT"]],
+
+				DataType:      rec[csvFields["DATA_TYPE"]],
+				DataPrecision: mustBeUint8(rec[csvFields["DATA_PRECISION"]]),
+				DataScale:     mustBeUint8(rec[csvFields["DATA_SCALE"]]),
+
+				CharacterSetName: rec[csvFields["CHARACTER_SET_NAME"]],
+				IndexBy:          rec[csvFields["INDEX_BY"]],
+				CharLength:       mustBeUint(rec[csvFields["CHAR_LENGTH"]]),
+
+				PlsType:     rec[csvFields["PLS_TYPE"]],
+				TypeLink:    rec[csvFields["TYPE_LINK"]],
+				TypeOwner:   rec[csvFields["TYPE_OWNER"]],
+				TypeName:    rec[csvFields["TYPE_NAME"]],
+				TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
+			}, nil) {
+				return
+			}
+		}
+	}
+}
+
+// ReadCsv reads the csv from the Reader, and sends the arguments to the given channel.
+func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
+	defer close(userArgs)
+
+	for ua, err := range NewUACsvReader(r) {
 		if err != nil {
 			if err == io.EOF {
-				err = nil
+				return nil
 			}
-			break
+			return err
 		}
-		arg := UserArgument{
-			ObjectID:     mustBeUint(rec[csvFields["OBJECT_ID"]]),
-			SubprogramID: mustBeUint(rec[csvFields["SUBPROGRAM_ID"]]),
-
-			PackageName: rec[csvFields["PACKAGE_NAME"]],
-			ObjectName:  rec[csvFields["OBJECT_NAME"]],
-
-			DataLevel:    mustBeUint8(rec[csvFields["DATA_LEVEL"]]),
-			Position:     mustBeUint(rec[csvFields["SEQUENCE"]]),
-			ArgumentName: rec[csvFields["ARGUMENT_NAME"]],
-			InOut:        rec[csvFields["IN_OUT"]],
-
-			DataType:      rec[csvFields["DATA_TYPE"]],
-			DataPrecision: mustBeUint8(rec[csvFields["DATA_PRECISION"]]),
-			DataScale:     mustBeUint8(rec[csvFields["DATA_SCALE"]]),
-
-			CharacterSetName: rec[csvFields["CHARACTER_SET_NAME"]],
-			IndexBy:          rec[csvFields["INDEX_BY"]],
-			CharLength:       mustBeUint(rec[csvFields["CHAR_LENGTH"]]),
-
-			PlsType:     rec[csvFields["PLS_TYPE"]],
-			TypeLink:    rec[csvFields["TYPE_LINK"]],
-			TypeOwner:   rec[csvFields["TYPE_OWNER"]],
-			TypeName:    rec[csvFields["TYPE_NAME"]],
-			TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
-		}
-
-		userArgs <- arg
+		userArgs <- ua
 	}
-	return err
+	return nil
 }
 
 func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []Function {

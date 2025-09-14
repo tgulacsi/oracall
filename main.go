@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/csv"
 	"errors"
 	"flag"
 	"fmt"
@@ -598,47 +597,15 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 	})
 
 	var cwMu sync.Mutex
-	var cw *csv.Writer
+	var cw *oracall.UACsvWriter
 	if dumpFn != "" {
-		var lastOk bool
-		qry := argumentsQry
-		qry = qry[:strings.Index(qry, "FROM "+tbl)] //nolint:gas
-		qry = strings.TrimPrefix(qry[strings.LastIndex(qry, "SELECT ")+7:], "DISTINCT ")
-		colNames := strings.Split(
-			strings.Map(
-				func(r rune) rune {
-					if 'A' <= r && r <= 'Z' || '0' <= r && r <= '9' || r == '_' {
-						lastOk = true
-						return r
-					}
-					if 'a' <= r && r <= 'z' {
-						lastOk = true
-						return unicode.ToUpper(r)
-					}
-					if r == ',' {
-						return r
-					}
-					if lastOk {
-						lastOk = false
-						return ' '
-					}
-					return -1
-				},
-				qry,
-			),
-			",",
-		)
-		for i, nm := range colNames {
-			nm = strings.TrimSpace(nm)
-			colNames[i] = nm
-			if j := strings.LastIndexByte(nm, ' '); j >= 0 {
-				colNames[i] = nm[j+1:]
-			}
-		}
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
 			logger.Error("create", "dump", dumpFn, "error", err)
 			return functions, annotations, fmt.Errorf("%s: %w", dumpFn, err)
+		}
+		if cw, err = oracall.NewUACsvWriter(fh); err != nil {
+			return functions, annotations, err
 		}
 		defer func() {
 			cwMu.Lock()
@@ -655,14 +622,6 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 				logger.Error("close", "dump", fh.Name(), "error", err)
 			}
 		}()
-		cwMu.Lock()
-		cw = csv.NewWriter(fh)
-		err = cw.Write(colNames)
-		cwMu.Unlock()
-		if err != nil {
-			logger.Error("write header to csv", "error", err)
-			return functions, annotations, fmt.Errorf("write header: %w", err)
-		}
 	}
 
 	var prevPackage string
@@ -697,21 +656,6 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 			var ua oracall.UserArgument
 			ua.DataType = row.Data
 			ua.InOut = row.InOut.String
-			if cw != nil {
-				N := i64ToString
-				cwMu.Lock()
-				err := cw.Write([]string{
-					strconv.Itoa(row.OID), N(row.SubID), strconv.Itoa(row.Seq), row.Package.String, row.Object.String,
-					strconv.Itoa(row.Level), row.Argument, ua.InOut,
-					ua.DataType, N(row.Prec), N(row.Scale), row.Charset, row.IndexBy,
-					row.PLS, N(row.Length),
-					row.Owner, row.Name, row.Subname, row.Link,
-				})
-				cwMu.Unlock()
-				if err != nil {
-					return fmt.Errorf("write csv: %w", err)
-				}
-			}
 			if !row.Package.Valid {
 				continue
 			}
@@ -799,6 +743,13 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 			if row.Length.Valid {
 				ua.CharLength = uint(row.Length.Int64)
 			}
+
+			if cw != nil {
+				if err = cw.WriteUA(ua); err != nil {
+					return err
+				}
+			}
+
 			userArgs <- ua
 		}
 		return nil
