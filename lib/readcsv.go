@@ -81,32 +81,64 @@ func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err 
 	return functions, grp.Wait()
 }
 
-func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgument, filter func(string) bool) {
-	defer close(filteredArgs)
-	type program struct {
-		PackageName, ObjectName string
-		ObjectID, SubprogramID  uint
-	}
-	var lastProg, zeroProg program
-	args := make([]UserArgument, 0, 4)
-	for ua := range userArgs {
-		if filter != nil && !filter(ua.PackageName+"."+ua.ObjectName) {
-			continue
-		}
-		actProg := program{
-			ObjectID: ua.ObjectID, SubprogramID: ua.SubprogramID,
-			PackageName: ua.PackageName, ObjectName: ua.ObjectName}
-		if lastProg != zeroProg && lastProg != actProg {
-			if len(args) != 0 {
-				filteredArgs <- args
-				args = make([]UserArgument, 0, cap(args))
+func filterArgs(userArgs iter.Seq[UserArgument], filter func(string) bool) iter.Seq[UserArgument] {
+	return func(yield func(UserArgument) bool) {
+		for ua := range userArgs {
+			if filter != nil && !filter(ua.PackageName+"."+ua.ObjectName) {
+				continue
+			}
+			if !yield(ua) {
+				return
 			}
 		}
-		args = append(args, ua)
-		lastProg = actProg
 	}
-	if len(args) != 0 {
-		filteredArgs <- args
+}
+
+func groupArgs(userArgs iter.Seq[UserArgument]) iter.Seq[[]UserArgument] {
+	return func(yield func([]UserArgument) bool) {
+		type program struct {
+			PackageName, ObjectName string
+			ObjectID, SubprogramID  uint
+		}
+		var lastProg, zeroProg program
+		args := make([]UserArgument, 0, 4)
+		for ua := range userArgs {
+			actProg := program{
+				ObjectID: ua.ObjectID, SubprogramID: ua.SubprogramID,
+				PackageName: ua.PackageName, ObjectName: ua.ObjectName}
+			if lastProg != zeroProg && lastProg != actProg {
+				if len(args) != 0 {
+					if !yield(args) {
+						return
+					}
+					args = make([]UserArgument, 0, cap(args))
+				}
+			}
+			args = append(args, ua)
+			lastProg = actProg
+		}
+		if len(args) != 0 {
+			if !yield(args) {
+				return
+			}
+		}
+	}
+}
+
+func FilterAndGroupIter(userArgs iter.Seq[UserArgument], filter func(string) bool) iter.Seq[[]UserArgument] {
+	return groupArgs(filterArgs(userArgs, filter))
+}
+
+func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgument, filter func(string) bool) {
+	defer close(filteredArgs)
+	for uas := range groupArgs(filterArgs(func(yield func(UserArgument) bool) {
+		for ua := range userArgs {
+			if !yield(ua) {
+				return
+			}
+		}
+	}, filter)) {
+		filteredArgs <- uas
 	}
 }
 
@@ -195,9 +227,13 @@ func NewUACsvReader(r io.Reader) iter.Seq2[UserArgument, error] {
 	}
 	csvr.LazyQuotes, csvr.TrimLeadingSpace = true, true
 	csvr.ReuseRecord = true
+	type csvStructIdx struct {
+		Csv, Struct int
+		Conv        func(reflect.Value, string)
+	}
 	var (
 		rec       []string
-		csvFields = make(map[string]int, 20)
+		csvFields = make(map[string]csvStructIdx, 20)
 	)
 	rt := reflect.TypeOf(UserArgument{})
 	for i := 0; i < rt.NumField(); i++ {
@@ -209,7 +245,20 @@ func NewUACsvReader(r io.Reader) iter.Seq2[UserArgument, error] {
 		if name == "" {
 			continue
 		}
-		csvFields[name] = -1
+		conv := func(st reflect.Value, s string) {
+			st.Field(i).SetString(s)
+		}
+		switch ft.Type.Kind() {
+		case reflect.Uint8:
+			conv = func(st reflect.Value, s string) {
+				st.Field(i).SetUint(uint64(mustBeUint8(s)))
+			}
+		case reflect.Uint:
+			conv = func(st reflect.Value, s string) {
+				st.Field(i).SetUint(uint64(mustBeUint(s)))
+			}
+		}
+		csvFields[name] = csvStructIdx{Csv: -1, Struct: i, Conv: conv}
 	}
 	// get head
 	if rec, err = csvr.Read(); err != nil {
@@ -220,8 +269,9 @@ func NewUACsvReader(r io.Reader) iter.Seq2[UserArgument, error] {
 	csvr.FieldsPerRecord = len(rec)
 	for i, h := range rec {
 		h = strings.ToUpper(h)
-		if j, ok := csvFields[h]; ok && j < 0 {
-			csvFields[h] = i
+		if idx, ok := csvFields[h]; ok && idx.Csv < 0 {
+			idx.Csv = i
+			csvFields[h] = idx
 		}
 	}
 	logger.Info("field order", "fields", csvFields)
@@ -233,32 +283,15 @@ func NewUACsvReader(r io.Reader) iter.Seq2[UserArgument, error] {
 				yield(UserArgument{}, err)
 				return
 			}
-			if !yield(UserArgument{
-				ObjectID:     mustBeUint(rec[csvFields["OBJECT_ID"]]),
-				SubprogramID: mustBeUint(rec[csvFields["SUBPROGRAM_ID"]]),
-
-				PackageName: rec[csvFields["PACKAGE_NAME"]],
-				ObjectName:  rec[csvFields["OBJECT_NAME"]],
-
-				DataLevel:    mustBeUint8(rec[csvFields["DATA_LEVEL"]]),
-				Position:     pos,
-				ArgumentName: rec[csvFields["ARGUMENT_NAME"]],
-				InOut:        rec[csvFields["IN_OUT"]],
-
-				DataType:      rec[csvFields["DATA_TYPE"]],
-				DataPrecision: mustBeUint8(rec[csvFields["DATA_PRECISION"]]),
-				DataScale:     mustBeUint8(rec[csvFields["DATA_SCALE"]]),
-
-				CharacterSetName: rec[csvFields["CHARACTER_SET_NAME"]],
-				IndexBy:          rec[csvFields["INDEX_BY"]],
-				CharLength:       mustBeUint(rec[csvFields["CHAR_LENGTH"]]),
-
-				PlsType:     rec[csvFields["PLS_TYPE"]],
-				TypeLink:    rec[csvFields["TYPE_LINK"]],
-				TypeOwner:   rec[csvFields["TYPE_OWNER"]],
-				TypeName:    rec[csvFields["TYPE_NAME"]],
-				TypeSubname: rec[csvFields["TYPE_SUBNAME"]],
-			}, nil) {
+			ua := UserArgument{Position: pos}
+			rv := reflect.ValueOf(&ua).Elem()
+			for _, idx := range csvFields {
+				if idx.Conv == nil || idx.Csv < 0 {
+					continue
+				}
+				idx.Conv(rv, rec[idx.Csv])
+			}
+			if !yield(ua, nil) {
 				return
 			}
 		}
@@ -281,10 +314,10 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	return nil
 }
 
-func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []Function {
+func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) bool) []Function {
 	// Split args by functions
-	names := make([]string, 0, len(userArgs)/4)
-	functions := make([]Function, cap(names))
+	var names []string
+	var functions []Function
 	var row int
 	for uas := range userArgs {
 		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
@@ -353,6 +386,17 @@ func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []
 	}
 	logger.Info("found", "functions", names)
 	return functions
+}
+
+func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []Function {
+	return ParseArgumentsIter(
+		func(yield func(uas []UserArgument) bool) {
+			for uas := range userArgs {
+				if !yield(uas) {
+					return
+				}
+			}
+		}, filter)
 }
 
 func mustBeUint(text string) uint {
