@@ -16,8 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 // UserArgument represents the required info from the user_arguments view
@@ -72,13 +70,22 @@ func ParseCsvFile(filename string, filter func(string) bool) (functions []Functi
 
 // ParseCsv parses the csv
 func ParseCsv(r io.Reader, filter func(string) bool) (functions []Function, err error) {
-	userArgs := make(chan UserArgument, 16)
-	var grp errgroup.Group
-	grp.Go(func() error { return ReadCsv(userArgs, r) })
-	filteredArgs := make(chan []UserArgument, 16)
-	grp.Go(func() error { FilterAndGroup(filteredArgs, userArgs, filter); return nil })
-	functions = ParseArguments(filteredArgs, filter)
-	return functions, grp.Wait()
+	functions = ParseArguments(groupArgs(filterArgs(
+		func(yield func(UserArgument) bool) {
+			var ua UserArgument
+			for ua, err = range NewUACsvReader(r) {
+				if err != nil {
+					if err == io.EOF {
+						err = nil
+					}
+					return
+				}
+				if !yield(ua) {
+					return
+				}
+			}
+		}, filter)), filter)
+	return functions, err
 }
 
 func filterArgs(userArgs iter.Seq[UserArgument], filter func(string) bool) iter.Seq[UserArgument] {
@@ -125,21 +132,8 @@ func groupArgs(userArgs iter.Seq[UserArgument]) iter.Seq[[]UserArgument] {
 	}
 }
 
-func FilterAndGroupIter(userArgs iter.Seq[UserArgument], filter func(string) bool) iter.Seq[[]UserArgument] {
+func FilterAndGroup(userArgs iter.Seq[UserArgument], filter func(string) bool) iter.Seq[[]UserArgument] {
 	return groupArgs(filterArgs(userArgs, filter))
-}
-
-func FilterAndGroup(filteredArgs chan<- []UserArgument, userArgs <-chan UserArgument, filter func(string) bool) {
-	defer close(filteredArgs)
-	for uas := range groupArgs(filterArgs(func(yield func(UserArgument) bool) {
-		for ua := range userArgs {
-			if !yield(ua) {
-				return
-			}
-		}
-	}, filter)) {
-		filteredArgs <- uas
-	}
 }
 
 // OpenCsv opens the filename
@@ -314,7 +308,7 @@ func ReadCsv(userArgs chan<- UserArgument, r io.Reader) error {
 	return nil
 }
 
-func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) bool) []Function {
+func ParseArguments(userArgs iter.Seq[[]UserArgument], filter func(string) bool) []Function {
 	// Split args by functions
 	var names []string
 	var functions []Function
@@ -386,17 +380,6 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 	}
 	logger.Info("found", "functions", names)
 	return functions
-}
-
-func ParseArguments(userArgs <-chan []UserArgument, filter func(string) bool) []Function {
-	return ParseArgumentsIter(
-		func(yield func(uas []UserArgument) bool) {
-			for uas := range userArgs {
-				if !yield(uas) {
-					return
-				}
-			}
-		}, filter)
 }
 
 func mustBeUint(text string) uint {
