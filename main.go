@@ -13,7 +13,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"iter"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -466,7 +465,10 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 		return t, nil
 	}
 
-	var dbRows iter.Seq2[dbRow, error] = func(yield func(dbRow, error) bool) {
+	dbCh := make(chan dbRow)
+	grp, grpCtx := errgroup.WithContext(ctx)
+	grp.Go(func() error {
+		defer close(dbCh)
 		var collStmt, attrStmt *sql.Stmt
 		qry := `SELECT coll_type, elem_type_owner, elem_type_name, elem_type_package,
 				   length, precision, scale, character_set_name, index_by,
@@ -491,11 +493,11 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 				  WHERE synonym_name = :pkg)`
 		var resolveTypeShort func(ctx context.Context, typ, owner, name, sub string) ([]dbType, error)
 		var err error
-		if collStmt, err = tx1.PrepareContext(ctx, qry); err != nil {
+		if collStmt, err = tx1.PrepareContext(grpCtx, qry); err != nil {
 			logger.Error("ERROR", "qry", qry, "error", err)
 		} else {
 			defer collStmt.Close()
-			if rows, err := collStmt.QueryContext(ctx,
+			if rows, err := collStmt.QueryContext(grpCtx,
 				sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", ""),
 			); err != nil {
 				collStmt = nil
@@ -518,11 +520,11 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
                        hidden_column = 'NO' AND INSTR(column_name, '$') = 0 AND 
                        owner = :owner AND table_name = :pkg
 				 ORDER BY attr_no`
-				if attrStmt, err = tx1.PrepareContext(ctx, qry); err != nil {
+				if attrStmt, err = tx1.PrepareContext(grpCtx, qry); err != nil {
 					logger.Error("Prepare", "qry", qry, "error", err)
 				} else {
 					defer attrStmt.Close()
-					if rows, err := attrStmt.QueryContext(ctx,
+					if rows, err := attrStmt.QueryContext(grpCtx,
 						sql.Named("owner", ""), sql.Named("pkg", ""), sql.Named("sub", ""),
 					); err != nil {
 						attrStmt = nil
@@ -537,13 +539,12 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 		}
 
 		qry = argumentsQry
-		rows, err := tx2.QueryContext(ctx,
+		rows, err := tx2.QueryContext(grpCtx,
 			qry, pattern, pattern, godror.FetchArraySize(1024), godror.PrefetchCount(1025),
 		)
 		if err != nil {
 			logger.Error("Query", "qry", qry, "error", err)
-			yield(dbRow{}, fmt.Errorf("%s: %w", qry, err))
-			return
+			return fmt.Errorf("%s: %w", qry, err)
 		}
 		defer rows.Close()
 
@@ -555,23 +556,25 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 				&row.Data, &row.Prec, &row.Scale, &row.Charset, &row.IndexBy,
 				&row.PLS, &row.Length, &row.Owner, &row.Name, &row.Subname, &row.Link,
 			); err != nil {
-				yield(row, fmt.Errorf("reading row=%v: %w", rows, err))
-				return
+				return fmt.Errorf("reading row=%v: %w", rows, err)
 			}
 			row.Seq = seq
 			seq++
+			select {
+			case <-grpCtx.Done():
+				return grpCtx.Err()
+			case dbCh <- row:
+			}
 			if resolveTypeShort == nil {
 				continue
 			}
 			if row.Data == "PL/SQL TABLE" || row.Data == "PL/SQL RECORD" || row.Data == "REF CURSOR" || row.Data == "TABLE" {
-				plus, err := resolveTypeShort(ctx, row.Data, row.Owner, row.Name, row.Subname)
+				plus, err := resolveTypeShort(grpCtx, row.Data, row.Owner, row.Name, row.Subname)
 				if err != nil {
-					yield(row, err)
-					return
+					return err
 				}
-				if plus, err = expandArgs(ctx, plus, resolveTypeShort); err != nil {
-					yield(row, err)
-					return
+				if plus, err = expandArgs(grpCtx, plus, resolveTypeShort); err != nil {
+					return err
 				}
 				for _, p := range plus {
 					row.Seq = seq
@@ -579,16 +582,19 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 					row.Argument, row.Data, row.Length, row.Prec, row.Scale, row.Charset, row.IndexBy = p.Argument, p.Data, p.Length, p.Prec, p.Scale, p.Charset, p.IndexBy
 					row.Owner, row.Name, row.Subname, row.Link = p.Owner, p.Name, p.Subname, p.Link
 					row.Level = p.Level
-					if !yield(row, nil) {
-						return
+					select {
+					case <-grpCtx.Done():
+						return grpCtx.Err()
+					case dbCh <- row:
 					}
 				}
 			}
 		}
 		if err = rows.Close(); err != nil {
-			yield(dbRow{}, fmt.Errorf("walking rows: %w", err))
+			return fmt.Errorf("walking rows: %w", err)
 		}
-	}
+		return nil
+	})
 
 	var cwMu sync.Mutex
 	var cw *oracall.UACsvWriter
@@ -622,21 +628,31 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 	var docsMu sync.Mutex
 	var replMu sync.Mutex
 	docs := make(map[string]string)
-	functions = oracall.ParseArguments(oracall.FilterAndGroup(func(yield func(oracall.UserArgument) bool) {
+	userArgs := make(chan oracall.UserArgument, 16)
+	grp.Go(func() error {
+		defer close(userArgs)
 		var pkgTime time.Time
-		for row, rowErr := range dbRows {
-			if rowErr != nil {
-				err = rowErr
-			}
-			if row.Name == "" {
-				row.PLS = row.Data
-			} else {
-				row.PLS = row.Owner + "." + row.Name + "." + row.Subname
-				if row.Link != "" {
-					row.PLS += "@" + row.Link
+		ctx := grpCtx
+	Loop:
+		for {
+			var row dbRow
+			var ok bool
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case row, ok = <-dbCh:
+				if !ok {
+					break Loop
+				}
+				if row.Name == "" {
+					row.PLS = row.Data
+				} else {
+					row.PLS = row.Owner + "." + row.Name + "." + row.Subname
+					if row.Link != "" {
+						row.PLS += "@" + row.Link
+					}
 				}
 			}
-
 			var ua oracall.UserArgument
 			ua.DataType = row.Data
 			ua.InOut = row.InOut.String
@@ -646,7 +662,7 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 			ua.PackageName = row.Package.String
 			if ua.PackageName != prevPackage {
 				if pkgTime, err = getObjTime(ua.PackageName); err != nil {
-					return
+					return err
 				}
 				prevPackage = ua.PackageName
 				if err := func() error {
@@ -681,7 +697,7 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 					}
 					return docsErr
 				}(); err != nil {
-					return
+					return err
 				}
 			}
 			ua.LastDDL = pkgTime
@@ -730,20 +746,21 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 
 			if cw != nil {
 				if err = cw.WriteUA(ua); err != nil {
-					return
+					return err
 				}
 			}
 
-			if !yield(ua) {
-				return
-			}
+			userArgs <- ua
 		}
-	}, filter), filter)
-
-	if err != nil {
-		return functions, annotations, err
+		return nil
+	})
+	filteredArgs := make(chan []oracall.UserArgument, 16)
+	grp.Go(func() error { oracall.FilterAndGroup(filteredArgs, userArgs, filter); return nil })
+	functions = oracall.ParseArguments(filteredArgs, filter)
+	if grpErr := grp.Wait(); grpErr != nil {
+		logger.Error("ParseArguments", "error", grpErr)
+		return functions, annotations, grpErr
 	}
-
 	docNames := make([]string, 0, len(docs))
 	for k := range docs {
 		docNames = append(docNames, k)
