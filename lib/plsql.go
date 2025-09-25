@@ -153,12 +153,6 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	}
 	defer tx.Rollback()
 	ctx = godror.ContextWithTraceTag(ctx, godror.TraceTag{Module: %q, Action: %q})
-if s.DBLog != nil {
-	var err error
-	if ctx, err = s.DBLog(ctx, tx, funName, input); err != nil {
-		logger.Error("dbLog", "fun", funName, "error", err)
-	}
-}
 const callText = `+"`%s`"+`
 if DebugLevel > 0 {
 	logger.Debug("calling", "qry", callText, "stmt", `+"`%s`"+`)
@@ -188,7 +182,13 @@ if DebugLevel > 0 {
 	defer stmt.Close()
 	stmtP := fmt.Sprintf("%p", stmt)
 	dl, _ := ctx.Deadline()
-	logger.Debug( "calling", "fun", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
+	if s.DBLog != nil {
+		var err error
+		if ctx, err = s.DBLog(ctx, tx, funName, input); err != nil {
+			logger.Error("dbLog", "fun", funName, "error", err)
+		}
+	}
+	logger.Info( "calling", "fun", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
 	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(` + aS + `))...)
 	logger.Info( "finished", "fun", funName, "stmt", stmtP, "error", err)
 	if err != nil {
