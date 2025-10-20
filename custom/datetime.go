@@ -154,7 +154,7 @@ func (dt *DateTime) MarshalText() ([]byte, error) {
 func (dt *DateTime) UnmarshalText(data []byte) error {
 	data = bytes.Trim(data, " \"")
 	n := len(data)
-	if n == 0 {
+	if n == 0 || n < 8 {
 		dt.Time = time.Time{}
 		//log.Println("time=")
 		return nil

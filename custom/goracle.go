@@ -69,7 +69,8 @@ func NumbersFromStrings(s *[]string) *[]godror.Number {
 const timeFormat = time.RFC3339
 
 func ParseTime(t *time.Time, s string) error {
-	if s == "" {
+	n := len(s)
+	if s == "" || n < 8 { //20060102
 		*t = time.Time{}
 		return nil
 	}
@@ -82,7 +83,6 @@ func ParseTime(t *time.Time, s string) error {
 		}
 	}
 
-	n := len(s)
 	if n > len(timeFormat) {
 		n = len(timeFormat)
 	}
