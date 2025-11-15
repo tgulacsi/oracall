@@ -58,7 +58,7 @@ func (dt *DateTime) AppendFormat(b []byte, layout string) []byte {
 	}
 	return dt.Time.AppendFormat(b, layout)
 }
-func (dt *DateTime) Scan(src interface{}) error {
+func (dt *DateTime) Scan(src any) error {
 	if src == nil {
 		dt.Time = time.Time{}
 		return nil

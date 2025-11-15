@@ -800,7 +800,7 @@ type bufPool struct {
 }
 
 func newBufPool(size int) *bufPool {
-	return &bufPool{sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 1<<16)) }}}
+	return &bufPool{sync.Pool{New: func() any { return bytes.NewBuffer(make([]byte, 0, 1<<16)) }}}
 }
 func (bp *bufPool) Get() *bytes.Buffer {
 	return bp.Pool.Get().(*bytes.Buffer)
@@ -815,7 +815,7 @@ func (bp *bufPool) Put(b *bytes.Buffer) {
 
 var rIdentifier = regexp.MustCompile(`:([0-9a-zA-Z][a-zA-Z0-9_]*)`)
 
-func ReplOraPh(s string, params []interface{}) string {
+func ReplOraPh(s string, params []any) string {
 	var i int
 	return rIdentifier.ReplaceAllStringFunc(
 		s,

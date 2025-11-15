@@ -329,7 +329,7 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 	}
 }
 
-type protoOptions map[string]interface{}
+type protoOptions map[string]any
 
 func (opts protoOptions) String() string {
 	if len(opts) == 0 {
@@ -353,7 +353,7 @@ func (opts protoOptions) String() string {
 	return buf.String()
 }
 
-func CopyStruct(dest interface{}, src interface{}) error {
+func CopyStruct(dest any, src any) error {
 	ds := fstructs.New(dest)
 	ss := fstructs.New(src)
 	snames := ss.Names()
