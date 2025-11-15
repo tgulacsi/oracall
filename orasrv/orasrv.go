@@ -88,7 +88,7 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 
 	opts := []grpc.ServerOption{
 		grpc.StreamInterceptor(
-			func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+			func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				if catchPanic {
 					defer func() {
 						if r := recover(); r != nil {
@@ -127,7 +127,7 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 			}),
 
 		grpc.UnaryInterceptor(
-			func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ interface{}, err error) {
+			func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ any, err error) {
 				if catchPanic {
 					defer func() {
 						if r := recover(); r != nil {

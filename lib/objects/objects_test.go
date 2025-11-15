@@ -73,7 +73,6 @@ func TestReadPackages(t *testing.T) {
 	var wg sync.WaitGroup
 	funcsCh := make(chan objects.Package, 1)
 	for _, pkg := range pkgs {
-		pkg := pkg
 		wg.Add(1)
 		t.Run(pkg, func(t *testing.T) {
 			defer wg.Done()

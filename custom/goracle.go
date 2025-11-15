@@ -22,7 +22,7 @@ import (
 )
 
 type SQLExecer interface {
-	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
 var ZeroIsAlmostZero bool
@@ -42,7 +42,7 @@ func (n Number) Value() (driver.Value, error) {
 }
 
 // Scan assigns a value from a database driver.
-func (n *Number) Scan(src interface{}) error {
+func (n *Number) Scan(src any) error {
 	switch x := src.(type) {
 	case Number:
 		*n = Number(x)
@@ -82,10 +82,7 @@ func ParseTime(t *time.Time, s string) error {
 		}
 	}
 
-	n := len(s)
-	if n > len(timeFormat) {
-		n = len(timeFormat)
-	}
+	n := min(len(s), len(timeFormat))
 	var err error
 	*t, err = time.ParseInLocation(timeFormat[:n], s, time.Local) // TODO(tgulacsi): more robust parser
 	if err != nil {
@@ -139,7 +136,7 @@ func (L *Lob) Value() (driver.Value, error) {
 }
 
 // Scan assigns a value from a database driver.
-func (L *Lob) Scan(src interface{}) error {
+func (L *Lob) Scan(src any) error {
 	switch x := src.(type) {
 	case Lob:
 		L.data, L.err = io.ReadAll(L.Lob)
@@ -157,7 +154,7 @@ func (L *Lob) Scan(src interface{}) error {
 	return nil
 }
 
-func AsString(v interface{}) string {
+func AsString(v any) string {
 	if v == nil {
 		return ""
 	}
@@ -174,7 +171,7 @@ func AsString(v interface{}) string {
 	return fmt.Sprintf("%v", v)
 }
 
-func AsFloat64(v interface{}) float64 {
+func AsFloat64(v any) float64 {
 	if v == nil {
 		return 0
 	}
@@ -216,7 +213,7 @@ func AsFloat64(v interface{}) float64 {
 	}
 	return result
 }
-func AsInt32(v interface{}) int32 {
+func AsInt32(v any) int32 {
 	if v == nil {
 		return 0
 	}
@@ -256,7 +253,7 @@ func AsInt32(v interface{}) int32 {
 	}
 	return 0
 }
-func AsInt64(v interface{}) int64 {
+func AsInt64(v any) int64 {
 	if v == nil {
 		return 0
 	}
@@ -296,7 +293,7 @@ func AsInt64(v interface{}) int64 {
 	}
 	return 0
 }
-func AsUint64(v interface{}) uint64 {
+func AsUint64(v any) uint64 {
 	if v == nil {
 		return 0
 	}
@@ -337,7 +334,7 @@ func AsUint64(v interface{}) uint64 {
 	return 0
 }
 
-func AsTimestamp(v interface{}) *timestamppb.Timestamp {
+func AsTimestamp(v any) *timestamppb.Timestamp {
 	if v == nil {
 		return nil
 	}
@@ -366,7 +363,7 @@ func AsTimestamp(v interface{}) *timestamppb.Timestamp {
 
 	return nil
 }
-func AsDate(v interface{}) *DateTime {
+func AsDate(v any) *DateTime {
 	//log.Printf("AsDate(%[1]v %[1]T)", v)
 	if v == nil {
 		return new(DateTime)
@@ -403,7 +400,7 @@ func AsDate(v interface{}) *DateTime {
 	return d
 }
 
-func AsTime(v interface{}) time.Time {
+func AsTime(v any) time.Time {
 	if v == nil {
 		return time.Time{}
 	}

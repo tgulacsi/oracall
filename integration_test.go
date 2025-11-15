@@ -88,7 +88,6 @@ func TestGenSimple(t *testing.T) {
 		{Name: "simple_nums_count", In: `{"nums":["1","2","3","4.4"]}`, Await: `{"ret":4}`},
 		{Name: "simple_sum_nums", In: `{"nums":["1.1","2","3.3"]}`, Await: `{"outnums":["2.1","3","4.3"],"text":"1=1.1 2=2 3=3.3 ","ret":"6.4"}`},
 	} {
-		todo := todo
 		t.Run(todo.Name, func(t *testing.T) {
 			got := runTest(t, outFn, "-connect="+dsn, oracall.CamelCase(todo.Name), todo.In)
 			todo.Await = strings.TrimSpace(todo.Await)
@@ -137,7 +136,6 @@ func TestGenRec(t *testing.T) {
 		{"rec_sendpreoffer_31101", `{"p_vonalkod":1}`,
 			`{"p_vonalkod":1,"p_kotveny":{},"p_kotveny_gfb":{},"p_gepjarmu":{}}`},
 	} {
-		todo := todo
 		t.Run(todo[0], func(t *testing.T) {
 			got := runTest(t, outFn, "-connect="+dsn, todo[0], todo[1])
 			todo[2] = strings.Replace(todo[2], "{{NOW}}", time.Now().Format(time.RFC3339), -1)
@@ -598,7 +596,7 @@ func getConnection(t *testing.T) *sql.DB {
 }
 
 func jsonEqual(a, b string) string {
-	var aJ, bJ map[string]interface{}
+	var aJ, bJ map[string]any
 	if err := json.Unmarshal([]byte(a), &aJ); err != nil {
 		return "ERROR a: " + err.Error()
 	}
@@ -610,7 +608,7 @@ func jsonEqual(a, b string) string {
 	return pretty.Compare(aJ, bJ)
 }
 
-func omitEmpty(m map[string]interface{}) {
+func omitEmpty(m map[string]any) {
 	for k, v := range m {
 		empty := false
 		switch x := v.(type) {
@@ -622,7 +620,7 @@ func omitEmpty(m map[string]interface{}) {
 			empty = x == 0
 		case time.Time:
 			empty = x.IsZero()
-		case map[string]interface{}:
+		case map[string]any:
 			omitEmpty(x)
 			empty = len(x) == 0
 		}

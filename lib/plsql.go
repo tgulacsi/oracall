@@ -129,7 +129,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 		first := make(map[string]int, len(paramsMap))
 		pls, _ = godror.MapToSlice(
 			plsBuf.String(),
-			func(key string) interface{} {
+			func(key string) any {
 				paramsMap[key] = append(paramsMap[key], i)
 				if _, ok := first[key]; !ok {
 					first[key] = i
@@ -274,7 +274,7 @@ func demap(plsql, callFun string) (string, string) {
 	first := make(map[string]int, len(paramsMap))
 	plsql, paramsArr := godror.MapToSlice(
 		plsql,
-		func(key string) interface{} {
+		func(key string) any {
 			paramsMap[key] = append(paramsMap[key], i)
 			if _, ok := first[key]; !ok {
 				first[key] = i
@@ -294,7 +294,7 @@ func demap(plsql, callFun string) (string, string) {
 	var lastIdx int
 	tpl, err := template.New("callFun").
 		Funcs(
-			map[string]interface{}{
+			map[string]any{
 				"paramsIdx": func(key string) int {
 					if strings.HasSuffix(key, MarkHidden) {
 						key = key[:len(key)-len(MarkHidden)] + "#"
@@ -325,7 +325,7 @@ func demap(plsql, callFun string) (string, string) {
 	}
 	callBuf.Reset()
 	prev := make(map[string]string)
-	for _, line := range bytes.Split(b, []byte{'\n'}) {
+	for line := range bytes.SplitSeq(b, []byte{'\n'}) {
 		if line = bytes.TrimSpace(line); len(line) != 0 && bytes.HasPrefix(line, []byte("params[")) && bytes.Contains(line, []byte("] = ")) {
 			idx := string(line[:bytes.IndexByte(line, ']')+1])
 			line = line[len(idx)+2:]
@@ -354,7 +354,7 @@ func demap(plsql, callFun string) (string, string) {
 	defer Buffers.Put(plus)
 
 	b = callBuf.Bytes()
-	i = bytes.LastIndex(b, []byte(fmt.Sprintf("params[%d] =", lastIdx)))
+	i = bytes.LastIndex(b, fmt.Appendf(nil, "params[%d] =", lastIdx))
 	j := bytes.IndexByte(b[i:], '\n')
 	j += i + 1
 	rest := string(b[j:])
@@ -437,12 +437,12 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			switch c {
 			case '(', ',':
 				return '_'
-			case ' ', ')':
+			case ' ', ')', '/':
 				return -1
 			default:
 				return c
 			}
-		}, absType) + "_tab_typ"
+		}, absType) + "_tt"
 		decls = append(decls, "TYPE "+typ+" IS TABLE OF "+absType+" INDEX BY BINARY_INTEGER;")
 		tableTypes[absType] = typ
 		return typ
@@ -536,7 +536,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 			}
 			for _, a := range arg.RecordOf {
-				a := a
 				k, v := a.Name, a.Argument
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				kName := (CamelCase(k))
@@ -641,11 +640,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 					// declarations go first
 					for _, a := range arg.TableOf.RecordOf {
-						a := a
 						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
 						if strings.IndexByte(typ, '/') >= 0 {
-							err = fmt.Errorf("nonsense table type of %s", arg)
+							err = fmt.Errorf("nonsense table type of %s (typ=%s)", arg, typ)
 							return
 						}
 						if strings.IndexByte(typ, '%') >= 0 {
@@ -665,7 +663,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					// here comes the loops
 					var idxvar string
 					for _, a := range arg.TableOf.RecordOf {
-						a := a
 						k, v := a.Name, a.Argument
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
@@ -717,15 +714,17 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							"  i1 := "+vn+".NEXT(i1); i2 := i2 + 1;",
 							"END LOOP;")
 						for _, a := range arg.TableOf.RecordOf {
-							a := a
 							k := a.Name
 							tmp = getParamName(fun.Name(), vn+"."+k)
 							post = append(post, ":"+tmp+" := "+tmp+";")
 						}
 					}
+
+				case FLAVOR_TABLE:
+
 				default:
-					logger.Info("Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
-					panic(fmt.Errorf("only table of simple or record types are allowed (no table of table!) - %s(%v)", fun.Name(), arg.Name))
+					logger.Info("unkown flavor", "flavor", arg.Flavor)
+					panic(fmt.Errorf("unknown flavor %s(%v)", fun.Name(), arg.Name))
 				}
 			}
 		default:
@@ -935,7 +934,6 @@ func (arg Argument) getFromRset(rsetRow string) string {
 	}
 	fmt.Fprintf(buf, "%s{\n", withPb(GoT))
 	for i, a := range arg.TableOf.RecordOf {
-		a := a
 		got, err = a.Argument.goType(true)
 		if err != nil {
 			panic(err)
