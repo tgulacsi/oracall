@@ -437,12 +437,12 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 			switch c {
 			case '(', ',':
 				return '_'
-			case ' ', ')':
+			case ' ', ')', '/':
 				return -1
 			default:
 				return c
 			}
-		}, absType) + "_tab_typ"
+		}, absType) + "_tt"
 		decls = append(decls, "TYPE "+typ+" IS TABLE OF "+absType+" INDEX BY BINARY_INTEGER;")
 		tableTypes[absType] = typ
 		return typ
@@ -643,7 +643,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						k, v := a.Name, a.Argument
 						typ = getTableType(v.AbsType)
 						if strings.IndexByte(typ, '/') >= 0 {
-							err = fmt.Errorf("nonsense table type of %s", arg)
+							err = fmt.Errorf("nonsense table type of %s (typ=%s)", arg, typ)
 							return
 						}
 						if strings.IndexByte(typ, '%') >= 0 {
@@ -719,9 +719,12 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							post = append(post, ":"+tmp+" := "+tmp+";")
 						}
 					}
+
+				case FLAVOR_TABLE:
+
 				default:
-					logger.Info("Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
-					panic(fmt.Errorf("only table of simple or record types are allowed (no table of table!) - %s(%v)", fun.Name(), arg.Name))
+					logger.Info("unkown flavor", "flavor", arg.Flavor)
+					panic(fmt.Errorf("unknown flavor %s(%v)", fun.Name(), arg.Name))
 				}
 			}
 		default:

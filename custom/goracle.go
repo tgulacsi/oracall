@@ -83,9 +83,7 @@ func ParseTime(t *time.Time, s string) error {
 		}
 	}
 
-	if n > len(timeFormat) {
-		n = len(timeFormat)
-	}
+	n = min(n, len(timeFormat))
 	var err error
 	*t, err = time.ParseInLocation(timeFormat[:n], s, time.Local) // TODO(tgulacsi): more robust parser
 	if err != nil {
