@@ -1,0 +1,18 @@
+version: v2
+plugins:
+  - remote: buf.build/grpc/go:v1.6.0
+    out: .
+    opt:
+      - paths=source_relative
+  - remote: buf.build/protocolbuffers/go:v1.36.11
+    out: .
+    opt:
+      - paths=source_relative
+  - remote: buf.build/community/mfridman-go-json:v1.5.0
+    out: .
+    opt:
+      - paths=source_relative
+  - remote: buf.build/community/planetscale-vtprotobuf:v0.6.0
+    out: .
+    opt:
+      - paths=source_relative

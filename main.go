@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -805,13 +804,6 @@ func getSource(ctx context.Context, w io.Writer, cx *sql.Tx, packageName string)
 		return fmt.Errorf("%s: %w", qry, err)
 	}
 	return nil
-}
-
-func i64ToString(n sql.NullInt64) string {
-	if n.Valid {
-		return strconv.FormatInt(n.Int64, 10)
-	}
-	return ""
 }
 
 func parsePkgFlag(s string) (string, string) {

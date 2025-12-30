@@ -148,22 +148,32 @@ func (tt *Types) get(ctx context.Context, name string) (*Type, error) {
 	_ = logger
 	t := tt.m[name]
 	if t == nil || t.TypeCode == "" {
-		const qry = `SELECT A.owner, A.type_name, NULL AS package_name, A.typecode 
-  FROM all_types A 
-  WHERE owner IN (COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')), COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))) AND 
+		const qry = `SELECT A.owner, A.type_name, NULL AS package_name, A.typecode
+  FROM all_types A
+  WHERE owner IN (COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')), COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))) AND
         type_name = :type
 UNION ALL
-SELECT SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AS owner, A.type_name, A.package_name, A.typecode 
-  FROM user_plsql_types A 
-  WHERE package_name = :package AND type_name = :type
+SELECT A.owner, A.type_name, A.package_name, A.typecode
+  FROM all_plsql_types A
+  WHERE owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND
+        package_name = :package AND type_name = :type
 UNION ALL
-SELECT owner, :type AS type_name, NULL AS package_name, '%ROWTYPE' AS typecode 
-  FROM all_tables 
-  WHERE owner IN (COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')), COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))) AND 
+SELECT A.owner, A.type_name, A.package_name, A.typecode
+  FROM all_plsql_types A
+  WHERE owner = COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND
+        package_name IS NULL AND type_name = :type
+UNION ALL
+SELECT A.owner, A.type_name, NULL AS package_name, A.typecode
+  FROM all_types A
+  WHERE type_name = :type
+UNION ALL
+SELECT owner, :type AS type_name, NULL AS package_name, '%ROWTYPE' AS typecode
+  FROM all_tables
+  WHERE owner IN (COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')), COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))) AND
         table_name = REGEXP_REPLACE(:type, '%ROWTYPE$')
 `
 		owner, pkg, typ := tt.currentSchema, "", name
-		fields := strings.Split(name, ".")
+		fields := strings.SplitN(name, ".", 4)
 		switch len(fields) {
 		case 1:
 		case 2:
@@ -186,48 +196,55 @@ SELECT owner, :type AS type_name, NULL AS package_name, '%ROWTYPE' AS typecode
 		).Scan(
 			&t.Owner, &t.Name, &t.Package, &t.TypeCode,
 		); err != nil {
-			return nil, fmt.Errorf("get basic type info %q: %s [%q, %q]: %w: %w", name, qry, pkg, typ, err, errUnknownType)
+			return nil, fmt.Errorf("get basic type info %q: %s [owner=%q, pkg=%q, typ=%q]: %w: %w", name, qry,
+				owner, pkg, typ,
+				err, errUnknownType)
 		}
 
 		name = t.name(".")
 		tt.m[name] = t
 	}
+	switch name {
+	case "PUBLIC.JSON_ARRAY_T", "SYS.JDOM_T", "SYS.JSON_ELEMENT_T", "SYS.JSON_ARRAY_T":
+		return t, nil
+	}
+
 	const (
 		collQry = `
 SELECT 'C' AS orig, 0+NULL AS attr_no, NULL AS attr_name, B.elem_type_owner, B.elem_type_name, NULL AS elem_package_name, B.length, B.precision, B.scale, B.coll_type, NULL AS index_by
-  FROM all_coll_types B 
-  WHERE B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND 
+  FROM all_coll_types B
+  WHERE B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND
         B.type_name = :name
 UNION ALL
-SELECT 'D' as orig, 0+NULL AS attr_no, NULL AS attr_name, B.elem_type_owner, B.elem_type_name, B.elem_type_package, B.length, B.precision, B.scale, B.coll_type, B.index_by 
-  FROM user_plsql_coll_types B 
-  WHERE B.package_name = :package AND 
-        B.type_name = :name 
+SELECT 'D' as orig, 0+NULL AS attr_no, NULL AS attr_name, B.elem_type_owner, B.elem_type_name, B.elem_type_package, B.length, B.precision, B.scale, B.coll_type, B.index_by
+  FROM user_plsql_coll_types B
+  WHERE B.package_name = :package AND
+        B.type_name = :name
   ORDER BY 2, 3
 `
 
 		attrQry = `
 SELECT 'A' as orig, B.attr_no, B.attr_name, B.attr_type_owner, B.attr_type_name, NULL AS attr_package_name, B.length, B.precision, B.scale, NULL as coll_type, NULL AS index_by
-  FROM all_type_attrs B 
-  WHERE B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND 
+  FROM all_type_attrs B
+  WHERE B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND
         B.type_name = :name
 UNION ALL
 SELECT 'B' as orign, B.attr_no, B.attr_name, B.attr_type_owner, B.attr_type_name, B.attr_type_package, B.length, B.precision, B.scale, NULL as coll_type, NULL AS index_by
-  FROM user_plsql_type_attrs B 
-  WHERE B.package_name = :package AND 
+  FROM user_plsql_type_attrs B
+  WHERE B.package_name = :package AND
         B.type_name = :name
   ORDER BY 2, 3
 `
 
 		tblQry = `
 SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.data_type, NULL, B.data_length, B.data_precision, B.data_scale, NULL as coll_type, NULL AS index_by
-  FROM all_tab_cols B 
-  WHERE INSTR(B.column_name, '$') = 0 AND 
-        B.virtual_column = 'NO' AND 
+  FROM all_tab_cols B
+  WHERE INSTR(B.column_name, '$') = 0 AND
+        B.virtual_column = 'NO' AND
         --B.hidden_column = 'NO' AND
         B.owner = COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')) AND
         :package IS NULL AND
-        B.table_name = REGEXP_REPLACE(:name, '%ROWTYPE$') 
+        B.table_name = REGEXP_REPLACE(:name, '%ROWTYPE$')
   ORDER BY 2, 3`
 	)
 	u := tt.m[name]
@@ -338,10 +355,24 @@ func (t Type) IsColl() bool {
 	}
 }
 func (t Type) String() string {
-	if t.composite() {
-		return fmt.Sprintf("%s.%s.%s[%s]{%s}", t.Owner, t.Package, t.Name, t.Elem, t.Arguments)
+	if !t.composite() {
+		return t.Name
 	}
-	return t.Name
+	var buf strings.Builder
+
+	buf.WriteString(t.Owner)
+	buf.WriteByte('.')
+	if t.Package != "" {
+		buf.WriteString(t.Package)
+		buf.WriteByte('.')
+	}
+	buf.WriteString(t.Name)
+	if t.Elem != nil {
+		fmt.Fprintf(&buf, "[%s]", t.Elem)
+	} else if len(t.Arguments) != 0 {
+		fmt.Fprintf(&buf, "{%s}", t.Arguments)
+	}
+	return buf.String()
 }
 func (t Type) composite() bool {
 	if t.Owner != "" || t.Package != "" {
