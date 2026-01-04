@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -102,9 +101,6 @@ func (t Type) ProtoMessageName() string {
 }
 
 func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
-	if t.Arguments == nil {
-		return nil
-	}
 	bw := bufio.NewWriter(w)
 	// logger := zlog.SFromContext(ctx)
 	fmt.Fprintf(bw, "\n// %s\nmessage %s {\n\toption (oracall_object_type) = %q;\n", t.name("."), t.ProtoMessageName(), t.OraType())
@@ -213,8 +209,8 @@ func (t Type) protoTypeName() string {
 			if t.Scale.Int32 == 0 {
 				if t.Precision.Int32 < 10 {
 					return "int32"
-					// } else if t.Precision.Int32 < 19 {
-					// 	return "int64"
+				} else if t.Precision.Int32 < 19 {
+					return "int64"
 				}
 			}
 		}
@@ -226,19 +222,76 @@ func (t *Type) Valid() bool {
 	return t != nil && t.Name != "" && (isSimpleType(t.Name) || t.Elem != nil || t.Arguments != nil)
 }
 
-var errNotImplemented = errors.New("not implemented")
-
 func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
 	bw := bufio.NewWriter(w)
 	fmt.Fprintf(bw, `
 func (x *%s) WriteObject(o *godror.Object) error {
+	var data godror.Data
+`,
+		t.ProtoMessageName())
+	for _, a := range t.Arguments {
+		cName := oracall.CamelCase(a.Name)
+		if a.Type.Elem == nil {
+			if isSimpleType(a.Type.OraType()) {
+				fmt.Fprintf(bw, "\tdata.Set(x.Get%s())\n\to.SetAttribute(%q, &data)\n",
+					cName,
+					a.Name,
+				)
+			} else {
+				fmt.Fprintf(bw, "\tx.Get%s()\n", cName)
+			}
+		}
+	}
+	fmt.Fprintf(bw, `
 	return nil
 }
 func (x *%s) Scan(v any) error {
+	var data godror.Data
+	o, ok := v.(*godror.Object)
+	if !ok { return fmt.Errorf("wanted Objet, got %%T", v)}
+`,
+		t.ProtoMessageName(),
+	)
+	for _, a := range t.Arguments {
+		cName := oracall.CamelCase(a.Name)
+		if a.Type.Elem == nil {
+			if isSimpleType(a.Type.OraType()) {
+				fmt.Fprintf(bw, "\to.GetAttribute(&data, %q)\n\tx.%s = %s\n",
+					a.Name,
+					cName,
+					a.Type.dataGetter("data"),
+				)
+			}
+		}
+	}
+	bw.WriteString(`
 	return nil
 }
-		`,
-		t.ProtoMessageName(), t.ProtoMessageName(),
-	)
+`)
 	return bw.Flush()
+}
+
+func (t Type) dataGetter(dataName string) string {
+	switch t.protoType() {
+	case "bool":
+		return dataName + ".GetBool()"
+	case "google.protobuf.Timestamp":
+		return dataName + ".GetTime()"
+	case "string":
+		return dataName + ".GetString()"
+	case "bytes":
+		return dataName + ".GetBytes()"
+	case "int32":
+		return "int32(" + dataName + ".GetInt64())"
+	case "int64":
+		return dataName + ".GetInt64()"
+	case "double":
+		return dataName + ".GetFloat64()"
+	default:
+		if strings.IndexByte(t.protoType(), '_') >= 0 {
+			return dataName + ".GetObject() // " + t.protoType()
+		}
+	}
+	panic(fmt.Errorf("no dataGetter for %s (%#v)", t.protoType(), t))
+	return ""
 }
