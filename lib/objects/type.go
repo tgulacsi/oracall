@@ -46,6 +46,7 @@ func (t *Type) IsZero() bool {
 	return t == nil ||
 		t.Name == "" ||
 		t.TypeCode == "" ||
+		t.Owner == "" && t.Package == "" && t.Name != "" && t.Length.Int32 == 0 && t.Precision.Int32 == 0 ||
 		t.Elem == nil && t.IsColl() ||
 		(t.Owner != "" || t.Package != "") && !t.IsColl() && len(t.Arguments) == 0
 }

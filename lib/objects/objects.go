@@ -41,7 +41,25 @@ func (tt *Types) MarshalJSONTo(enc *jsontext.Encoder) error {
 	enc.WriteToken(jsontext.String(tt.currentSchema))
 	enc.WriteToken(jsontext.String("m"))
 	enc.WriteToken(jsontext.BeginObject)
-	T := func(k string, v *Type, margs []argumentM) error {
+	extra := make(map[string]*Type)
+	var registerType func(t *Type)
+	registerType = func(t *Type) {
+		if t == nil {
+			return
+		}
+		if t.Elem != nil {
+			registerType(t.Elem)
+		}
+		k := t.OraType()
+		if _, ok := tt.m[k]; ok {
+			return
+		}
+		if _, ok := extra[k]; ok {
+			return
+		}
+		extra[k] = t
+	}
+	T := func(k string, v *Type, margs []argumentM, addElem bool) error {
 		enc.WriteToken(jsontext.String(k))
 		var etn string
 		if v.Elem != nil {
@@ -55,41 +73,30 @@ func (tt *Types) MarshalJSONTo(enc *jsontext.Encoder) error {
 			Length:    v.Length, Precision: v.Precision, Scale: v.Scale,
 		})
 	}
-	extra := make(map[string]*Type)
 	margs := make([]argumentM, 0, 64)
 	for k, v := range tt.m {
 		margs = margs[:0]
+		registerType(v)
 		for _, a := range v.Arguments {
 			ma := argumentM{Name: a.Name}
 			if a.Type != nil {
-				ma.TypeName = a.Type.name(".")
-				if _, ok := tt.m[ma.TypeName]; !ok {
-					if _, ok := extra[ma.TypeName]; !ok {
-						if strings.IndexByte(ma.TypeName, '.') >= 0 {
-							extra[ma.TypeName] = a.Type
-						} else {
-							t2 := *a.Type
-							t2.Length, t2.Precision, t2.Scale = sql.NullInt32{}, sql.NullInt32{}, sql.NullInt32{}
-							extra[ma.TypeName] = &t2
-						}
-					}
-				}
+				registerType(a.Type)
 			}
 			margs = append(margs, ma)
 		}
-		if err := T(k, v, margs); err != nil {
-			return err
+		if err := T(k, v, margs, true); err != nil {
+			return fmt.Errorf("marshal %s=%#v: %w", k, v, err)
 		}
 	}
 	for k, v := range extra {
-		fmt.Println(k)
-		if err := T(k, v, nil); err != nil {
-			return err
+		// fmt.Println(k)
+		if err := T(k, v, nil, false); err != nil {
+			return fmt.Errorf("marshal %s=%#v: %w", k, v, err)
 		}
 	}
 	enc.WriteToken(jsontext.EndObject)
-	enc.WriteToken(jsontext.EndObject)
-	return nil
+
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
@@ -147,7 +154,7 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				args := make([]Argument, 0, len(v.Arguments))
 				for _, a := range v.Arguments {
 					args = append(args, Argument{Name: a.Name})
-					fmt.Println(k, len(args)-1, a.TypeName)
+					// fmt.Println(k, len(args)-1, a.TypeName)
 					elems[k+"\t"+strconv.Itoa(len(args)-1)] = a.TypeName
 				}
 				tt.m[k] = &Type{
@@ -165,11 +172,15 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				if k, a, ok := strings.Cut(k, "\t"); ok {
 					if i, err := strconv.Atoi(a); err != nil {
 						return fmt.Errorf("%s\t%s: %w", k, a, err)
+					} else if t := tt.m[v]; t == nil {
+						return fmt.Errorf("unknown type %s for %s", v, k)
 					} else {
-						tt.m[k].Arguments[i].Type = tt.m[v]
+						tt.m[k].Arguments[i].Type = t
 					}
+				} else if t := tt.m[v]; t == nil {
+					return fmt.Errorf("unknown type %s", k)
 				} else {
-					tt.m[k].Elem = tt.m[v]
+					tt.m[k].Elem = t
 				}
 			}
 		}
