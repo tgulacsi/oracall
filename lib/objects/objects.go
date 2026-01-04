@@ -1,45 +1,32 @@
-// Copyright 2024 Tamás Gulácsi. All rights reserved.
+// Copyright 2024, 2026 Tamás Gulácsi. All rights reserved.
 //
-// SPDX-Licens-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 package objects
 
 import (
-	"bufio"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/UNO-SOFT/zlog/v2"
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/godror/godror"
-	"github.com/tgulacsi/oracall/lib"
 	"golang.org/x/sync/errgroup"
 )
 
 type (
-	Type struct {
-		Elem *Type
-		// SELECT A.package_name, A.type_name, A.typecode, B.attr_type_owner, B.attr_type_name, B.attr_type_package, B.length, B.precision, B.scale, NULL AS index_by
-		Owner, Package, Name        string
-		TypeCode, CollType, IndexBy string
-		Arguments                   []Argument
-		Length, Precision, Scale    sql.NullInt32
-	}
-	Argument struct {
-		Type *Type
-		Name string
-	}
-
 	Types struct {
-		db            querier
+		db            querier `json:"-"`
 		m             map[string]*Type
 		currentSchema string
-		mu            sync.RWMutex
+		mu            sync.RWMutex `json:"-"`
 	}
 
 	querier interface {
@@ -47,6 +34,151 @@ type (
 		QueryRowContext(context.Context, string, ...any) *sql.Row
 	}
 )
+
+func (tt *Types) MarshalJSONTo(enc *jsontext.Encoder) error {
+	enc.WriteToken(jsontext.BeginObject)
+	enc.WriteToken(jsontext.String("currentSchema"))
+	enc.WriteToken(jsontext.String(tt.currentSchema))
+	enc.WriteToken(jsontext.String("m"))
+	enc.WriteToken(jsontext.BeginObject)
+	T := func(k string, v *Type, margs []argumentM) error {
+		enc.WriteToken(jsontext.String(k))
+		var etn string
+		if v.Elem != nil {
+			etn = v.Elem.name(".")
+		}
+		return json.MarshalEncode(enc, typeM{
+			ElemTypeName: etn,
+			Owner:        v.Owner, Package: v.Package, Name: v.Name,
+			TypeCode: v.TypeCode, CollType: v.CollType, IndexBy: v.IndexBy,
+			Arguments: margs,
+			Length:    v.Length, Precision: v.Precision, Scale: v.Scale,
+		})
+	}
+	extra := make(map[string]*Type)
+	margs := make([]argumentM, 0, 64)
+	for k, v := range tt.m {
+		margs = margs[:0]
+		for _, a := range v.Arguments {
+			ma := argumentM{Name: a.Name}
+			if a.Type != nil {
+				ma.TypeName = a.Type.name(".")
+				if _, ok := tt.m[ma.TypeName]; !ok {
+					if _, ok := extra[ma.TypeName]; !ok {
+						if strings.IndexByte(ma.TypeName, '.') >= 0 {
+							extra[ma.TypeName] = a.Type
+						} else {
+							t2 := *a.Type
+							t2.Length, t2.Precision, t2.Scale = sql.NullInt32{}, sql.NullInt32{}, sql.NullInt32{}
+							extra[ma.TypeName] = &t2
+						}
+					}
+				}
+			}
+			margs = append(margs, ma)
+		}
+		if err := T(k, v, margs); err != nil {
+			return err
+		}
+	}
+	for k, v := range extra {
+		fmt.Println(k)
+		if err := T(k, v, nil); err != nil {
+			return err
+		}
+	}
+	enc.WriteToken(jsontext.EndObject)
+	enc.WriteToken(jsontext.EndObject)
+	return nil
+}
+
+func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if k := dec.PeekKind(); k != '{' {
+		return &json.SemanticError{JSONKind: k}
+	}
+	if _, err := dec.ReadToken(); err != nil {
+		return err
+	}
+	if dec.PeekKind() != '}' {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			return err
+		}
+		if tok.String() == "currentSchema" {
+			if tok, err = dec.ReadToken(); err != nil {
+				return err
+			} else if tok.Kind() != '"' {
+				return &json.SemanticError{JSONKind: tok.Kind()}
+			}
+			tt.currentSchema = tok.String()
+			fmt.Println("currentSchema:", tt.currentSchema)
+			if tok, err = dec.ReadToken(); err != nil {
+				return err
+			}
+		}
+		if tok.String() == "m" {
+			if tt.m == nil {
+				tt.m = make(map[string]*Type)
+			}
+			fmt.Println("m")
+			if k := dec.PeekKind(); k != '{' {
+				return &json.SemanticError{JSONKind: k}
+			}
+			if _, err = dec.ReadToken(); err != nil {
+				return err
+			}
+			elems := make(map[string]string)
+			for {
+				if k := dec.PeekKind(); k == '}' {
+					break
+				} else if k != '"' {
+					return &json.SemanticError{JSONKind: k}
+				}
+				if tok, err = dec.ReadToken(); err != nil {
+					return err
+				}
+				k := tok.String()
+				// fmt.Println("k:", k, dec.PeekKind())
+				var v typeM
+				if err = json.UnmarshalDecode(dec, &v); err != nil {
+					return fmt.Errorf("UnmarshalDecode typeM: %w", err)
+				}
+				elems[k] = v.ElemTypeName
+				args := make([]Argument, 0, len(v.Arguments))
+				for _, a := range v.Arguments {
+					args = append(args, Argument{Name: a.Name})
+					fmt.Println(k, len(args)-1, a.TypeName)
+					elems[k+"\t"+strconv.Itoa(len(args)-1)] = a.TypeName
+				}
+				tt.m[k] = &Type{
+					Owner: v.Owner, Package: v.Package, Name: v.Name,
+					TypeCode: v.TypeCode, CollType: v.CollType, IndexBy: v.IndexBy,
+					Arguments: args,
+					Length:    v.Length, Precision: v.Precision, Scale: v.Scale,
+				}
+			}
+			if _, err = dec.ReadToken(); err != nil {
+				return err
+			}
+
+			for k, v := range elems {
+				if k, a, ok := strings.Cut(k, "\t"); ok {
+					if i, err := strconv.Atoi(a); err != nil {
+						return fmt.Errorf("%s\t%s: %w", k, a, err)
+					} else {
+						tt.m[k].Arguments[i].Type = tt.m[v]
+					}
+				} else {
+					tt.m[k].Elem = tt.m[v]
+				}
+			}
+		}
+	}
+	_, err := dec.ReadToken()
+	return err
+}
+
+var ErrNotSupported = errors.New("not supported")
 
 func NewTypes(ctx context.Context, db querier) (*Types, error) {
 	var currentSchema string
@@ -60,6 +192,29 @@ func NewTypes(ctx context.Context, db querier) (*Types, error) {
 }
 
 func (tt *Types) Names(ctx context.Context, only ...string) ([]string, error) {
+	if len(tt.m) != 0 {
+		// fmt.Println("SKIP")
+		if len(only) == 0 {
+			names := make([]string, 0, len(tt.m))
+			for k := range tt.m {
+				names = append(names, k)
+			}
+			return names, nil
+		}
+		names := make([]string, 0, len(only))
+		var nok bool
+		for _, k := range only {
+			if _, ok := tt.m[k]; ok {
+				names = append(names, k)
+			} else {
+				nok = true
+				break
+			}
+		}
+		if !nok {
+			return names, nil
+		}
+	}
 	const qry = `SELECT A.type_name, NULL AS package_name, A.typecode FROM user_types A
 UNION ALL
 SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A
@@ -143,6 +298,9 @@ func (tt *Types) Get(ctx context.Context, name string) (*Type, error) {
 func (tt *Types) get(ctx context.Context, name string) (*Type, error) {
 	if name == "" {
 		panic(`Types.Get("")`)
+	}
+	if v := tt.m[name]; !v.IsZero() {
+		return v, nil
 	}
 	logger := zlog.SFromContext(ctx)
 	_ = logger
@@ -332,182 +490,6 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 	tt.m[name] = t
 
 	return t, nil
-}
-
-var ErrNotSupported = errors.New("not supported")
-
-func (t Type) name(sep string) string {
-	name := t.Name
-	if t.Package != "" {
-		name = t.Package + sep + name
-	}
-	if t.Owner != "" {
-		name = t.Owner + sep + name
-	}
-	return name
-}
-func (t Type) IsColl() bool {
-	switch t.TypeCode {
-	case "COLLECTION", "TABLE", "VARYING ARRAY":
-		return true
-	default:
-		return t.CollType != "" && t.CollType != "TABLE"
-	}
-}
-func (t Type) String() string {
-	if !t.composite() {
-		return t.Name
-	}
-	var buf strings.Builder
-
-	buf.WriteString(t.Owner)
-	buf.WriteByte('.')
-	if t.Package != "" {
-		buf.WriteString(t.Package)
-		buf.WriteByte('.')
-	}
-	buf.WriteString(t.Name)
-	if t.Elem != nil {
-		fmt.Fprintf(&buf, "[%s]", t.Elem)
-	} else if len(t.Arguments) != 0 {
-		fmt.Fprintf(&buf, "{%s}", t.Arguments)
-	}
-	return buf.String()
-}
-func (t Type) composite() bool {
-	if t.Owner != "" || t.Package != "" {
-		return true
-	}
-	return t.protoTypeName() == ""
-}
-
-func (t Type) ProtoMessageName() string {
-	return oracall.CamelCase(strings.ReplaceAll(t.name("__"), "%", "__"))
-}
-
-func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
-	if t.Arguments == nil {
-		return nil
-	}
-	bw := bufio.NewWriter(w)
-	// logger := zlog.SFromContext(ctx)
-	fmt.Fprintf(bw, "// %s\nmessage %s {\n\toption (oracall_object_type) = %q;\n", t.name("."), t.ProtoMessageName(), t.OraType())
-	if t.Arguments != nil {
-		var i int
-		for _, a := range t.Arguments {
-			name := a.Name
-			s := a.Type
-			oraType := s.OraType()
-			var rule string
-			// logger.Debug("attr", "t", t.Name, "a", a.Name, "type", fmt.Sprintf("%#v", s), "isColl", s.IsColl(), "elem", s.Elem)
-			if s.IsColl() {
-				rule = "repeated "
-				if !isSimpleType(s.Name) && s.Elem != nil {
-					s = s.Elem
-				}
-			} else if s.Elem != nil {
-				rule = "repeated "
-				s = s.Elem
-				if name == "" {
-					name = "record"
-				}
-			}
-			i++
-			fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n", rule, s.protoType(), strings.ToLower(name), i, oraType)
-		}
-	} else if s := t.Elem; s != nil {
-		// fmt.Fprintf(bw, "\trepeated %s = %d;  //b %s\n", s.protoType(), 1, s.name("."))
-	} else {
-		fmt.Fprintf(bw, "\t  //c ?%#v\n", t)
-		panic(fmt.Sprintf("%#v\n", t))
-	}
-	bw.WriteString("}\n")
-	return bw.Flush()
-}
-
-func (t Type) OraType() string {
-	if t.composite() {
-		return t.name(".")
-	}
-	switch t.Name {
-	case "CHAR", "VARCHAR2":
-		return fmt.Sprintf("%s(%d)", t.Name, t.Length.Int32)
-	case "NUMBER":
-		if t.Precision.Valid {
-			if t.Scale.Int32 != 0 {
-				return fmt.Sprintf("NUMBER(%d,%d)", t.Precision.Int32, t.Scale.Int32)
-			}
-			return fmt.Sprintf("NUMBER(%d)", t.Precision.Int32)
-		} else if t.Scale.Valid {
-			return fmt.Sprintf("NUMBER(*,%d)", t.Scale.Int32)
-		}
-		return "NUMBER"
-	default:
-		return t.Name
-	}
-}
-
-func (t Type) protoType() string {
-	if t.Name == "XMLTYPE" && (t.Owner == "PUBLIC" || t.Owner == "SYS") {
-		return "string"
-	}
-	if t.composite() {
-		return t.ProtoMessageName()
-	}
-	if typ := t.protoTypeName(); typ != "" {
-		return typ
-	}
-	panic(fmt.Errorf("protoType(%q)", t.Name))
-}
-
-func isSimpleType(s string) bool {
-	switch s {
-	case "XMLTYPE", "PUBLIC.XMLTYPE", "RAW", "LONG RAW", "BLOB",
-		"VARCHAR2", "CHAR", "LONG", "CLOB", "PL/SQL ROWID",
-		"BOOLEAN", "PL/SQL BOOLEAN",
-		"DATE", "TIMESTAMP",
-		"PL/SQL PLS INTEGER", "PL/SQL BINARY INTEGER",
-		"BINARY_DOUBLE",
-		"NUMBER", "INTEGER":
-		return true
-	default:
-		return false
-	}
-}
-func (t Type) protoTypeName() string {
-	switch t.Name {
-	case "RAW", "LONG RAW", "BLOB":
-		return "bytes"
-	case "VARCHAR2", "CHAR", "LONG", "CLOB", "PL/SQL ROWID", "XMLTYPE", "PUBLIC.XMLTYPE":
-		return "string"
-	case "BOOLEAN", "PL/SQL BOOLEAN":
-		return "bool"
-	case "DATE", "TIMESTAMP":
-		return "google.protobuf.Timestamp"
-	case "PL/SQL PLS INTEGER", "PL/SQL BINARY INTEGER":
-		return "int32"
-	case "BINARY_DOUBLE":
-		return "double"
-	case "NUMBER", "INTEGER":
-		if t.Precision.Valid {
-			if t.Scale.Int32 == 0 {
-				if t.Precision.Int32 < 10 {
-					return "int32"
-					// } else if t.Precision.Int32 < 19 {
-					// 	return "int64"
-				}
-			}
-		}
-		return "string"
-	}
-	return ""
-}
-func (t *Type) Valid() bool {
-	return t != nil && t.Name != "" && (isSimpleType(t.Name) || t.Elem != nil || t.Arguments != nil)
-}
-
-func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
-	return fmt.Errorf("not implemented")
 }
 
 var ProtoImports = protoImports{

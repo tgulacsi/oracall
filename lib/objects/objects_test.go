@@ -1,4 +1,4 @@
-// Copyright 2024 Tamás Gulácsi. All rights reserved.
+// Copyright 2024, 2026 Tamás Gulácsi. All rights reserved.
 //
 // SPDX-Licens-Identifier: Apache-2.0
 
@@ -9,19 +9,26 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	// "encoding/json/v2"
 	"errors"
 	"flag"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/UNO-SOFT/zlog/v2"
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	_ "github.com/godror/godror"
+	"github.com/google/renameio/v2"
 	"github.com/tgulacsi/oracall/lib/objects"
 )
 
 //go:generate go install github.com/bufbuild/buf/cmd/buf@latest
+
+var typesFn = filepath.Join("testdata", "funcs.types.json")
 
 func TestReadTypes(t *testing.T) {
 	logger := zlog.NewT(t).SLog()
@@ -37,6 +44,43 @@ func TestReadTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 	names, err := types.Names(ctx, flag.Args()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(len(names))
+	fh, err := renameio.NewPendingFile(typesFn, renameio.WithPermissions(0644))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fh.Cleanup()
+	enc := jsontext.NewEncoder(fh, jsontext.WithIndent("  "))
+	if err = json.MarshalEncode(enc, types,
+		json.DefaultOptionsV2(), json.OmitZeroStructFields(true),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err = fh.CloseAtomicallyReplace(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWriteProtobufSpec(t *testing.T) {
+	logger := zlog.NewT(t).SLog()
+	ctx := zlog.NewSContext(context.Background(), logger)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	fh, err := os.Open(typesFn)
+	if err != nil {
+		t.Skip(err)
+	}
+	defer fh.Close()
+	var types objects.Types
+	if err = json.UnmarshalRead(fh, &types); err != nil {
+		t.Fatal(err)
+	}
+	fh.Close()
+	names, err := types.Names(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
