@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"slices"
 	// "encoding/json/v2"
 	"errors"
 	"flag"
@@ -88,6 +89,7 @@ func TestWriteProtobufSpec(t *testing.T) {
 	var buf bytes.Buffer
 	buf.WriteString(`
 syntax = "proto3";
+// edition = "2023";
 
 package objects;
 option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
@@ -96,6 +98,7 @@ option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 ` + objects.ProtoExtends.String() + `
 `)
 	bw := bufio.NewWriter(&buf)
+	slices.Sort(names)
 	for _, nm := range names {
 		x, err := types.Get(ctx, nm)
 		// t.Logf("%s: %v", nm, x)

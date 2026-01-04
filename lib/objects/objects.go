@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -88,9 +89,9 @@ func (tt *Types) MarshalJSONTo(enc *jsontext.Encoder) error {
 
 	enc.WriteToken(jsontext.String("m"))
 	enc.WriteToken(jsontext.BeginObject)
-	for k, v := range tt.m {
+	for _, k := range slices.Sorted(maps.Keys(tt.m)) {
 		enc.WriteToken(jsontext.String(k))
-		enc.WriteToken(jsontext.Uint(uint64(typeIdxs[v])))
+		enc.WriteToken(jsontext.Uint(uint64(typeIdxs[tt.m[k]])))
 	}
 	enc.WriteToken(jsontext.EndObject)
 
@@ -116,7 +117,7 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				return &json.SemanticError{JSONKind: tok.Kind()}
 			}
 			tt.currentSchema = tok.String()
-			fmt.Println("currentSchema:", tt.currentSchema)
+			// fmt.Println("currentSchema:", tt.currentSchema)
 			if tok, err = dec.ReadToken(); err != nil {
 				return err
 			}

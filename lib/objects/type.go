@@ -107,7 +107,7 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 	}
 	bw := bufio.NewWriter(w)
 	// logger := zlog.SFromContext(ctx)
-	fmt.Fprintf(bw, "// %s\nmessage %s {\n\toption (oracall_object_type) = %q;\n", t.name("."), t.ProtoMessageName(), t.OraType())
+	fmt.Fprintf(bw, "\n// %s\nmessage %s {\n\toption (oracall_object_type) = %q;\n", t.name("."), t.ProtoMessageName(), t.OraType())
 	if len(t.Arguments) != 0 {
 		var i int
 		for _, a := range t.Arguments {
