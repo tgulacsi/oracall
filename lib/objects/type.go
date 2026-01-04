@@ -31,7 +31,7 @@ type (
 	}
 
 	typeM struct {
-		ElemTypePtr                 uintptr
+		TypeIdx, ElemTypeIdx        uint
 		Owner, Package, Name        string
 		TypeCode, CollType, IndexBy string
 		Arguments                   []argumentM
@@ -39,7 +39,7 @@ type (
 	}
 	argumentM struct {
 		Name    string
-		TypePtr uintptr
+		TypeIdx uint
 	}
 )
 
@@ -108,10 +108,13 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 	bw := bufio.NewWriter(w)
 	// logger := zlog.SFromContext(ctx)
 	fmt.Fprintf(bw, "// %s\nmessage %s {\n\toption (oracall_object_type) = %q;\n", t.name("."), t.ProtoMessageName(), t.OraType())
-	if t.Arguments != nil {
+	if len(t.Arguments) != 0 {
 		var i int
 		for _, a := range t.Arguments {
 			name := a.Name
+			if strings.HasSuffix(name, "#") {
+				name = name[:len(name)-1] + "_hidden"
+			}
 			s := a.Type
 			oraType := s.OraType()
 			var rule string
@@ -164,7 +167,8 @@ func (t Type) OraType() string {
 }
 
 func (t Type) protoType() string {
-	if t.Name == "XMLTYPE" && (t.Owner == "PUBLIC" || t.Owner == "SYS") {
+	if t.Name == "XMLTYPE" && (t.Owner == "PUBLIC" || t.Owner == "SYS") ||
+		t.Owner == "SYS" && strings.HasPrefix(t.Name, "JSON_") {
 		return "string"
 	}
 	if t.composite() {

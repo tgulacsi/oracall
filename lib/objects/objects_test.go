@@ -98,7 +98,7 @@ option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 	bw := bufio.NewWriter(&buf)
 	for _, nm := range names {
 		x, err := types.Get(ctx, nm)
-		t.Logf("%s: %v", nm, x)
+		// t.Logf("%s: %v", nm, x)
 		if err != nil {
 			if errors.Is(err, objects.ErrNotSupported) {
 				t.Logf("%+v", err)
@@ -113,10 +113,22 @@ option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
 	}
 	bw.Flush()
 	os.MkdirAll("testdata", 0755)
-	os.WriteFile("testdata/x.proto", buf.Bytes(), 0664)
+	os.WriteFile("testdata/funcs.proto", buf.Bytes(), 0664)
 	os.WriteFile("testdata/buf.gen.yaml", []byte(`version: v2
 plugins:
-  - local: protoc-gen-go
+  - remote: buf.build/grpc/go:v1.6.0
+    out: .
+    opt:
+      - paths=source_relative
+  - remote: buf.build/protocolbuffers/go:v1.36.11
+    out: .
+    opt:
+      - paths=source_relative
+  - remote: buf.build/community/mfridman-go-json:v1.5.0
+    out: .
+    opt:
+      - paths=source_relative
+  - remote: buf.build/community/planetscale-vtprotobuf:v0.6.0
     out: .
     opt:
       - paths=source_relative
@@ -125,7 +137,7 @@ plugins:
 	cmd := exec.CommandContext(ctx,
 		//"protoc", "-I.", "-I../../../../../google/protobuf/timestamp.proto", "--go_out=_test.go",
 		"buf", "generate",
-		"x.proto")
+		"funcs.proto")
 	cmd.Dir = "testdata"
 	if b, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("%q\n%s\n%+v", cmd.Args, string(b), err)

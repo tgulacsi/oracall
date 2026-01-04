@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -39,60 +38,59 @@ func (tt *Types) MarshalJSONTo(enc *jsontext.Encoder) error {
 	enc.WriteToken(jsontext.BeginObject)
 	enc.WriteToken(jsontext.String("currentSchema"))
 	enc.WriteToken(jsontext.String(tt.currentSchema))
-	enc.WriteToken(jsontext.String("m"))
-	enc.WriteToken(jsontext.BeginObject)
-	extra := make(map[string]*Type)
-	var registerType func(t *Type)
-	registerType = func(t *Type) {
+
+	allTypes := make([]typeM, 0, len(tt.m))
+	typeIdxs := make(map[*Type]uint, len(tt.m))
+	var serialize func(t *Type) uint
+	serialize = func(t *Type) uint {
 		if t == nil {
-			return
+			return 0
+		}
+		// Use topological sorting order: leaves (dependencies) first
+		if idx, ok := typeIdxs[t]; ok {
+			return idx
+		}
+		tm := typeM{
+			Owner: t.Owner, Package: t.Package, Name: t.Name,
+			TypeCode: t.TypeCode, CollType: t.CollType, IndexBy: t.IndexBy,
+			Length: t.Length, Precision: t.Precision, Scale: t.Scale,
 		}
 		if t.Elem != nil {
-			registerType(t.Elem)
+			tm.ElemTypeIdx = serialize(t.Elem)
 		}
-		k := t.OraType()
-		if _, ok := tt.m[k]; ok {
-			return
-		}
-		if _, ok := extra[k]; ok {
-			return
-		}
-		extra[k] = t
-	}
-	T := func(k string, v *Type, margs []argumentM, addElem bool) error {
-		enc.WriteToken(jsontext.String(k))
-		var etn string
-		if v.Elem != nil {
-			etn = v.Elem.name(".")
-		}
-		return json.MarshalEncode(enc, typeM{
-			ElemTypeName: etn,
-			Owner:        v.Owner, Package: v.Package, Name: v.Name,
-			TypeCode: v.TypeCode, CollType: v.CollType, IndexBy: v.IndexBy,
-			Arguments: margs,
-			Length:    v.Length, Precision: v.Precision, Scale: v.Scale,
-		})
-	}
-	margs := make([]argumentM, 0, 64)
-	for k, v := range tt.m {
-		margs = margs[:0]
-		registerType(v)
-		for _, a := range v.Arguments {
-			ma := argumentM{Name: a.Name}
-			if a.Type != nil {
-				registerType(a.Type)
+		if len(t.Arguments) != 0 {
+			margs := make([]argumentM, 0, len(t.Arguments))
+			for _, a := range t.Arguments {
+				margs = append(margs, argumentM{
+					Name: a.Name, TypeIdx: serialize(a.Type),
+				})
 			}
-			margs = append(margs, ma)
+			tm.Arguments = margs
 		}
-		if err := T(k, v, margs, true); err != nil {
-			return fmt.Errorf("marshal %s=%#v: %w", k, v, err)
-		}
+		u := uint(len(allTypes) + 1) // 1-base index !
+		tm.TypeIdx = u
+		allTypes = append(allTypes, tm)
+		typeIdxs[t] = u
+
+		return u
 	}
-	for k, v := range extra {
-		// fmt.Println(k)
-		if err := T(k, v, nil, false); err != nil {
-			return fmt.Errorf("marshal %s=%#v: %w", k, v, err)
-		}
+	mm := make([]uint, 0, len(tt.m))
+	for _, v := range tt.m {
+		mm = append(mm, serialize(v))
+	}
+
+	enc.WriteToken(jsontext.String("all"))
+	enc.WriteToken(jsontext.BeginArray)
+	for _, tm := range allTypes {
+		json.MarshalEncode(enc, tm)
+	}
+	enc.WriteToken(jsontext.EndArray)
+
+	enc.WriteToken(jsontext.String("m"))
+	enc.WriteToken(jsontext.BeginObject)
+	for k, v := range tt.m {
+		enc.WriteToken(jsontext.String(k))
+		enc.WriteToken(jsontext.Uint(uint64(typeIdxs[v])))
 	}
 	enc.WriteToken(jsontext.EndObject)
 
@@ -123,18 +121,67 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				return err
 			}
 		}
+		allTypes := make(map[uint]*Type)
+		if tok.String() == "all" {
+			if tok, err = dec.ReadToken(); err != nil {
+				return err
+			} else if tok.Kind() != '[' {
+				return &json.SemanticError{JSONKind: tok.Kind()}
+			}
+			var u uint
+			for {
+				if k := dec.PeekKind(); k == ']' {
+					break
+				}
+				var tm typeM
+				if err = json.UnmarshalDecode(dec, &tm); err != nil {
+					return err
+				}
+				t := &Type{
+					Owner: tm.Owner, Package: tm.Package, Name: tm.Name,
+					TypeCode: tm.TypeCode, CollType: tm.CollType, IndexBy: tm.IndexBy,
+					Length: tm.Length, Precision: tm.Precision, Scale: tm.Scale,
+				}
+				if tm.ElemTypeIdx != 0 {
+					t.Elem = allTypes[tm.ElemTypeIdx]
+				}
+				if len(tm.Arguments) != 0 {
+					t.Arguments = make([]Argument, len(tm.Arguments))
+					for i, a := range tm.Arguments {
+						if strings.IndexByte(a.Name, '%') >= 0 {
+							return fmt.Errorf("wrong argument name %#v", a)
+						}
+						if s := allTypes[a.TypeIdx]; t == nil {
+							return fmt.Errorf("no type for %d", a.TypeIdx)
+						} else {
+							t.Arguments[i] = Argument{Name: a.Name, Type: s}
+						}
+					}
+				}
+
+				u++ // 1-based index !
+				if u != tm.TypeIdx {
+					fmt.Errorf("idx=%d != TypeIdx=%d", u, tm.TypeIdx)
+				}
+				allTypes[u] = t
+			}
+			if _, err = dec.ReadToken(); err != nil {
+				return err
+			}
+			if tok, err = dec.ReadToken(); err != nil {
+				return err
+			}
+		}
 		if tok.String() == "m" {
 			if tt.m == nil {
-				tt.m = make(map[string]*Type)
+				tt.m = make(map[string]*Type, len(allTypes))
 			}
-			fmt.Println("m")
 			if k := dec.PeekKind(); k != '{' {
 				return &json.SemanticError{JSONKind: k}
 			}
 			if _, err = dec.ReadToken(); err != nil {
 				return err
 			}
-			elems := make(map[string]string)
 			for {
 				if k := dec.PeekKind(); k == '}' {
 					break
@@ -146,42 +193,19 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				}
 				k := tok.String()
 				// fmt.Println("k:", k, dec.PeekKind())
-				var v typeM
-				if err = json.UnmarshalDecode(dec, &v); err != nil {
-					return fmt.Errorf("UnmarshalDecode typeM: %w", err)
+				tok, err := dec.ReadToken()
+				if err != nil {
+					return err
 				}
-				elems[k] = v.ElemTypeName
-				args := make([]Argument, 0, len(v.Arguments))
-				for _, a := range v.Arguments {
-					args = append(args, Argument{Name: a.Name})
-					// fmt.Println(k, len(args)-1, a.TypeName)
-					elems[k+"\t"+strconv.Itoa(len(args)-1)] = a.TypeName
-				}
-				tt.m[k] = &Type{
-					Owner: v.Owner, Package: v.Package, Name: v.Name,
-					TypeCode: v.TypeCode, CollType: v.CollType, IndexBy: v.IndexBy,
-					Arguments: args,
-					Length:    v.Length, Precision: v.Precision, Scale: v.Scale,
+				u := uint(tok.Uint())
+				if t := allTypes[u]; t == nil {
+					return fmt.Errorf("no type for %d", u)
+				} else {
+					tt.m[k] = allTypes[u]
 				}
 			}
 			if _, err = dec.ReadToken(); err != nil {
 				return err
-			}
-
-			for k, v := range elems {
-				if k, a, ok := strings.Cut(k, "\t"); ok {
-					if i, err := strconv.Atoi(a); err != nil {
-						return fmt.Errorf("%s\t%s: %w", k, a, err)
-					} else if t := tt.m[v]; t == nil {
-						return fmt.Errorf("unknown type %s for %s", v, k)
-					} else {
-						tt.m[k].Arguments[i].Type = t
-					}
-				} else if t := tt.m[v]; t == nil {
-					return fmt.Errorf("unknown type %s", k)
-				} else {
-					tt.m[k].Elem = t
-				}
 			}
 		}
 	}
@@ -310,10 +334,11 @@ func (tt *Types) get(ctx context.Context, name string) (*Type, error) {
 	if name == "" {
 		panic(`Types.Get("")`)
 	}
-	if v := tt.m[name]; !v.IsZero() {
+	if v := tt.m[name]; !v.IsZero() || tt.db == nil && v != nil {
 		return v, nil
 	}
 	logger := zlog.SFromContext(ctx)
+	logger.Warn("get", "name", name, "t", fmt.Sprintf("%#v", tt.m[name]))
 	_ = logger
 	t := tt.m[name]
 	if t == nil || t.TypeCode == "" {
