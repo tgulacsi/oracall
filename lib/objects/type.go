@@ -31,14 +31,15 @@ type (
 	}
 
 	typeM struct {
-		ElemTypeName                string
+		ElemTypePtr                 uintptr
 		Owner, Package, Name        string
 		TypeCode, CollType, IndexBy string
 		Arguments                   []argumentM
 		Length, Precision, Scale    sql.NullInt32
 	}
 	argumentM struct {
-		Name, TypeName string
+		Name    string
+		TypePtr uintptr
 	}
 )
 
