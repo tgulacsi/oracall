@@ -75,9 +75,10 @@ func (tt *Types) MarshalJSONTo(enc *jsontext.Encoder) error {
 
 		return u
 	}
-	mm := make([]uint, 0, len(tt.m))
-	for _, v := range tt.m {
-		mm = append(mm, serialize(v))
+	names := slices.Sorted(maps.Keys(tt.m))
+	mm := make([]uint, 0, len(names))
+	for _, k := range names {
+		mm = append(mm, serialize(tt.m[k]))
 	}
 
 	enc.WriteToken(jsontext.String("all"))
@@ -89,7 +90,7 @@ func (tt *Types) MarshalJSONTo(enc *jsontext.Encoder) error {
 
 	enc.WriteToken(jsontext.String("m"))
 	enc.WriteToken(jsontext.BeginObject)
-	for _, k := range slices.Sorted(maps.Keys(tt.m)) {
+	for _, k := range names {
 		enc.WriteToken(jsontext.String(k))
 		enc.WriteToken(jsontext.Uint(uint64(typeIdxs[tt.m[k]])))
 	}
