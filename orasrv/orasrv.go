@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/UNO-SOFT/otel"
+	"github.com/UNO-SOFT/w3ctrace"
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/UNO-SOFT/zlog/v2/slog"
 
@@ -217,19 +217,19 @@ type reqIDCtxKey struct{}
 
 func ContextWithReqID(ctx context.Context, reqID string) context.Context {
 	if reqID == "" {
-		// if sc := otel.SpanContextFromContext(ctx); sc.IsValid() {
-		// 	reqID = sc.TraceID().String() + "-" + sc.SpanID().String()
-		// } else {
-		reqID = NewULID()
-		// }
+		if tr := w3ctrace.FromContext(ctx); tr.IsValid() {
+			reqID = tr.ShortString()
+		} else {
+			reqID = NewULID()
+		}
 	}
 	return context.WithValue(ctx, reqIDCtxKey{}, reqID)
 }
 func ContextGetReqID(ctx context.Context) string {
 	if reqID, ok := ctx.Value(reqIDCtxKey{}).(string); ok {
 		return reqID
-		// } else if sc := otel.SpanContextFromContext(ctx); sc.IsValid() {
-		// 	return sc.TraceID().String() + "-" + sc.SpanID().String()
+	} else if tr := w3ctrace.FromContext(ctx); tr.IsValid() {
+		return tr.ShortString()
 	}
 	return NewULID()
 }

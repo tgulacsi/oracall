@@ -1,6 +1,6 @@
 module github.com/tgulacsi/oracall
 
-go 1.25.0
+go 1.25.4
 
 require (
 	github.com/UNO-SOFT/zlog v0.8.6
@@ -19,6 +19,7 @@ require (
 )
 
 require (
+	github.com/UNO-SOFT/w3ctrace v0.0.0-20260217182632-62e23a54a05a
 	github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e
 	github.com/godror/knownpb v0.3.0
 	github.com/google/renameio/v2 v2.0.0
