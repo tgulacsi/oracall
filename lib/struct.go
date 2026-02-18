@@ -1,4 +1,4 @@
-// Copyright 2013, 2021 Tamás Gulácsi
+// Copyright 2013, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/UNO-SOFT/zlog/v2/slog"
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // Log is discarded by default.
@@ -31,15 +33,50 @@ const (
 )
 
 type Function struct {
-	LastDDL              time.Time
-	Replacement          *Function
-	Returns              *Argument
-	Package, name, alias string
-	Documentation        string
-	Args                 []Argument
-	Tag, handle          []string
-	maxTableSize         int
-	ReplacementIsJSON    bool
+	LastDDL              time.Time  `json:",omitzero"`
+	Replacement          *Function  `json:",omitempty"`
+	Returns              *Argument  `json:",omitempty"`
+	Package, name, alias string     `json:",omitzero"`
+	Documentation        string     `json:",omitzero"`
+	Args                 []Argument `json:",omitempty"`
+	Tag, handle          []string   `json:",omitempty"`
+	maxTableSize         int        `json:",omitzero"`
+	ReplacementIsJSON    bool       `json:",omitzero"`
+}
+
+func (f Function) MarshalJSONTo(enc *jsontext.Encoder) error {
+	W := func(k string, v any) { enc.WriteToken(jsontext.String(k)); json.MarshalEncode(enc, v) }
+	enc.WriteToken(jsontext.BeginObject)
+	W("Package", f.Package)
+	W("Name", f.name)
+	if f.alias != "" {
+		W("Alias", f.alias)
+	}
+	W("RealName", f.RealName())
+	W("LastDDL", f.LastDDL)
+	if f.Replacement != nil {
+		W("Replacement", f.Replacement)
+		if f.ReplacementIsJSON {
+			W("ReplacementIsJSON", true)
+		}
+	}
+	if f.Returns != nil {
+		W("Returns", f.Returns)
+	}
+	if f.Documentation != "" {
+		W("Documentation", f.Documentation)
+	}
+	W("Args", f.Args)
+	if len(f.Tag) != 0 {
+		W("Tag", f.Tag)
+	}
+	if len(f.handle) != 0 {
+		W("Handle", f.handle)
+	}
+	if f.maxTableSize != 0 {
+		W("MaxTableSize", f.maxTableSize)
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 func (f Function) Name() string {
@@ -137,22 +174,25 @@ const (
 )
 
 type Argument struct {
-	TableOf          *Argument // this argument is a table (array) of this type
-	mu               *sync.Mutex
-	goTypeName       string
-	Name             string
-	Type, TypeName   string
-	AbsType          string
-	Charset, IndexBy string
-	Documentation    string
-	RecordOf         []NamedArgument //this argument is a record (map) of this type
+	TableOf       *Argument `json:",omitempty"` // this argument is a table (array) of this type
+	mu            *sync.Mutex
+	goTypeName    string
+	Name          string          `json:",omitzero"`
+	Type          string          `json:",omitzero"`
+	TypeName      string          `json:",omitzero"`
+	AbsType       string          `json:",omitzero"`
+	Charset       string          `json:",omitzero"`
+	IndexBy       string          `json:",omitzero"`
+	Documentation string          `json:",omitzero"`
+	RecordOf      []NamedArgument `json:",omitzero"` //this argument is a record (map) of this type
 	PlsType
-	Charlength uint
-	Flavor     flavor
-	Direction  direction
-	Precision  uint8
-	Scale      uint8
+	Charlength uint      `json:",omitzero"`
+	Flavor     flavor    `json:",omitzero"`
+	Direction  direction `json:",omitzero"`
+	Precision  uint8     `json:",omitzero"`
+	Scale      uint8     `json:",omitzero"`
 }
+
 type NamedArgument struct {
 	*Argument
 	Name string
