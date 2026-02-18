@@ -144,6 +144,7 @@ type Argument struct {
 	Type, TypeName   string
 	AbsType          string
 	Charset, IndexBy string
+	Documentation    string
 	RecordOf         []NamedArgument //this argument is a record (map) of this type
 	PlsType
 	Charlength uint

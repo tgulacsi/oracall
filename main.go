@@ -1,4 +1,4 @@
-// Copyright 2017, 2023 Tamás Gulácsi
+// Copyright 2017, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -29,6 +29,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/UNO-SOFT/zlog/v2"
+	"github.com/go-json-experiment/json"
 	"github.com/google/renameio/v2"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	custom "github.com/tgulacsi/oracall/custom"
@@ -66,7 +67,7 @@ func Main() error {
 	fs := flag.NewFlagSet("call", flag.ContinueOnError)
 	fs.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", true, "skip functions with missing TableOf info")
 	flagDump := fs.String("dump", "", "dump to this csv")
-	flagPrint := fs.String("print", "", "print spec to this file")
+	flagPrint := fs.String("print", "", "print spec to this file - it will be json if extension is .json or is -:json")
 	flagBaseDir := fs.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := fs.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := fs.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
@@ -147,7 +148,8 @@ func Main() error {
 			if *flagPrint != "" {
 				fh := io.WriteCloser(os.Stdout)
 				fhClose := fh.Close
-				if *flagPrint != "-" {
+				isJSON := *flagPrint == "-:json" || strings.HasSuffix(*flagPrint, ".json")
+				if *flagPrint != "-" && *flagPrint != "-:json" {
 					pf, err := renameio.NewPendingFile(*flagPrint)
 					if err != nil {
 						return err
@@ -156,28 +158,8 @@ func Main() error {
 					fh, fhClose = pf, pf.CloseAtomicallyReplace
 				}
 				defer fhClose()
-				bw := bufio.NewWriter(fh)
-				defer bw.Flush()
-				for _, f := range functions {
-					fmt.Fprintf(bw, "\n# %s\n%s\n", f.RealName(), f.Documentation)
-					fmt.Fprintln(bw, "\n## Input")
-					for _, a := range f.Args {
-						if !a.IsInput() {
-							continue
-						}
-						fmt.Fprintf(bw, "  - %s - %s\n", a.Name, a.TypeString("  ", "  "))
-					}
-					fmt.Fprintln(bw, "\n## Output")
-					for _, a := range f.Args {
-						if !a.IsOutput() {
-							continue
-						}
-						fmt.Fprintf(bw, "  - %s - %s\n", a.Name, a.TypeString("  ", "  "))
-					}
-					bw.WriteString("\n")
-				}
-				if err = bw.Flush(); err != nil {
-					return nil
+				if err := printTo(fh, functions, isJSON); err != nil {
+					return err
 				}
 				if err = fhClose(); err != nil {
 					return err
@@ -516,7 +498,7 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
                  FROM all_tab_cols A
                  WHERE NOT EXISTS (SELECT 1 FROM all_plsql_type_attrs B
                                      WHERE B.owner = :owner AND package_name = :pkg AND type_name = :sub) AND
-                       hidden_column = 'NO' AND INSTR(column_name, '$') = 0 AND 
+                       hidden_column = 'NO' AND INSTR(column_name, '$') = 0 AND
                        owner = :owner AND table_name = :pkg
 				 ORDER BY attr_no`
 				if attrStmt, err = tx1.PrepareContext(grpCtx, qry); err != nil {
@@ -973,6 +955,36 @@ func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx co
 		}
 	}
 	return plus, nil
+}
+
+func printTo(w io.Writer, functions []oracall.Function, isJSON bool) error {
+	bw := bufio.NewWriter(w)
+	defer bw.Flush()
+	if isJSON {
+		if err := json.MarshalWrite(bw, functions); err != nil {
+			return err
+		}
+	} else {
+		for _, f := range functions {
+			fmt.Fprintf(bw, "\n# %s\n%s\n", f.RealName(), f.Documentation)
+			fmt.Fprintln(bw, "\n## Input")
+			for _, a := range f.Args {
+				if !a.IsInput() {
+					continue
+				}
+				fmt.Fprintf(bw, "  - %s - %s\n", a.Name, a.TypeString("  ", "  "))
+			}
+			fmt.Fprintln(bw, "\n## Output")
+			for _, a := range f.Args {
+				if !a.IsOutput() {
+					continue
+				}
+				fmt.Fprintf(bw, "  - %s - %s\n", a.Name, a.TypeString("  ", "  "))
+			}
+			bw.WriteString("\n")
+		}
+	}
+	return bw.Flush()
 }
 
 // vim: set fileencoding=utf-8 noet:

@@ -228,8 +228,8 @@ func NewUACsvReader(r io.Reader) iter.Seq2[UserArgument, error] {
 	csvr.LazyQuotes, csvr.TrimLeadingSpace = true, true
 	csvr.ReuseRecord = true
 	type csvStructIdx struct {
-		Csv, Struct int
 		Conv        func(reflect.Value, string)
+		Csv, Struct int
 	}
 	var (
 		rec       []string
