@@ -18,7 +18,7 @@ import (
 
 var (
 	rDecl   = regexp.MustCompile(`(FUNCTION|PROCEDURE) +([^ (;]+)`)
-	rIndent = regexp.MustCompile("^ +")
+	rIndent = regexp.MustCompile("(?m)^ +")
 )
 
 func ParseDocs(ctx context.Context, src string) (docs map[string]string, err error) {
@@ -63,30 +63,32 @@ Loop:
 			break Loop
 
 		case ItemText:
-			ss := rDecl.FindStringSubmatch(it.val)
-			if ss != nil {
-				docs[ss[2]] = buf.String()
-			} else if s := buf.String(); (strings.Contains(s, "---") || strings.Contains(s, "# ")) &&
-				(len(docs) == 0 || len(docs) == 1 && docs[""] != "") {
-				indents := rIndent.FindAllStringIndex(s, -1)
-				if len(indents) != 0 {
-					minIndent := 8
-					for _, ii := range indents {
-						minIndent = min(minIndent, ii[1]-ii[0])
-					}
-					if minIndent > 0 {
-						indent := strings.Repeat(" ", minIndent)
-						s = strings.TrimPrefix(s, indent)
-						s = strings.ReplaceAll(s, "\n"+indent, "\n")
-					}
+			s := strings.TrimRight(buf.String(), " \t\r\n")
+			buf.Reset()
+			if strings.IndexByte(s, '\n') < 0 {
+				s = strings.TrimLeft(s, " \t")
+			} else if indents := rIndent.FindAllStringIndex(s, -1); len(indents) != 0 {
+				minIndent := 8
+				for _, ii := range indents {
+					minIndent = min(minIndent, ii[1]-ii[0])
 				}
+				if minIndent > 0 {
+					indent := strings.Repeat(" ", minIndent)
+					s = strings.TrimPrefix(s, indent)
+					s = strings.ReplaceAll(s, "\n"+indent, "\n")
+				}
+			}
+			if ss := rDecl.FindStringSubmatch(it.val); ss != nil {
+				docs[ss[2]] = s
+			} else if (strings.Contains(s, "---") ||
+				strings.Contains(s, "# ")) &&
+				(len(docs) == 0 || len(docs) == 1 && docs[""] != "") {
 				if docs[""] == "" {
 					docs[""] = s
 				} else {
 					docs[""] = docs[""] + "\n\n------\n\n" + s
 				}
 			}
-			buf.Reset()
 
 		case ItemComment:
 			var found bool
