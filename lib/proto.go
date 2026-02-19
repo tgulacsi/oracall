@@ -1,4 +1,4 @@
-// Copyright 2019, 2021 Tamás Gulácsi
+// Copyright 2019, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -145,7 +145,7 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 	}
 	// return variable for function out structs
 	if out && f.Returns != nil {
-		args = append(args, *f.Returns)
+		args = append(args, Argument{Name: "ret", Type: f.Returns})
 	}
 
 	nm := f.name
@@ -216,16 +216,12 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			//lName := strings.ToLower(arg.Name)
 			subArgs := make([]Argument, 0, 16)
 			if arg.TableOf == nil {
-				for _, v := range arg.RecordOf {
-					subArgs = append(subArgs, *v.Argument)
-				}
+				subArgs = append(subArgs, arg.RecordOf...)
 			} else {
 				if arg.TableOf.RecordOf == nil {
-					subArgs = append(subArgs, *arg.TableOf)
+					subArgs = append(subArgs, Argument{Name: arg.Name, Type: arg.TableOf})
 				} else {
-					for _, v := range arg.TableOf.RecordOf {
-						subArgs = append(subArgs, *v.Argument)
-					}
+					subArgs = append(subArgs, arg.TableOf.RecordOf...)
 				}
 			}
 			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, subArgs...); err != nil {

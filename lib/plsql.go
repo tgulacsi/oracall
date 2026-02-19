@@ -1,4 +1,4 @@
-// Copyright 2013, 2022 Tamás Gulácsi
+// Copyright 2013, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -321,6 +321,7 @@ func demap(plsql, callFun string) (string, string) {
 	}
 	b, fmtErr := format.Source(callBuf.Bytes())
 	if fmtErr != nil {
+		fmt.Println(callBuf.String())
 		panic(fmtErr)
 	}
 	callBuf.Reset()
@@ -454,7 +455,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		args = append(args, arg)
 	}
 	if fun.Returns != nil {
-		args = append(args, *fun.Returns)
+		args = append(args, Argument{Name: "ret", Type: fun.Returns})
 	}
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE {
@@ -473,7 +474,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 	addParam := func(paramName string) string {
 		if paramName == "" {
-			panic("empty param name")
+			paramName = "ret"
+			// panic("empty param name")
 		}
 		return fmt.Sprintf(`params[{{paramsIdx %q}}]`, paramName)
 	}
@@ -536,7 +538,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 			}
 			for _, a := range arg.RecordOf {
-				k, v := a.Name, a.Argument
+				k, v := a.Name, a.Type
 				tmp = getParamName(fun.Name(), vn+"."+k)
 				kName := (CamelCase(k))
 				//kName := capitalize(replHidden(k))
@@ -552,7 +554,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					0, arg, k, maxTableSize)
 			}
 		case FLAVOR_TABLE:
-			if arg.Type == "REF CURSOR" {
+			if arg.Type.Type == "REF CURSOR" {
 				if arg.IsInput() {
 					logger.Info("cannot use IN cursor variables", "arg", arg)
 					panic(fmt.Sprintf("cannot use IN cursor variables (%v)", arg))
@@ -608,7 +610,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						name, addParam(arg.Name), maxTableSize)
 
 				case FLAVOR_RECORD:
-					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.Name)
+					vn = getInnerVarName(fun.Name(), arg.Name+"."+arg.TableOf.TypeName)
 					callArgs[arg.Name] = vn
 					if arg.IsNestedTable() {
 						decls = append(decls, vn+" "+arg.TypeName+" := "+arg.TypeName+"()"+"; --C="+arg.Name)
@@ -640,7 +642,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 
 					// declarations go first
 					for _, a := range arg.TableOf.RecordOf {
-						k, v := a.Name, a.Argument
+						k, v := a.Name, a.Type
 						typ = getTableType(v.AbsType)
 						if strings.IndexByte(typ, '/') >= 0 {
 							err = fmt.Errorf("nonsense table type of %s", arg)
@@ -663,7 +665,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 					// here comes the loops
 					var idxvar string
 					for _, a := range arg.TableOf.RecordOf {
-						k, v := a.Name, a.Argument
+						k, v := a.Name, a.Type
 
 						tmp = getParamName(fun.Name(), vn+"."+k)
 
@@ -750,7 +752,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	return
 }
 
-func (arg Argument) getConvSimple(
+func (arg Type) getConvSimple(
 	convIn, convOut []string,
 	name, paramName string,
 ) ([]string, []string) {
@@ -785,7 +787,7 @@ func (arg Argument) getConvSimple(
 	return convIn, convOut
 }
 
-func (arg Argument) getConvSimpleTable(
+func (arg Type) getConvSimpleTable(
 	convIn, convOut []string,
 	name, paramName string,
 	tableSize int,
@@ -868,7 +870,7 @@ func (arg Argument) getConvSimpleTable(
 	return convIn, convOut
 }
 
-func (arg Argument) getConvRefCursor(
+func (arg Type) getConvRefCursor(
 	convIn, convOut []string,
 	name, paramName string,
 	tableSize int,
@@ -917,7 +919,7 @@ func (arg Argument) getConvRefCursor(
 	return convIn, convOut
 }
 
-func (arg Argument) getFromRset(rsetRow string) string {
+func (arg Type) getFromRset(rsetRow string) string {
 	buf := Buffers.Get()
 	defer Buffers.Put(buf)
 
@@ -931,7 +933,7 @@ func (arg Argument) getFromRset(rsetRow string) string {
 	}
 	fmt.Fprintf(buf, "%s{\n", withPb(GoT))
 	for i, a := range arg.TableOf.RecordOf {
-		got, err = a.Argument.goType(true)
+		got, err = a.Type.goType(true)
 		if err != nil {
 			panic(err)
 		}
@@ -991,7 +993,7 @@ func (arg Argument) getFromRset(rsetRow string) string {
 					}`, pTyp, name, pTyp)
 	}
 */
-func (arg Argument) getConvRec(
+func (arg Type) getConvRec(
 	convIn, convOut []string,
 	name, paramName string,
 	tableSize uint,
@@ -1034,13 +1036,13 @@ func (arg Argument) getConvRec(
 	return convIn, convOut
 }
 
-func (arg Argument) getConvTableRec(
+func (arg Type) getConvTableRec(
 	convIn, convOut []string,
 	name [2]string,
 	paramName string,
 	tableSize uint,
 	key string,
-	parent Argument,
+	parent Type,
 ) ([]string, []string) {
 	absName := "x__" + name[0] + "__" + name[1]
 	typ, err := arg.goType(true)

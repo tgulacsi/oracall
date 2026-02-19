@@ -1,4 +1,4 @@
-// Copyright 2013, 2022 Tamás Gulácsi
+// Copyright 2013, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -385,7 +385,7 @@ func (f Function) SaveStruct(dst io.Writer, out bool) error {
 	}
 	// return variable for function out structs
 	if out && f.Returns != nil {
-		args = append(args, *f.Returns)
+		args = append(args, Argument{Name: "ret", Type: f.Returns})
 	}
 
 	structName = CamelCase(f.getStructName(out, true))
@@ -564,7 +564,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 			checks = append(checks, "if "+name+" != nil {")
 		}
 		for _, sub := range arg.RecordOf {
-			checks = genChecks(checks, *sub.Argument, name, arg.Flavor == FLAVOR_TABLE) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
+			checks = genChecks(checks, sub, name, arg.Flavor == FLAVOR_TABLE) //parentIsTable || sub.Flavor == FLAVOR_TABLE)
 		}
 		if parentIsTable || got[0] == '*' {
 			checks = append(checks, "}")
@@ -574,7 +574,7 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 			checks = append(checks, fmt.Sprintf("if %s != nil {  // genChecks[T] %q", name, got))
 		}
 		plus := strings.Join(
-			genChecks(nil, *arg.TableOf, "v", true),
+			genChecks(nil, Argument{Name: arg.Name, Type: arg.TableOf}, "v", true),
 			"\n\t")
 		if len(strings.TrimSpace(plus)) > 0 {
 			checks = append(checks,
@@ -601,7 +601,7 @@ func capitalize(text string) string {
 
 var ErrUnknownSimpleType = errors.New("unknown simple type")
 
-func (arg *Argument) goType(isTable bool) (typName string, err error) {
+func (arg *Type) goType(isTable bool) (typName string, err error) {
 	defer func() {
 		if strings.HasPrefix(typName, "**") {
 			typName = typName[1:]
@@ -699,10 +699,10 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 	}
 
 	// FLAVOR_RECORD
-	if false && arg.TypeName == "" {
-		logger.Info("arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
-		arg.TypeName = strings.ToLower(arg.Name)
-	}
+	// if false && arg.TypeName == "" {
+	// 	logger.Info("arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
+	// 	arg.TypeName = strings.ToLower(arg.Name)
+	// }
 	return "*" + typName, nil
 }
 

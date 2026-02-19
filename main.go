@@ -127,6 +127,7 @@ func Main() error {
 				})
 			}
 
+			var packages map[string]string
 			var annotations []oracall.Annotation
 			logger.Debug("parse", "db", db != nil, "pattern", pattern)
 			if db == nil {
@@ -138,13 +139,13 @@ func Main() error {
 				}
 				functions, err = oracall.ParseCsvFile("", filter)
 			} else {
-				functions, annotations, err = parseDB(ctx, db, pattern, *flagDump, filter)
+				packages, functions, annotations, err = parseDB(ctx, db, pattern, *flagDump, filter)
 			}
 			if err != nil {
 				return fmt.Errorf("read %s: %w", flag.Arg(0), err)
 			}
 
-			logger.Debug("print", "print", *flagPrint, "functions", len(functions), "annotations", annotations)
+			logger.Debug("print", "print", *flagPrint, "functions", len(functions), "annotations", annotations, "packages", packages)
 			if *flagPrint != "" {
 				fh := io.WriteCloser(os.Stdout)
 				fhClose := fh.Close
@@ -158,7 +159,7 @@ func Main() error {
 					fh, fhClose = pf, pf.CloseAtomicallyReplace
 				}
 				defer fhClose()
-				if err := printTo(fh, functions, isJSON); err != nil {
+				if err := printTo(fh, packages, functions, isJSON); err != nil {
 					return err
 				}
 				if err = fhClose(); err != nil {
@@ -390,19 +391,23 @@ func (t dbType) String() string {
 	return fmt.Sprintf("%s{%s}[%d](%s[%s]/%s.%s.%s@%s)", t.Argument, t.Data, t.Level, t.PLS, t.IndexBy, t.Owner, t.Name, t.Subname, t.Link)
 }
 
-func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter func(string) bool) (functions []oracall.Function, annotations []oracall.Annotation, err error) {
+func parseDB(
+	ctx context.Context, db *sql.DB, pattern, dumpFn string, filter func(string) bool,
+) (
+	packages map[string]string, functions []oracall.Function, annotations []oracall.Annotation, err error,
+) {
 	tbl, objTbl := "user_arguments", "user_objects"
 	if strings.HasPrefix(pattern, "DBMS_") || strings.HasPrefix(pattern, "UTL_") {
 		tbl, objTbl = "all_arguments", "all_objects"
 	}
 	tx1, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
-		return functions, annotations, err
+		return packages, functions, annotations, err
 	}
 	defer tx1.Rollback()
 	tx2, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
-		return functions, annotations, err
+		return packages, functions, annotations, err
 	}
 	defer tx2.Rollback()
 	argumentsQry := `` + //nolint:gas
@@ -435,7 +440,7 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 	objTimeQry := `SELECT last_ddl_time FROM ` + objTbl + ` WHERE object_name = :1 AND object_type <> 'PACKAGE BODY'`
 	objTimeStmt, err := tx1.PrepareContext(ctx, objTimeQry)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s: %w", objTimeQry, err)
+		return nil, nil, nil, fmt.Errorf("%s: %w", objTimeQry, err)
 	}
 	defer objTimeStmt.Close()
 	getObjTime := func(name string) (time.Time, error) {
@@ -583,10 +588,10 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 		var fh *os.File
 		if fh, err = os.Create(dumpFn); err != nil {
 			logger.Error("create", "dump", dumpFn, "error", err)
-			return functions, annotations, fmt.Errorf("%s: %w", dumpFn, err)
+			return packages, functions, annotations, fmt.Errorf("%s: %w", dumpFn, err)
 		}
 		if cw, err = oracall.NewUACsvWriter(fh); err != nil {
-			return functions, annotations, err
+			return packages, functions, annotations, err
 		}
 		defer func() {
 			cwMu.Lock()
@@ -665,6 +670,12 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 							annotations = append(annotations, a)
 						}
 					}
+					if s := funDocs[""]; s != "" {
+						if packages == nil {
+							packages = make(map[string]string)
+						}
+						packages[ua.PackageName] = s
+					}
 					replMu.Unlock()
 					logger.Info("parseDocs", "docs", len(funDocs), "error", docsErr)
 					docsMu.Lock()
@@ -740,7 +751,7 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 	functions = oracall.ParseArguments(filteredArgs, filter)
 	if grpErr := grp.Wait(); grpErr != nil {
 		logger.Error("ParseArguments", "error", grpErr)
-		return functions, annotations, grpErr
+		return packages, functions, annotations, grpErr
 	}
 	docNames := make([]string, 0, len(docs))
 	for k := range docs {
@@ -761,7 +772,7 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 		logger.Info("any", "has", docNames)
 	}
 	logger.Info("found", "annotations", annotations)
-	return functions, annotations, nil
+	return packages, functions, annotations, nil
 }
 
 var bufPool = sync.Pool{New: func() any { return bytes.NewBuffer(make([]byte, 0, 1024)) }}
@@ -958,11 +969,18 @@ func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx co
 	return plus, nil
 }
 
-func printTo(w io.Writer, functions []oracall.Function, isJSON bool) error {
+func printTo(w io.Writer, packages map[string]string, functions []oracall.Function, isJSON bool) error {
 	bw := bufio.NewWriter(w)
 	defer bw.Flush()
 	if isJSON {
-		if err := json.MarshalWrite(bw, functions); err != nil {
+		if err := json.MarshalWrite(bw, struct {
+			Packages  map[string]string          `json:",omitempty"`
+			Functions []oracall.Function         `json:",omitempty"`
+			Types     map[string]oracall.PlsType `json:",omitempty"`
+		}{
+			Packages:  packages,
+			Functions: functions,
+		}); err != nil {
 			return err
 		}
 	} else {
