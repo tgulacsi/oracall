@@ -652,6 +652,7 @@ func parseDB(
 					return err
 				}
 				prevPackage = ua.PackageName
+				otherDocs := make(map[string]map[string]string)
 				if err := func() error {
 					buf := bufPool.Get().(*bytes.Buffer)
 					defer bufPool.Put(buf)
@@ -665,8 +666,33 @@ func parseDB(
 					replMu.Lock()
 					bb := buf.String()
 					funDocs, annots, docsErr := source.Parse(ctx, bb)
+					otherDocs[ua.PackageName] = funDocs
 					if len(annots) != 0 {
 						for _, a := range annots {
+							if a.Type == "replace_docs" {
+								other, nm, _ := strings.Cut(a.Other, ".")
+								other = strings.ToUpper(other)
+								if _, ok := otherDocs[other]; !ok {
+									buf.Reset()
+									if srcErr := getSource(ctx, buf, tx1, other); srcErr != nil {
+										logger.Error("getSource", "error", srcErr)
+									} else if dd, _, err := source.Parse(ctx, bb); err != nil {
+										logger.Error("parse", "other", other, "error", err)
+									} else {
+										otherDocs[other] = dd
+									}
+								}
+								if nm == "" {
+									nm = a.Name
+								}
+								if s := otherDocs[other][nm]; s != "" {
+									funDocs[a.Name] = s
+								} else {
+									logger.Warn("cannot replace_docs", "annotation", a)
+								}
+								continue
+							}
+							// logger.Warn("annotation", "a", a)
 							a.Package = ua.PackageName
 							annotations = append(annotations, a)
 						}
