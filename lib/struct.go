@@ -33,15 +33,17 @@ const (
 )
 
 type Function struct {
-	LastDDL              time.Time  `json:",omitzero"`
-	Replacement          *Function  `json:",omitempty"`
-	Returns              *Argument  `json:",omitempty"`
-	Package, name, alias string     `json:",omitzero"`
-	Documentation        string     `json:",omitzero"`
-	Args                 []Argument `json:",omitempty"`
-	Tag, handle          []string   `json:",omitempty"`
-	maxTableSize         int        `json:",omitzero"`
-	ReplacementIsJSON    bool       `json:",omitzero"`
+	LastDDL           time.Time `json:",omitzero"`
+	Replacement       *Function `json:",omitempty"`
+	Returns           *Argument `json:",omitempty"`
+	Package           string    `json:",omitzero"`
+	name, alias       string
+	Documentation     string     `json:",omitzero"`
+	Args              []Argument `json:",omitempty"`
+	Tag               []string   `json:",omitempty"`
+	handle            []string
+	maxTableSize      int
+	ReplacementIsJSON bool `json:",omitzero"`
 }
 
 func (f Function) MarshalJSONTo(enc *jsontext.Encoder) error {

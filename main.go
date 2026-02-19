@@ -766,19 +766,20 @@ func parseDB(ctx context.Context, db *sql.DB, pattern, dumpFn string, filter fun
 
 var bufPool = sync.Pool{New: func() any { return bytes.NewBuffer(make([]byte, 0, 1024)) }}
 
-func getSource(ctx context.Context, w io.Writer, cx *sql.Tx, packageName string) error {
+func getSource(ctx context.Context, w io.Writer, tx *sql.Tx, packageName string) error {
 	qry := "SELECT text FROM user_source WHERE name = UPPER(:1) AND type = 'PACKAGE' ORDER BY line"
-	rows, err := cx.QueryContext(ctx, qry, packageName, godror.PrefetchCount(129))
+	rows, err := tx.QueryContext(ctx, qry, packageName, godror.PrefetchCount(129))
 	if err != nil {
 		return fmt.Errorf("%s [%q]: %w", qry, packageName, err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var line sql.NullString
+		var line string
 		if err := rows.Scan(&line); err != nil {
 			return fmt.Errorf("%s: %w", qry, err)
 		}
-		if _, err := io.WriteString(w, line.String); err != nil {
+		line = strings.TrimRight(line, " \t\r\n") + "\n"
+		if _, err := io.WriteString(w, line); err != nil {
 			return err
 		}
 	}

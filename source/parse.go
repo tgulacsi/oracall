@@ -16,7 +16,10 @@ import (
 	oracall "github.com/tgulacsi/oracall/lib"
 )
 
-var rDecl = regexp.MustCompile(`(FUNCTION|PROCEDURE) +([^ (;]+)`)
+var (
+	rDecl   = regexp.MustCompile(`(FUNCTION|PROCEDURE) +([^ (;]+)`)
+	rIndent = regexp.MustCompile("^ +")
+)
 
 func ParseDocs(ctx context.Context, src string) (docs map[string]string, err error) {
 	logger := zlog.SFromContext(ctx)
@@ -42,7 +45,9 @@ func Parse(ctx context.Context, src string) (docs map[string]string, annotations
 
 // var rAnnotation = regexp.MustCompile(`--oracall:(?:(replace(_json)?|rename|tag)\s+[a-zA-Z0-9_#]+\s*=>\s*.+|(handle|private)\s+[a-zA-Z0-9_#]+|max-table-size\s+[a-zA-Z0-9_$]+\s*=\s*[0-9]+)`)
 
-func parseDocsAnnotations(ctx context.Context, src string) (docs map[string]string, annotations []oracall.Annotation, err error) {
+func parseDocsAnnotations(ctx context.Context, src string) (
+	docs map[string]string, annotations []oracall.Annotation, err error,
+) {
 	logger := zlog.SFromContext(ctx)
 	docs = make(map[string]string)
 	var buf bytes.Buffer
@@ -61,6 +66,25 @@ Loop:
 			ss := rDecl.FindStringSubmatch(it.val)
 			if ss != nil {
 				docs[ss[2]] = buf.String()
+			} else if s := buf.String(); (strings.Contains(s, "---") || strings.Contains(s, "# ")) &&
+				(len(docs) == 0 || len(docs) == 1 && docs[""] != "") {
+				indents := rIndent.FindAllStringIndex(s, -1)
+				if len(indents) != 0 {
+					minIndent := 8
+					for _, ii := range indents {
+						minIndent = min(minIndent, ii[1]-ii[0])
+					}
+					if minIndent > 0 {
+						indent := strings.Repeat(" ", minIndent)
+						s = strings.TrimPrefix(s, indent)
+						s = strings.ReplaceAll(s, "\n"+indent, "\n")
+					}
+				}
+				if docs[""] == "" {
+					docs[""] = s
+				} else {
+					docs[""] = docs[""] + "\n\n------\n\n" + s
+				}
 			}
 			buf.Reset()
 
