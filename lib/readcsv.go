@@ -1,4 +1,4 @@
-// Copyright 2019, 2026 Tamás Gulácsi
+// Copyright 2019, 2021 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -327,7 +327,7 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 
 		var fun Function
 		lastArgs := make(map[int8]*Argument, 8)
-		lastArgs[-1] = &Argument{Type: &Type{Flavor: FLAVOR_RECORD}}
+		lastArgs[-1] = &Argument{Flavor: FLAVOR_RECORD}
 		var level int8
 		for i, ua := range uas {
 			row++
@@ -363,7 +363,7 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 			}
 			if level == 0 && fun.Returns == nil && arg.Name == "" {
 				arg.Name = "ret"
-				fun.Returns = arg.Type
+				fun.Returns = &arg
 				continue
 			}
 			parent := lastArgs[level-1]
@@ -372,13 +372,15 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 				panic(fmt.Sprintf("parent is nil, at level=%d, lastArgs=%v, fun=%v", level, lastArgs, fun))
 			}
 			if parent.Flavor == FLAVOR_TABLE {
-				parent.TableOf = arg.Type
+				parent.TableOf = &arg
 			} else {
-				parent.RecordOf = append(parent.RecordOf, Argument{Name: arg.Name, Type: arg.Type})
+				parent.RecordOf = append(parent.RecordOf, NamedArgument{Name: arg.Name, Argument: &arg})
 			}
 		}
 		fun.Args = make([]Argument, len(lastArgs[-1].RecordOf))
-		copy(fun.Args, lastArgs[-1].RecordOf)
+		for i, na := range lastArgs[-1].RecordOf {
+			fun.Args[i] = *na.Argument
+		}
 		functions = append(functions, fun)
 		names = append(names, fun.Name())
 	}

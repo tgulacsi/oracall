@@ -35,7 +35,7 @@ const (
 type Function struct {
 	LastDDL           time.Time `json:",omitzero"`
 	Replacement       *Function `json:",omitempty"`
-	Returns           *Type     `json:",omitempty"`
+	Returns           *Argument `json:",omitempty"`
 	Package           string    `json:",omitzero"`
 	name, alias       string
 	Documentation     string     `json:",omitzero"`
@@ -57,13 +57,13 @@ func (f Function) MarshalJSONTo(enc *jsontext.Encoder) error {
 	W("RealName", f.RealName())
 	W("LastDDL", f.LastDDL)
 	if f.Replacement != nil {
-		W("Replacement", f.Replacement.Name())
+		W("Replacement", f.Replacement)
 		if f.ReplacementIsJSON {
 			W("ReplacementIsJSON", true)
 		}
 	}
 	if f.Returns != nil {
-		W("Returns", f.Returns.Type)
+		W("Returns", f.Returns)
 	}
 	if f.Documentation != "" {
 		W("Documentation", f.Documentation)
@@ -120,7 +120,7 @@ func (f Function) HasCursorOut() bool {
 		return true
 	}
 	for _, arg := range f.Args {
-		if arg.IsOutput() && arg.Type.Type == "REF CURSOR" {
+		if arg.IsOutput() && arg.Type == "REF CURSOR" {
 			return true
 		}
 	}
@@ -175,33 +175,59 @@ const (
 	FLAVOR_TABLE  = flavor(2)
 )
 
-type (
-	Type struct {
-		TableOf       *Type `json:",omitempty"` // this argument is a table (array) of this type
-		mu            *sync.Mutex
-		goTypeName    string
-		Type          string     `json:",omitzero"`
-		TypeName      string     `json:",omitzero"`
-		AbsType       string     `json:",omitzero"`
-		Charset       string     `json:",omitzero"`
-		IndexBy       string     `json:",omitzero"`
-		Documentation string     `json:",omitzero"`
-		RecordOf      []Argument `json:",omitzero"` //this argument is a record (map) of this type
-		PlsType
-		Charlength uint      `json:",omitzero"`
-		Flavor     flavor    `json:",omitzero"`
-		Direction  direction `json:",omitzero"`
-		Precision  uint8     `json:",omitzero"`
-		Scale      uint8     `json:",omitzero"`
-	}
+type Argument struct {
+	TableOf       *Argument `json:",omitempty"` // this argument is a table (array) of this type
+	mu            *sync.Mutex
+	goTypeName    string
+	Name          string          `json:",omitzero"`
+	Type          string          `json:",omitzero"`
+	TypeName      string          `json:",omitzero"`
+	AbsType       string          `json:",omitzero"`
+	Charset       string          `json:",omitzero"`
+	IndexBy       string          `json:",omitzero"`
+	Documentation string          `json:",omitzero"`
+	RecordOf      []NamedArgument `json:",omitzero"` //this argument is a record (map) of this type
+	PlsType
+	Charlength uint      `json:",omitzero"`
+	Flavor     flavor    `json:",omitzero"`
+	Direction  direction `json:",omitzero"`
+	Precision  uint8     `json:",omitzero"`
+	Scale      uint8     `json:",omitzero"`
+}
 
-	Argument struct {
-		*Type
-		Name string
-	}
-)
+type NamedArgument struct {
+	*Argument
+	Name string
+}
 
-func (a Type) TypeString(prefix, indent string) string {
+func (a Argument) OracleName() string {
+	switch a.Flavor {
+	case FLAVOR_RECORD:
+		return a.PlsType.String()
+	case FLAVOR_TABLE:
+		return a.PlsType.String()
+	}
+	typ := a.Type
+	switch typ {
+	case "CHAR", "NCHAR", "VARCHAR2", "NVARCHAR2":
+		return typ + fmt.Sprintf("(%d)", a.Charlength)
+	case "NUMBER":
+		if a.Precision <= 0 {
+			if a.Scale > 0 {
+				return typ + fmt.Sprintf("(*,%d)", a.Scale)
+			}
+		} else {
+			if a.Scale <= 0 {
+				return typ + fmt.Sprintf("(%d)", a.Precision)
+			} else {
+				return typ + fmt.Sprintf("(%d,%d)", a.Precision, a.Scale)
+			}
+		}
+	}
+	return typ
+}
+
+func (a Argument) TypeString(prefix, indent string) string {
 	typ := a.Type
 	var suffix string
 	var buf strings.Builder
@@ -238,30 +264,26 @@ func (a Type) TypeString(prefix, indent string) string {
 	return typ + suffix
 }
 
-func (t Type) String() string {
-	typ := t.Type
-	switch t.Flavor {
-	case FLAVOR_RECORD:
-		typ = fmt.Sprintf("%s{%v}", t.PlsType, t.RecordOf)
-	case FLAVOR_TABLE:
-		typ = fmt.Sprintf("%s[%v]", t.PlsType, t.TableOf)
-	}
-	return typ
-}
-
 func (a Argument) String() string {
-	return a.Name + " " + a.Direction.String() + " " + a.Type.String()
+	typ := a.Type
+	switch a.Flavor {
+	case FLAVOR_RECORD:
+		typ = fmt.Sprintf("%s{%v}", a.PlsType, a.RecordOf)
+	case FLAVOR_TABLE:
+		typ = fmt.Sprintf("%s[%v]", a.PlsType, a.TableOf)
+	}
+	return a.Name + " " + a.Direction.String() + " " + typ
 }
 
-func (a Type) IsInput() bool {
+func (a Argument) IsInput() bool {
 	return a.Direction&DIR_IN > 0
 }
-func (a Type) IsOutput() bool {
+func (a Argument) IsOutput() bool {
 	return a.Direction&DIR_OUT > 0
 }
 
 // Should check for Associative Array (when using INDEX BY)
-func (a Type) IsNestedTable() bool {
+func (a Argument) IsNestedTable() bool {
 	if a.Type == "TABLE" && a.IndexBy == "" {
 		return true
 	}
@@ -269,10 +291,9 @@ func (a Type) IsNestedTable() bool {
 	return false
 }
 
-func NewArgument(
-	name, dataType, plsType, typeName, dirName string, dir direction,
-	charset, indexBy string, precision, scale uint8, charlength uint,
-) Argument {
+func NewArgument(name, dataType, plsType, typeName, dirName string, dir direction,
+	charset, indexBy string, precision, scale uint8, charlength uint) Argument {
+
 	name = strings.ToLower(name)
 	if typeName == "..@" {
 		typeName = ""
@@ -296,38 +317,35 @@ func NewArgument(
 	}
 
 	arg := Argument{
-		Name: name,
-		Type: &Type{
-			Type:     dataType,
-			PlsType:  NewPlsType(plsType, precision, scale),
-			TypeName: typeName, Direction: dir,
-			Precision: precision, Scale: scale, Charlength: charlength,
-			Charset: charset, IndexBy: indexBy,
-			mu: new(sync.Mutex),
-		},
+		Name: name, Type: dataType,
+		PlsType:  NewPlsType(plsType, precision, scale),
+		TypeName: typeName, Direction: dir,
+		Precision: precision, Scale: scale, Charlength: charlength,
+		Charset: charset, IndexBy: indexBy,
+		mu: new(sync.Mutex),
 	}
 	if arg.ora == "" {
 		panic(fmt.Sprintf("empty PLS type of %#v", arg))
 	}
-	switch arg.Type.Type {
+	switch arg.Type {
 	case "PL/SQL PLS INTEGER":
-		arg.Type.Type = "PLS_INTEGER"
+		arg.Type = "PLS_INTEGER"
 	case "PL/SQL BINARY INTEGER":
-		arg.Type.Type = "BINARY_INTEGER"
+		arg.Type = "BINARY_INTEGER"
 	case "PL/SQL RECORD":
 		arg.Flavor = FLAVOR_RECORD
-		arg.RecordOf = make([]Argument, 0, 1)
+		arg.RecordOf = make([]NamedArgument, 0, 1)
 	case "TABLE", "PL/SQL TABLE", "REF CURSOR":
 		arg.Flavor = FLAVOR_TABLE
 	}
 
-	switch arg.Type.Type {
+	switch arg.Type {
 	case "CHAR", "NCHAR", "VARCHAR", "NVARCHAR", "VARCHAR2", "NVARCHAR2",
 		"RAW":
 		if arg.Charlength == 0 {
-			if arg.Type.Type == "RAW" {
+			if arg.Type == "RAW" {
 				arg.Charlength = DefaultMaxRAWLength
-			} else if strings.Contains(arg.Type.Type, "VAR") {
+			} else if strings.Contains(arg.Type, "VAR") {
 				arg.Charlength = DefaultMaxVARCHARLength
 			} else {
 				arg.Charlength = DefaultMaxCHARLength
@@ -345,7 +363,7 @@ func NewArgument(
 	case "PLS_INTEGER", "BINARY_INTEGER":
 		arg.AbsType = "INTEGER(10)"
 	default:
-		arg.AbsType = arg.Type.Type
+		arg.AbsType = arg.Type
 	}
 	return arg
 }

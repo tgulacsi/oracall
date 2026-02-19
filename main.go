@@ -30,6 +30,7 @@ import (
 
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/google/renameio/v2"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	custom "github.com/tgulacsi/oracall/custom"
@@ -969,17 +970,124 @@ func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx co
 	return plus, nil
 }
 
+type (
+	pkg struct {
+		LastDDL       time.Time
+		Documentation string
+	}
+
+	argument struct{ a oracall.Argument }
+	function struct{ f oracall.Function }
+)
+
+func (a argument) MarshalJSONTo(enc *jsontext.Encoder) error {
+	W := func(k string, v any) { enc.WriteToken(jsontext.String(k)); json.MarshalEncode(enc, v) }
+	enc.WriteToken(jsontext.BeginObject)
+	if a.a.Documentation != "" {
+		W("Documentation", a.a.Documentation)
+	}
+	if a.a.TableOf != nil {
+		W("TableOf", a.a.TableOf.OracleName())
+	} else if len(a.a.RecordOf) != 0 {
+		enc.WriteToken(jsontext.String("RecordOf"))
+		enc.WriteToken(jsontext.BeginArray)
+		for _, a := range a.a.RecordOf {
+			W(a.Name, a)
+		}
+		enc.WriteToken(jsontext.EndArray)
+	} else {
+		W("Type", a.a.Type)
+		W("TypeName", a.a.TypeName)
+		W("AbsType", a.a.AbsType)
+		W("Charset", a.a.Charset)
+		W("IndexBy", a.a.IndexBy)
+		W("Charlength", a.a.Charlength)
+		W("Flavor", a.a.Flavor)
+		W("Preciion", a.a.Precision)
+		W("Scale", a.a.Scale)
+	}
+	return enc.WriteToken(jsontext.EndObject)
+}
+
+func (f function) MarshalJSONTo(enc *jsontext.Encoder) error {
+	W := func(k string, v any) { enc.WriteToken(jsontext.String(k)); json.MarshalEncode(enc, v) }
+	enc.WriteToken(jsontext.BeginObject)
+	W("Package", f.f.Package)
+	W("Name", f.f.Name())
+	W("RealName", f.f.RealName())
+	if f.f.Replacement != nil {
+		W("Replacement", f.f.Replacement.Name())
+		if f.f.ReplacementIsJSON {
+			W("ReplacementIsJSON", true)
+		}
+	}
+	if f.f.Returns != nil {
+		W("Returns", f.f.Returns.Type)
+	}
+	if f.f.Documentation != "" {
+		W("Documentation", f.f.Documentation)
+	}
+	if len(f.f.Args) != 0 {
+		enc.WriteToken(jsontext.String("Args"))
+		enc.WriteToken(jsontext.BeginObject)
+		for _, a := range f.f.Args {
+			W(a.Name, a.OracleName())
+		}
+		enc.WriteToken(jsontext.EndObject)
+	}
+	if len(f.f.Tag) != 0 {
+		W("Tag", f.f.Tag)
+	}
+	return enc.WriteToken(jsontext.EndObject)
+}
+
 func printTo(w io.Writer, packages map[string]string, functions []oracall.Function, isJSON bool) error {
 	bw := bufio.NewWriter(w)
 	defer bw.Flush()
 	if isJSON {
+		pp := make(map[string]pkg, len(packages))
+		for k, v := range packages {
+			pp[k] = pkg{Documentation: v}
+		}
+		tt := make(map[string]argument)
+		var add func(t *oracall.Argument)
+		add = func(t *oracall.Argument) {
+			if t == nil {
+				return
+			}
+			if t.TableOf != nil {
+				tt[t.PlsType.String()] = argument{a: *t}
+				add(t.TableOf)
+			} else if len(t.RecordOf) != 0 {
+				tt[t.PlsType.String()] = argument{a: *t}
+				for _, a := range t.RecordOf {
+					add(a.Argument)
+				}
+			}
+		}
+		ff := make([]function, len(functions))
+		for i, f := range functions {
+			p := pp[f.Package]
+			if p.LastDDL.Before(f.LastDDL) {
+				p.LastDDL = f.LastDDL
+			}
+			pp[f.Package] = p
+			ff[i] = function{f: f}
+			if f.Returns != nil {
+				add(f.Returns)
+			}
+			for _, a := range f.Args {
+				add(&a)
+			}
+		}
 		if err := json.MarshalWrite(bw, struct {
-			Packages  map[string]string          `json:",omitempty"`
-			Functions []oracall.Function         `json:",omitempty"`
-			Types     map[string]oracall.PlsType `json:",omitempty"`
+			Packages  map[string]pkg      `json:",omitempty"`
+			Functions []function          `json:",omitempty"`
+			Types     map[string]argument `json:",omitempty"`
 		}{
-			Packages:  packages,
-			Functions: functions,
+			Packages:  pp,
+			Functions: ff,
+			Types:     tt,
 		}); err != nil {
 			return err
 		}
