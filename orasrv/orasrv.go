@@ -1,4 +1,4 @@
-// Copyright 2017, 2024 Tamas Gulacsi
+// Copyright 2017, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/UNO-SOFT/w3ctrace"
+	"github.com/UNO-SOFT/w3ctrace/gtrace"
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/UNO-SOFT/zlog/v2/slog"
 
@@ -57,6 +58,9 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 		if Timeout != 0 {
 			ctx, cancel = context.WithTimeout(ctx, Timeout) //nolint:govet
 		}
+		if tr := gtrace.FromIncomingContext(ctx); tr.IsValid() {
+			ctx = w3ctrace.NewContext(ctx, tr)
+		}
 		reqID := ContextGetReqID(ctx)
 		ctx = ContextWithReqID(ctx, reqID)
 		lgr := logger.With("reqID", reqID)
@@ -86,22 +90,25 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 		return lgr, commit, ctx, cancel
 	}
 
+	var catchPanicF func()
+	if catchPanic {
+		catchPanicF = func() {
+			if r := recover(); r != nil {
+				trace := stack.Trace().String()
+				if err, ok := r.(error); ok {
+					logger.Error("PANIC", "trace", trace, "error", err)
+					return
+				}
+				logger.Error("PANIC", "trace", trace, "error", fmt.Errorf("%+v", r))
+			}
+		}
+	}
+
 	opts := []grpc.ServerOption{
 		grpc.StreamInterceptor(
 			func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				if catchPanic {
-					defer func() {
-						if r := recover(); r != nil {
-							trace := stack.Trace().String()
-							var ok bool
-							if err, ok = r.(error); ok {
-								logger.Error("PANIC", "trace", trace, "error", err)
-								return
-							}
-							err = fmt.Errorf("%+v", r)
-							logger.Error("PANIC", "trace", trace, "error", err)
-						}
-					}()
+					defer catchPanicF()
 				}
 				lgr, commit, ctx, cancel := getLogger(ss.Context(), info.FullMethod)
 				defer cancel()
@@ -129,18 +136,7 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 		grpc.UnaryInterceptor(
 			func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ any, err error) {
 				if catchPanic {
-					defer func() {
-						if r := recover(); r != nil {
-							trace := stack.Trace().String()
-							var ok bool
-							if err, ok = r.(error); ok {
-								logger.Error("PANIC", "trace", trace, "error", err)
-								return
-							}
-							err = fmt.Errorf("%+v", r)
-							logger.Error("PANIC", "trace", trace, "error", err)
-						}
-					}()
+					defer catchPanicF()
 				}
 				logger, commit, ctx, cancel := getLogger(ctx, info.FullMethod)
 				defer cancel()
