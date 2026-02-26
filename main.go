@@ -1018,7 +1018,7 @@ func (a argument) MarshalJSONTo(enc *jsontext.Encoder) error {
 		enc.WriteToken(jsontext.String("RecordOf"))
 		enc.WriteToken(jsontext.BeginArray)
 		for _, a := range a.a.RecordOf {
-			W(a.Name, a)
+			json.MarshalEncode(enc, a)
 		}
 		enc.WriteToken(jsontext.EndArray)
 	} else {
