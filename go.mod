@@ -24,7 +24,7 @@ require (
 	github.com/godror/knownpb v0.3.0
 	github.com/google/renameio/v2 v2.0.0
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/peterbourgon/ff/v3 v3.4.0
+	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 )
 
 require (
