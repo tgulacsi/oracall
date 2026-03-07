@@ -163,7 +163,7 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 				u++ // 1-based index !
 				if u != tm.TypeIdx {
-					fmt.Errorf("idx=%d != TypeIdx=%d", u, tm.TypeIdx)
+					return fmt.Errorf("idx=%d != TypeIdx=%d", u, tm.TypeIdx)
 				}
 				allTypes[u] = t
 			}

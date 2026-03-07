@@ -107,7 +107,10 @@ import (
 	"fmt"
 
 	"github.com/godror/godror"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var _ = (*timestamppb.Timestamp)(nil)
 
 	`)
 	slices.Sort(names)
@@ -169,6 +172,80 @@ plugins:
 		t.Errorf("%q\n%s\n%+v", cmd.Args, string(b), err)
 	}
 
+}
+
+var procsFn = filepath.Join("testdata", "funcs_procs.json")
+
+func TestReadProcedures(t *testing.T) {
+	ctx := zlog.NewSContext(context.Background(), zlog.NewT(t).SLog())
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	db, err := sql.Open("godror", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	procs, err := objects.ReadProcedures(ctx, db, flag.Args()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("found %d procedures", len(procs.Items))
+	fh, err := renameio.NewPendingFile(procsFn, renameio.WithPermissions(0644))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fh.Cleanup()
+	enc := jsontext.NewEncoder(fh, jsontext.WithIndent("  "))
+	if err = json.MarshalEncode(enc, procs,
+		json.DefaultOptionsV2(), json.OmitZeroStructFields(true),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err = fh.CloseAtomicallyReplace(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWriteProcedureWrappers(t *testing.T) {
+	ctx := zlog.NewSContext(context.Background(), zlog.NewT(t).SLog())
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	// Load type metadata
+	var types objects.Types
+	if fh, err := os.Open(typesFn); err != nil {
+		t.Skip("no types file:", err)
+	} else {
+		if err = json.UnmarshalRead(fh, &types); err != nil {
+			fh.Close()
+			t.Fatal(err)
+		}
+		fh.Close()
+	}
+
+	// Load procedure metadata
+	fh, err := os.Open(procsFn)
+	if err != nil {
+		t.Skip("no procedures file:", err)
+	}
+	defer fh.Close()
+	var procs objects.Procedures
+	if err = json.UnmarshalRead(fh, &procs); err != nil {
+		t.Fatal(err)
+	}
+	fh.Close()
+
+	t.Logf("generating wrappers for %d procedures", len(procs.Items))
+
+	pkg := "testdata"
+	var buf bytes.Buffer
+	if err = procs.WriteProceduresFile(ctx, &buf, pkg, &types); err != nil {
+		t.Fatal(err)
+	}
+
+	os.MkdirAll("testdata", 0755)
+	if err = os.WriteFile("testdata/funcs_procs_ora.go", buf.Bytes(), 0664); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func nvl[T comparable](a T, b ...T) T {
