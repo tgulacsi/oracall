@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"slices"
 	"strings"
@@ -403,8 +404,9 @@ func (tt *Types) get(ctx context.Context, name string) (*Type, error) {
 		return v, nil
 	}
 	logger := zlog.SFromContext(ctx)
-	logger.Warn("get", "name", name, "t", fmt.Sprintf("%#v", tt.m[name]))
-	_ = logger
+	if logger.Enabled(ctx, slog.LevelDebug) {
+		logger.Debug("get", "name", name, "t", fmt.Sprintf("%#v", tt.m[name]))
+	}
 	t := tt.m[name]
 	if t == nil || t.TypeCode == "" {
 		if strings.Count(name, ".") < 2 {
@@ -608,4 +610,3 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 
 	return t, nil
 }
-
