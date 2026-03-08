@@ -12,7 +12,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/tgulacsi/oracall/lib"
+	oracall "github.com/tgulacsi/oracall/lib"
 )
 
 type (
@@ -222,52 +222,125 @@ func (t *Type) Valid() bool {
 	return t != nil && t.Name != "" && (isSimpleType(t.Name) || t.Elem != nil || t.Arguments != nil)
 }
 
+// protoGoName converts a proto field name (snake_case, may have trailing underscores)
+// to the Go identifier used by protoc-gen-go (e.g. "size_" → "Size_", "f_szorzo" → "FSzorzo").
+func protoGoName(protoField string) string {
+	trailing := len(protoField) - len(strings.TrimRight(protoField, "_"))
+	inner := protoField[:len(protoField)-trailing]
+	parts := strings.Split(inner, "_")
+	var b strings.Builder
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		b.WriteString(strings.ToUpper(p[:1]) + p[1:])
+	}
+	b.WriteString(strings.Repeat("_", trailing))
+	return b.String()
+}
+
+// protoFieldName converts an Oracle attribute name to the proto field name.
+func protoFieldName(oraName string) string {
+	name := oraName
+	if strings.HasSuffix(name, "#") {
+		name = name[:len(name)-1] + "_hidden"
+	}
+	return strings.ToLower(name)
+}
+
 func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
 	bw := bufio.NewWriter(w)
-	fmt.Fprintf(bw, `
-func (x *%s) WriteObject(o *godror.Object) error {
-	var data godror.Data
-`,
-		t.ProtoMessageName())
+	msgName := t.ProtoMessageName()
+
+	// WriteObject
+	fmt.Fprintf(bw, "\nfunc (x *%s) WriteObject(o *godror.Object) error {\n\tvar data godror.Data\n", msgName)
 	for _, a := range t.Arguments {
-		cName := oracall.CamelCase(a.Name)
-		if a.Type.Elem == nil {
-			if isSimpleType(a.Type.OraType()) {
-				fmt.Fprintf(bw, "\tdata.Set(x.Get%s())\n\to.SetAttribute(%q, &data)\n",
-					cName,
-					a.Name,
-				)
+		goName := protoGoName(protoFieldName(a.Name))
+		s := a.Type
+		if s.IsColl() {
+			if s.Elem == nil {
+				continue // unresolved collection, skip
+			}
+			fmt.Fprintf(bw, "\tif items := x.Get%s(); len(items) > 0 {\n", goName)
+			fmt.Fprintf(bw, "\t\tattr, ok := o.ObjectType.Attributes[%q]\n", a.Name)
+			fmt.Fprintf(bw, "\t\tif !ok { return fmt.Errorf(\"no attribute %s in %%s\", o.ObjectType.FullName()) }\n", a.Name)
+			fmt.Fprintf(bw, "\t\tcoll, err := attr.ObjectType.NewCollection()\n")
+			fmt.Fprintf(bw, "\t\tif err != nil { return fmt.Errorf(\"NewCollection %s: %%w\", err) }\n", a.Name)
+			fmt.Fprintf(bw, "\t\tdefer coll.Object.Close()\n")
+			fmt.Fprintf(bw, "\t\tfor _, item := range items {\n")
+			if isSimpleType(s.Elem.Name) {
+				fmt.Fprintf(bw, "\t\t\tvar d godror.Data\n")
+				fmt.Fprintf(bw, "\t\t\tif err := d.Set(%s); err != nil { return err }\n", s.Elem.writeObjectExpr("item"))
+				fmt.Fprintf(bw, "\t\t\tif err := coll.AppendData(&d); err != nil { return err }\n")
 			} else {
-				fmt.Fprintf(bw, "\tx.Get%s()\n", cName)
+				fmt.Fprintf(bw, "\t\t\tif attr.ObjectType.CollectionOf == nil { return fmt.Errorf(\"CollectionOf not set for %s\") }\n", a.Name)
+				fmt.Fprintf(bw, "\t\t\telemObj, err := attr.ObjectType.CollectionOf.NewObject()\n")
+				fmt.Fprintf(bw, "\t\t\tif err != nil { return err }\n")
+				fmt.Fprintf(bw, "\t\t\tif err = item.WriteObject(elemObj); err != nil { return err }\n")
+				fmt.Fprintf(bw, "\t\t\tif err = coll.AppendObject(elemObj); err != nil { return err }\n")
 			}
+			fmt.Fprintf(bw, "\t\t}\n")
+			fmt.Fprintf(bw, "\t\tdata.SetObject(coll.Object)\n")
+			fmt.Fprintf(bw, "\t\tif err = o.SetAttribute(%q, &data); err != nil { return fmt.Errorf(\"SetAttribute %s: %%w\", err) }\n", a.Name, a.Name)
+			fmt.Fprintf(bw, "\t}\n")
+		} else if isSimpleType(s.Name) {
+			fmt.Fprintf(bw, "\tif err := data.Set(%s); err != nil { return err }\n", s.writeObjectExpr("x.Get"+goName+"()"))
+			fmt.Fprintf(bw, "\tif err := o.SetAttribute(%q, &data); err != nil { return err }\n", a.Name)
+		} else {
+			// nested object
+			fmt.Fprintf(bw, "\tif sub := x.Get%s(); sub != nil {\n", goName)
+			fmt.Fprintf(bw, "\t\tattr, ok := o.ObjectType.Attributes[%q]\n", a.Name)
+			fmt.Fprintf(bw, "\t\tif !ok { return fmt.Errorf(\"no attribute %s in %%s\", o.ObjectType.FullName()) }\n", a.Name)
+			fmt.Fprintf(bw, "\t\tsubObj, err := attr.ObjectType.NewObject()\n")
+			fmt.Fprintf(bw, "\t\tif err != nil { return fmt.Errorf(\"NewObject %s: %%w\", err) }\n", a.Name)
+			fmt.Fprintf(bw, "\t\tdefer subObj.Close()\n")
+			fmt.Fprintf(bw, "\t\tif err = sub.WriteObject(subObj); err != nil { return fmt.Errorf(\"WriteObject %s: %%w\", err) }\n", a.Name)
+			fmt.Fprintf(bw, "\t\tdata.SetObject(subObj)\n")
+			fmt.Fprintf(bw, "\t\tif err = o.SetAttribute(%q, &data); err != nil { return fmt.Errorf(\"SetAttribute %s: %%w\", err) }\n", a.Name, a.Name)
+			fmt.Fprintf(bw, "\t}\n")
 		}
 	}
-	fmt.Fprintf(bw, `
-	return nil
-}
-func (x *%s) Scan(v any) error {
-	var data godror.Data
-	o, ok := v.(*godror.Object)
-	if !ok { return fmt.Errorf("wanted Objet, got %%T", v)}
-`,
-		t.ProtoMessageName(),
-	)
+	fmt.Fprintf(bw, "\treturn nil\n}\n")
+
+	// Scan
+	fmt.Fprintf(bw, "func (x *%s) Scan(v any) error {\n\tvar data godror.Data\n", msgName)
+	fmt.Fprintf(bw, "\to, ok := v.(*godror.Object)\n\tif !ok { return fmt.Errorf(\"wanted Object, got %%T\", v) }\n")
 	for _, a := range t.Arguments {
-		cName := oracall.CamelCase(a.Name)
-		if a.Type.Elem == nil {
-			if isSimpleType(a.Type.OraType()) {
-				fmt.Fprintf(bw, "\to.GetAttribute(&data, %q)\n\tx.%s = %s\n",
-					a.Name,
-					cName,
-					a.Type.dataGetter("data"),
-				)
+		goName := protoGoName(protoFieldName(a.Name))
+		s := a.Type
+		if s.IsColl() {
+			if s.Elem == nil {
+				continue
 			}
+			fmt.Fprintf(bw, "\tif err := o.GetAttribute(&data, %q); err != nil { return err }\n", a.Name)
+			fmt.Fprintf(bw, "\tif collObj := data.GetObject(); collObj != nil {\n")
+			fmt.Fprintf(bw, "\t\tcoll := collObj.Collection()\n")
+			fmt.Fprintf(bw, "\t\tvar itemData godror.Data\n")
+			fmt.Fprintf(bw, "\t\tfor i, err := coll.First(); err == nil; i, err = coll.Next(i) {\n")
+			fmt.Fprintf(bw, "\t\t\tif err := coll.GetItem(&itemData, i); err != nil { return err }\n")
+			if isSimpleType(s.Elem.Name) {
+				fmt.Fprintf(bw, "\t\t\tx.%s = append(x.%s, %s)\n", goName, goName, s.Elem.dataGetter("itemData"))
+			} else {
+				fmt.Fprintf(bw, "\t\t\tif subObj := itemData.GetObject(); subObj != nil {\n")
+				fmt.Fprintf(bw, "\t\t\t\telem := new(%s)\n", s.Elem.ProtoMessageName())
+				fmt.Fprintf(bw, "\t\t\t\tif err := elem.Scan(subObj); err != nil { return err }\n")
+				fmt.Fprintf(bw, "\t\t\t\tx.%s = append(x.%s, elem)\n", goName, goName)
+				fmt.Fprintf(bw, "\t\t\t}\n")
+			}
+			fmt.Fprintf(bw, "\t\t}\n\t}\n")
+		} else if isSimpleType(s.Name) {
+			fmt.Fprintf(bw, "\tif err := o.GetAttribute(&data, %q); err != nil { return err }\n", a.Name)
+			fmt.Fprintf(bw, "\tx.%s = %s\n", goName, s.dataGetter("data"))
+		} else {
+			// nested object
+			fmt.Fprintf(bw, "\tif err := o.GetAttribute(&data, %q); err != nil { return err }\n", a.Name)
+			fmt.Fprintf(bw, "\tif subObj := data.GetObject(); subObj != nil {\n")
+			fmt.Fprintf(bw, "\t\tx.%s = new(%s)\n", goName, s.ProtoMessageName())
+			fmt.Fprintf(bw, "\t\tif err := x.%s.Scan(subObj); err != nil { return err }\n", goName)
+			fmt.Fprintf(bw, "\t}\n")
 		}
 	}
-	bw.WriteString(`
-	return nil
-}
-`)
+	fmt.Fprintf(bw, "\treturn nil\n}\n")
 	return bw.Flush()
 }
 
@@ -300,14 +373,24 @@ func writeArguments(bw *bufio.Writer, args []Argument) error {
 	return nil
 }
 
+// writeObjectExpr returns a Go expression that converts val to something data.Set() accepts.
+func (t Type) writeObjectExpr(val string) string {
+	switch t.protoType() {
+	case "google.protobuf.Timestamp":
+		return val + ".AsTime()"
+	default:
+		return val
+	}
+}
+
 func (t Type) dataGetter(dataName string) string {
 	switch t.protoType() {
 	case "bool":
 		return dataName + ".GetBool()"
 	case "google.protobuf.Timestamp":
-		return dataName + ".GetTime()"
+		return "timestamppb.New(" + dataName + ".GetTime())"
 	case "string":
-		return dataName + ".GetString()"
+		return "string(" + dataName + ".GetBytes())"
 	case "bytes":
 		return dataName + ".GetBytes()"
 	case "int32":
@@ -317,10 +400,9 @@ func (t Type) dataGetter(dataName string) string {
 	case "double":
 		return dataName + ".GetFloat64()"
 	default:
-		if strings.IndexByte(t.protoType(), '_') >= 0 {
+		if strings.ContainsRune(t.protoType(), '_') {
 			return dataName + ".GetObject() // " + t.protoType()
 		}
 	}
 	panic(fmt.Errorf("no dataGetter for %s (%#v)", t.protoType(), t))
-	return ""
 }
