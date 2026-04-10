@@ -79,6 +79,7 @@ func Main() error {
 	flagReplace := FS.StringLong("replace", "", "funcA=>funcB")
 	FS.IntVar(&oracall.MaxTableSize, 0, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
 	FS.StringVar(&dsn, 0, "connect", "", "connect to DB for retrieving function arguments")
+	flagPkgCacheDir := FS.StringLong("pkg-cache-dir", "", "directory for per-package JSON cache files")
 
 	var db *sql.DB
 
@@ -130,8 +131,23 @@ func Main() error {
 
 			var packages map[string]string
 			var annotations []oracall.Annotation
-			logger.Debug("parse", "db", db != nil, "pattern", pattern)
-			if db == nil {
+			logger.Debug("parse", "db", db != nil, "pkgCacheDir", *flagPkgCacheDir, "pattern", pattern)
+			switch {
+			case db != nil:
+				packages, functions, annotations, err = parseDB(ctx, db, pattern, *flagDump, *flagPkgCacheDir, filter)
+			case *flagPkgCacheDir != "":
+				// file -> memory: load from per-package cache files, no DB needed.
+				if pattern != "%" {
+					rPattern := regexp.MustCompile("(?i)" + strings.NewReplacer(
+						".", "[.]", "%", ".*",
+					).Replace(pattern))
+					filters = append(filters, func(s string) bool {
+						return rPattern.MatchString(s)
+					})
+				}
+				packages, functions, annotations, err = oracall.ParsePackageCaches(*flagPkgCacheDir, filter)
+			default:
+				// Legacy: read one big CSV from stdin.
 				if pattern != "%" {
 					rPattern := regexp.MustCompile("(?i)" + strings.NewReplacer(
 						".", "[.]", "%", ".*",
@@ -141,11 +157,9 @@ func Main() error {
 					})
 				}
 				functions, err = oracall.ParseCsvFile("", filter)
-			} else {
-				packages, functions, annotations, err = parseDB(ctx, db, pattern, *flagDump, filter)
 			}
 			if err != nil {
-				return fmt.Errorf("read %s: %w", args[0], err)
+				return fmt.Errorf("parse: %w", err)
 			}
 
 			logger.Debug("print", "print", *flagPrint, "functions", len(functions), "annotations", annotations, "packages", packages)
@@ -337,10 +351,33 @@ func Main() error {
 		},
 	}
 
+	FS = ff.NewFlagSet("update")
+	flagUpdatePkgCacheDir := FS.StringLong("pkg-cache-dir", "", "directory for per-package JSON cache files (required)")
+	updateCmd := ff.Command{Name: "update", Flags: FS,
+		Exec: func(ctx context.Context, args []string) error {
+			if *flagUpdatePkgCacheDir == "" {
+				return errors.New("--pkg-cache-dir is required for update")
+			}
+			if db == nil {
+				return errors.New("--connect is required for update")
+			}
+			pattern := "%"
+			if len(args) > 0 {
+				pattern = args[0]
+			}
+			if err := os.MkdirAll(*flagUpdatePkgCacheDir, 0775); err != nil {
+				return fmt.Errorf("mkdirAll %s: %w", *flagUpdatePkgCacheDir, err)
+			}
+			// Connect to DB, write per-package cache files, discard generated functions.
+			_, _, _, err := parseDB(ctx, db, pattern, "", *flagUpdatePkgCacheDir, nil)
+			return err
+		},
+	}
+
 	FS = ff.NewFlagSet("oracall")
 	FS.StringVar(&dsn, 0, "connect", "", "connect to DB for retrieving function arguments")
 	app := ff.Command{Name: "oracall", Flags: FS,
-		Subcommands: []*ff.Command{&callCmd, &genModelCmd},
+		Subcommands: []*ff.Command{&callCmd, &genModelCmd, &updateCmd},
 	}
 
 	if err := app.Parse(os.Args[1:]); err != nil {
@@ -396,7 +433,7 @@ func (t dbType) String() string {
 }
 
 func parseDB(
-	ctx context.Context, db *sql.DB, pattern, dumpFn string, filter func(string) bool,
+	ctx context.Context, db *sql.DB, pattern, dumpFn, pkgCacheDir string, filter func(string) bool,
 ) (
 	packages map[string]string, functions []oracall.Function, annotations []oracall.Annotation, err error,
 ) {
@@ -618,6 +655,11 @@ func parseDB(
 	var docsMu sync.Mutex
 	var replMu sync.Mutex
 	docs := make(map[string]string)
+	// pkgUAs buffers UserArguments per package for cache writing (used when pkgCacheDir != "").
+	var pkgUAs map[string][]oracall.UserArgument
+	if pkgCacheDir != "" {
+		pkgUAs = make(map[string][]oracall.UserArgument)
+	}
 	userArgs := make(chan oracall.UserArgument, 16)
 	grp.Go(func() error {
 		defer close(userArgs)
@@ -773,6 +815,9 @@ func parseDB(
 			}
 
 			userArgs <- ua
+			if pkgUAs != nil {
+				pkgUAs[ua.PackageName] = append(pkgUAs[ua.PackageName], ua)
+			}
 		}
 		return nil
 	})
@@ -802,6 +847,43 @@ func parseDB(
 		logger.Info("any", "has", docNames)
 	}
 	logger.Info("found", "annotations", annotations)
+
+	// Write per-package cache files if requested.
+	if pkgCacheDir != "" && len(pkgUAs) > 0 {
+		if err = os.MkdirAll(pkgCacheDir, 0775); err != nil {
+			return packages, functions, annotations, fmt.Errorf("mkdirAll %s: %w", pkgCacheDir, err)
+		}
+		for pkgName, uas := range pkgUAs {
+			pc := oracall.PackageCache{
+				PackageName: pkgName,
+				Arguments:   uas,
+			}
+			if len(uas) > 0 {
+				pc.LastDDL = uas[0].LastDDL
+			}
+			if packages != nil {
+				pc.Documentation = packages[pkgName]
+			}
+			pn := oracall.UnoCap(pkgName) + "."
+			for k, v := range docs {
+				if strings.HasPrefix(k, pn) {
+					if pc.FunctionDocs == nil {
+						pc.FunctionDocs = make(map[string]string)
+					}
+					pc.FunctionDocs[k] = v
+				}
+			}
+			for _, a := range annotations {
+				if a.Package == pkgName {
+					pc.Annotations = append(pc.Annotations, a)
+				}
+			}
+			if err = oracall.WritePackageCache(pkgCacheDir, pc); err != nil {
+				return packages, functions, annotations, fmt.Errorf("WritePackageCache %s: %w", pkgName, err)
+			}
+		}
+	}
+
 	return packages, functions, annotations, nil
 }
 
