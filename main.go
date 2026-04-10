@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -28,8 +27,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/UNO-SOFT/zlog/v2"
-	"github.com/go-json-experiment/json"
-	"github.com/go-json-experiment/json/jsontext"
 	"github.com/google/renameio/v2"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
@@ -68,7 +65,6 @@ func Main() error {
 	FS := ff.NewFlagSet("call")
 	FS.BoolVar(&oracall.SkipMissingTableOf, 0, "skip-missing-table-of", "skip functions with missing TableOf info")
 	flagDump := FS.StringLong("dump", "", "dump to this csv")
-	flagPrint := FS.StringLong("print", "", "print spec to this file - it will be json if extension is .json or is -:json")
 	flagBaseDir := FS.StringLong("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := FS.StringLong("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := FS.StringLong("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
@@ -85,7 +81,7 @@ func Main() error {
 	callCmd := ff.Command{Name: "call", Flags: FS,
 		Exec: func(ctx context.Context, args []string) error {
 			if *flagPbOut == "" {
-				if *flagDbOut == "" && *flagPrint == "" {
+				if *flagDbOut == "" {
 					return errors.New("-pb-out or -db-out is required")
 				}
 				*flagPbOut = *flagDbOut
@@ -129,13 +125,13 @@ func Main() error {
 				})
 			}
 
-			var packages map[string]string
+			// var packages map[string]string
 			var annotations []oracall.Annotation
 			logger.Debug("parse", "db", db != nil, "pkgCacheDir", *flagPkgCacheDir, "pattern", pattern)
 			switch {
 			case db != nil:
 				logger.Info("read from DB")
-				packages, functions, annotations, err = parseDB(ctx, db, pattern, *flagDump, *flagPkgCacheDir, filter)
+				_, functions, annotations, err = parseDB(ctx, db, pattern, *flagDump, *flagPkgCacheDir, filter)
 			case *flagPkgCacheDir != "":
 				logger.Info("read from", "cache", *flagPkgCacheDir)
 				// file -> memory: load from per-package cache files, no DB needed.
@@ -147,7 +143,7 @@ func Main() error {
 						return rPattern.MatchString(s)
 					})
 				}
-				packages, functions, annotations, err = oracall.ParsePackageCaches(ctx, *flagPkgCacheDir, filter)
+				_, functions, annotations, err = oracall.ParsePackageCaches(ctx, *flagPkgCacheDir, filter)
 			default:
 				// Legacy: read one big CSV from stdin.
 				if pattern != "%" {
@@ -162,28 +158,6 @@ func Main() error {
 			}
 			if err != nil {
 				return fmt.Errorf("parse: %w", err)
-			}
-
-			logger.Debug("print", "print", *flagPrint, "functions", len(functions), "annotations", annotations, "packages", packages)
-			if *flagPrint != "" {
-				fh := io.WriteCloser(os.Stdout)
-				fhClose := fh.Close
-				isJSON := *flagPrint == "-:json" || strings.HasSuffix(*flagPrint, ".json")
-				if *flagPrint != "-" && *flagPrint != "-:json" {
-					pf, err := renameio.NewPendingFile(*flagPrint)
-					if err != nil {
-						return err
-					}
-					defer pf.Cleanup()
-					fh, fhClose = pf, pf.CloseAtomicallyReplace
-				}
-				defer fhClose()
-				if err := printTo(fh, packages, functions, isJSON); err != nil {
-					return err
-				}
-				if err = fhClose(); err != nil {
-					return err
-				}
 			}
 
 			defer os.Stdout.Sync()
@@ -871,13 +845,14 @@ func parseDB(
 			if packages != nil {
 				pc.Documentation = packages[pkgName]
 			}
-			pn := oracall.UnoCap(pkgName) + "."
+			pn := pkgName + "."
 			for k, v := range docs {
+				k = strings.ToUpper(k)
 				if fn, ok := strings.CutPrefix(k, pn); ok {
-					f, ok := pc.Functions[strings.ToUpper(fn)]
+					f, ok := pc.Functions[fn]
 					if ok {
 						f.Documentation = v
-						pc.Functions[k] = f
+						pc.Functions[fn] = f
 					} else {
 						logger.Warn("no function", "fn", fn)
 					}
@@ -1091,150 +1066,6 @@ func expandArgs(ctx context.Context, plus []dbType, resolveTypeShort func(ctx co
 		}
 	}
 	return plus, nil
-}
-
-type (
-	pkg struct {
-		LastDDL       time.Time
-		Documentation string
-	}
-
-	argument struct{ a oracall.Argument }
-	function struct{ f oracall.Function }
-)
-
-func (a argument) MarshalJSONTo(enc *jsontext.Encoder) error {
-	W := func(k string, v any) { enc.WriteToken(jsontext.String(k)); json.MarshalEncode(enc, v) }
-	enc.WriteToken(jsontext.BeginObject)
-	if a.a.Documentation != "" {
-		W("Documentation", a.a.Documentation)
-	}
-	if a.a.TableOf != nil {
-		W("TableOf", a.a.TableOf.OracleName())
-	} else if len(a.a.RecordOf) != 0 {
-		enc.WriteToken(jsontext.String("RecordOf"))
-		enc.WriteToken(jsontext.BeginArray)
-		for _, a := range a.a.RecordOf {
-			json.MarshalEncode(enc, a)
-		}
-		enc.WriteToken(jsontext.EndArray)
-	} else {
-		W("Type", a.a.Type)
-		W("TypeName", a.a.TypeName)
-		W("AbsType", a.a.AbsType)
-		W("Charset", a.a.Charset)
-		W("IndexBy", a.a.IndexBy)
-		W("Charlength", a.a.Charlength)
-		W("Flavor", a.a.Flavor)
-		W("Preciion", a.a.Precision)
-		W("Scale", a.a.Scale)
-	}
-	return enc.WriteToken(jsontext.EndObject)
-}
-
-func (f function) MarshalJSONTo(enc *jsontext.Encoder) error {
-	W := func(k string, v any) { enc.WriteToken(jsontext.String(k)); json.MarshalEncode(enc, v) }
-	enc.WriteToken(jsontext.BeginObject)
-	W("Package", f.f.Package)
-	W("Name", f.f.Name())
-	W("RealName", f.f.RealName())
-	if f.f.Replacement != nil {
-		W("Replacement", f.f.Replacement.Name())
-		if f.f.ReplacementIsJSON {
-			W("ReplacementIsJSON", true)
-		}
-	}
-	if f.f.Returns != nil {
-		W("Returns", f.f.Returns.Type)
-	}
-	if f.f.Documentation != "" {
-		W("Documentation", f.f.Documentation)
-	}
-	if len(f.f.Args) != 0 {
-		enc.WriteToken(jsontext.String("Args"))
-		enc.WriteToken(jsontext.BeginObject)
-		for _, a := range f.f.Args {
-			W(a.Name, a.OracleName())
-		}
-		enc.WriteToken(jsontext.EndObject)
-	}
-	if len(f.f.Tag) != 0 {
-		W("Tag", f.f.Tag)
-	}
-	return enc.WriteToken(jsontext.EndObject)
-}
-
-func printTo(w io.Writer, packages map[string]string, functions []oracall.Function, isJSON bool) error {
-	bw := bufio.NewWriter(w)
-	defer bw.Flush()
-	if isJSON {
-		pp := make(map[string]pkg, len(packages))
-		for k, v := range packages {
-			pp[k] = pkg{Documentation: v}
-		}
-		tt := make(map[string]argument)
-		var add func(t *oracall.Argument)
-		add = func(t *oracall.Argument) {
-			if t == nil {
-				return
-			}
-			if t.TableOf != nil {
-				tt[t.PlsType.String()] = argument{a: *t}
-				add(t.TableOf)
-			} else if len(t.RecordOf) != 0 {
-				tt[t.PlsType.String()] = argument{a: *t}
-				for _, a := range t.RecordOf {
-					add(a.Argument)
-				}
-			}
-		}
-		ff := make([]function, len(functions))
-		for i, f := range functions {
-			p := pp[f.Package]
-			if p.LastDDL.Before(f.LastDDL) {
-				p.LastDDL = f.LastDDL
-			}
-			pp[f.Package] = p
-			ff[i] = function{f: f}
-			if f.Returns != nil {
-				add(f.Returns)
-			}
-			for _, a := range f.Args {
-				add(&a)
-			}
-		}
-		if err := json.MarshalWrite(bw, struct {
-			Packages  map[string]pkg      `json:",omitempty"`
-			Functions []function          `json:",omitempty"`
-			Types     map[string]argument `json:",omitempty"`
-		}{
-			Packages:  pp,
-			Functions: ff,
-			Types:     tt,
-		}); err != nil {
-			return err
-		}
-	} else {
-		for _, f := range functions {
-			fmt.Fprintf(bw, "\n# %s\n%s\n", f.RealName(), f.Documentation)
-			fmt.Fprintln(bw, "\n## Input")
-			for _, a := range f.Args {
-				if !a.IsInput() {
-					continue
-				}
-				fmt.Fprintf(bw, "  - %s - %s\n", a.Name, a.TypeString("  ", "  "))
-			}
-			fmt.Fprintln(bw, "\n## Output")
-			for _, a := range f.Args {
-				if !a.IsOutput() {
-					continue
-				}
-				fmt.Fprintf(bw, "  - %s - %s\n", a.Name, a.TypeString("  ", "  "))
-			}
-			bw.WriteString("\n")
-		}
-	}
-	return bw.Flush()
 }
 
 // vim: set fileencoding=utf-8 noet:
