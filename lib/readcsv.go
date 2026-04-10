@@ -85,6 +85,7 @@ func filterArgs(userArgs iter.Seq[UserArgument], filter func(string) bool) iter.
 	return func(yield func(UserArgument) bool) {
 		for ua := range userArgs {
 			if filter != nil && !filter(ua.PackageName+"."+ua.ObjectName) {
+				logger.Debug("SKIP", "pkg", ua.PackageName, "obj", ua.ObjectName)
 				continue
 			}
 			if !yield(ua) {
@@ -321,7 +322,8 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 	var row int
 	for uas := range userArgs {
 		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
-			filter != nil && !filter(ua.ObjectName) {
+			filter != nil && !filter(ua.ObjectName) && !filter(ua.PackageName+"."+ua.ObjectName) {
+			logger.Debug("SKIP", "pkg", ua.PackageName, "obj", ua.ObjectName)
 			continue
 		}
 

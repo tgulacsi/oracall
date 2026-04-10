@@ -33,6 +33,7 @@ require (
 	github.com/dgryski/go-linebreak v0.0.0-20180812204043-d8f37254e7d3 // indirect
 	github.com/go-logfmt/logfmt v0.6.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/mfridman/buildversion v0.3.0 // indirect
 	github.com/mfridman/protoc-gen-go-json v1.5.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
