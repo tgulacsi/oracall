@@ -6,8 +6,11 @@ package oracall
 
 import (
 	"context"
+	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -146,8 +149,10 @@ func ParsePackageCaches(ctx context.Context, dir string, filter func(string) boo
 		// Attach per-function docs.
 		for i, f := range fns {
 			if f.Documentation == "" {
-				if d := pc.Functions[f.Name()].Documentation; d != "" {
+				if d := pc.Functions[f.name].Documentation; d != "" {
 					fns[i].Documentation = d
+				} else if logger.Enabled(ctx, slog.LevelDebug) {
+					logger.Warn("no documentation", "for", f.Name(), "have", slices.Collect(maps.Keys(pc.Functions)))
 				}
 			}
 		}

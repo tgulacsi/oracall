@@ -6,9 +6,11 @@ package oracall
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -22,13 +24,11 @@ var NumberAsString bool
 
 //go:generate sh ./download-protoc.sh
 //go:generate go install github.com/golang/protobuf/protoc-gen-go@latest
-// go : generate go get -u github.com/gogo/protobuf/protoc-gen-gogofast
-// go : generate go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
 //go:generate go install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@latest
 
 // build: protoc --go_out=. --go-grpc_out=. my.proto
 
-func SaveProtobuf(dst io.Writer, functions []Function, pkg, path string) error {
+func SaveProtobuf(ctx context.Context, dst io.Writer, functions []Function, pkg, path string) error {
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
@@ -82,6 +82,8 @@ FunLoop:
 		var comment string
 		if fun.Documentation != "" {
 			comment = asComment(fun.Documentation, "")
+		} else if logger.Enabled(ctx, slog.LevelDebug) {
+			logger.Warn("missing documentation", "function", fun.name)
 		}
 		if len(fun.Tag) == 0 {
 			tags.Reset()

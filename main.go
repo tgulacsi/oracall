@@ -262,7 +262,7 @@ func Main() error {
 					if err != nil {
 						return fmt.Errorf("create proto: %w", err)
 					}
-					err = oracall.SaveProtobuf(fh, functions, pbPkg, pbPath)
+					err = oracall.SaveProtobuf(ctx, fh, functions, pbPkg, pbPath)
 					if closeErr := fh.Close(); closeErr != nil && err == nil {
 						err = closeErr
 					}
