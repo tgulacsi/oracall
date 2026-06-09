@@ -121,7 +121,7 @@ func ParsePackageCaches(ctx context.Context, dir string, filter func(string) boo
 	packages = make(map[string]string, len(pkgNames))
 	for _, pkgName := range pkgNames {
 		if filter != nil && !filter(pkgName+".") {
-			logger.Info("SKIP", "pkgName", pkgName)
+			logger.Debug("SKIP", "pkgName", pkgName)
 			continue
 		}
 		pc, err := ReadPackageCache(ctx, dir, pkgName)
