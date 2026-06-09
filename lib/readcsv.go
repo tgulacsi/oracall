@@ -1,4 +1,4 @@
-// Copyright 2019, 2021 Tamás Gulácsi
+// Copyright 2019, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -85,7 +85,7 @@ func filterArgs(userArgs iter.Seq[UserArgument], filter func(string) bool) iter.
 	return func(yield func(UserArgument) bool) {
 		for ua := range userArgs {
 			if filter != nil && !filter(ua.PackageName+"."+ua.ObjectName) {
-				logger.Debug("SKIP", "pkg", ua.PackageName, "obj", ua.ObjectName)
+				// logger.Debug("SKIP", "pkg", ua.PackageName, "obj", ua.ObjectName)
 				continue
 			}
 			if !yield(ua) {
@@ -159,7 +159,6 @@ func OpenCsv(filename string) (*os.File, error) {
 func MustOpenCsv(filename string) *os.File {
 	fh, err := OpenCsv(filename)
 	if err != nil {
-		logger.Error("MustOpenCsv", "file", filename, "error", err)
 		panic(fmt.Errorf("%s: %w", filename, err))
 	}
 	return fh
@@ -275,7 +274,7 @@ func NewUACsvReader(r io.Reader) iter.Seq2[UserArgument, error] {
 			csvFields[h] = idx
 		}
 	}
-	logger.Info("field order", "fields", csvFields)
+	// logger.Info("field order", "fields", csvFields)
 
 	return func(yield func(UserArgument, error) bool) {
 		for pos := uint(0); ; pos++ {
@@ -323,7 +322,7 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 	for uas := range userArgs {
 		if ua := uas[0]; ua.ObjectName[len(ua.ObjectName)-1] == '#' || //hidden
 			filter != nil && !filter(ua.ObjectName) && !filter(ua.PackageName+"."+ua.ObjectName) {
-			logger.Debug("SKIP", "pkg", ua.PackageName, "obj", ua.ObjectName)
+			// logger.Debug("SKIP", "pkg", ua.PackageName, "obj", ua.ObjectName)
 			continue
 		}
 
@@ -354,7 +353,7 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 				ua.DataScale,
 				ua.CharLength,
 			)
-			logger.Debug("ParseArgument", "level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
+			// logger.Debug("ParseArgument", "level", level, "fun", fun.name, "arg", arg.Name, "type", ua.DataType, "last", lastArgs, "flavor", arg.Flavor, "typeName", typeName, "ua", ua, "arg", arg, "typeSub", ua.TypeSubname, "pls", ua.PlsType)
 			// Possibilities:
 			// 1. SIMPLE
 			// 2. RECORD at level 0
@@ -370,7 +369,6 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 			}
 			parent := lastArgs[level-1]
 			if parent == nil {
-				logger.Info("parent is nil", "level", level, "lastArgs", lastArgs, "fun", fun)
 				panic(fmt.Sprintf("parent is nil, at level=%d, lastArgs=%v, fun=%v", level, lastArgs, fun))
 			}
 			if parent.Flavor == FLAVOR_TABLE {
@@ -386,7 +384,7 @@ func ParseArgumentsIter(userArgs iter.Seq[[]UserArgument], filter func(string) b
 		functions = append(functions, fun)
 		names = append(names, fun.Name())
 	}
-	logger.Info("found", "functions", names)
+	// logger.Info("found", "functions", names)
 	return functions
 }
 
@@ -476,24 +474,24 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 		switch a.Type {
 		case "private":
 			nm := L(a.FullName())
-			logger.Info("directive", "private", nm)
+			// logger.Info("directive", "private", nm)
 			delete(funcs, nm)
 		case "rename":
 			nm := L(a.FullName())
 			if f := funcs[nm]; f != nil {
 				delete(funcs, nm)
 				funcs[L(a.FullOther())] = f
-				logger.Info("directive", "rename", nm, "to", a.Other)
+				// logger.Info("directive", "rename", nm, "to", a.Other)
 				f.alias = a.Other
 			}
 		case "replace", "replace_json":
 			k, v := L(a.FullName()), L(a.FullOther())
 			if f := funcs[k]; f != nil {
-				logger.Info("directive", "replace", k, "with", v)
+				// logger.Info("directive", "replace", k, "with", v)
 				f.Replacement = funcs[v]
 				f.ReplacementIsJSON = a.Type == "replace_json"
 				delete(funcs, v)
-				logger.Info("directive", "delete", v, "add", f.Name())
+				// logger.Info("directive", "delete", v, "add", f.Name())
 				funcs[L(f.Name())] = f
 			}
 
@@ -508,7 +506,7 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 
 		case "max-table-size":
 			nm := L(a.FullName())
-			logger.Info("directive", "max-table-size", nm, "size", a.Size)
+			// logger.Info("directive", "max-table-size", nm, "size", a.Size)
 			if f := funcs[nm]; f != nil && a.Size >= f.maxTableSize {
 				f.maxTableSize = a.Size
 			}
@@ -517,9 +515,9 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 			nm := L(a.FullName())
 			if f := funcs[nm]; f != nil {
 				f.Tag = append(f.Tag, a.Other)
-				logger.Info("directive", "f", nm, "tag", f.Tag)
+				// logger.Info("directive", "f", nm, "tag", f.Tag)
 			} else {
-				logger.Warn("no function for tag", "name", nm, "tag", a.Other, "have", funcs)
+				// logger.Warn("no function for tag", "name", nm, "tag", a.Other, "have", funcs)
 			}
 		}
 	}
@@ -527,9 +525,11 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 	for _, f := range funcs {
 		functions = append(functions, *f)
 	}
-	for _, f := range functions {
-		if len(f.Tag) != 0 {
-			logger.Info("ApplyAnnotations", "f", f.name, "tag", f.Tag)
+	if false {
+		for _, f := range functions {
+			if len(f.Tag) != 0 {
+				// logger.Info("ApplyAnnotations", "f", f.name, "tag", f.Tag)
+			}
 		}
 	}
 	return functions

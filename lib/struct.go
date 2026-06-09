@@ -10,15 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/UNO-SOFT/zlog/v2/slog"
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 )
-
-// Log is discarded by default.
-var logger *slog.Logger
-
-func SetLogger(lgr *slog.Logger) { logger = lgr }
 
 const (
 	MarkNull = "\u2400" // 0x2400 = nul

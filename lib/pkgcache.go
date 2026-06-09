@@ -102,7 +102,6 @@ func ListPackageCaches(dir string) ([]string, error) {
 			names = append(names, bn)
 		}
 	}
-	logger.Debug("ListPackageCaches", "dir", dir, "names", names)
 	return names, nil
 }
 
@@ -113,6 +112,7 @@ func ParsePackageCaches(ctx context.Context, dir string, filter func(string) boo
 	annotations []Annotation,
 	err error,
 ) {
+	logger := zlog.SFromContext(ctx)
 	pkgNames, err := ListPackageCaches(dir)
 	if err != nil {
 		logger.Error("ListPackageCaches", "error", err)

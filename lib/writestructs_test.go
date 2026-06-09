@@ -1,4 +1,4 @@
-// Copyright 2015, 2021 Tamás Gulácsi
+// Copyright 2015, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -21,7 +21,8 @@ import (
 var flagKeep = flag.Bool("keep", false, "keep temp files")
 
 func TestWriteStruct(t *testing.T) {
-	logger = zlog.NewT(t).SLog()
+	logger := zlog.NewT(t).SLog()
+	ctx := zlog.NewSContext(t.Context(), logger)
 	var (
 		dn, fn string
 		keep   = *flagKeep
@@ -55,7 +56,7 @@ func TestWriteStruct(t *testing.T) {
 			t.Skipf("cannot create temp file in %q: %v", dn, err)
 			return
 		}
-		err = SaveFunctions(fh, functions, "main", "unosoft.hu/ws/bruno/pb", true)
+		err = SaveFunctions(ctx, fh, functions, "main", "unosoft.hu/ws/bruno/pb", true)
 		if err != nil {
 			_ = fh.Close()
 			t.Errorf("%d. Saving functions: %v", i, err)

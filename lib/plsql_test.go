@@ -1,4 +1,4 @@
-// Copyright 2015, 2023 Tamás Gulácsi
+// Copyright 2015, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,12 +7,10 @@ package oracall
 import (
 	"testing"
 
-	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/kylelemons/godebug/diff"
 )
 
 func TestOne(t *testing.T) {
-	logger = zlog.NewT(t).SLog()
 	for i, tc := range testCases {
 		functions := tc.ParseCsv(t, i)
 		got, _ := functions[0].PlsqlBlock("")

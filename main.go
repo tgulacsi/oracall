@@ -51,8 +51,6 @@ var (
 )
 
 func main() {
-	godror.SetLogger(logger)
-	oracall.SetLogger(logger.WithGroup("oracall"))
 	if err := Main(); err != nil {
 		logger.Error("ERROR", "error", err)
 		os.Exit(1)
@@ -223,6 +221,7 @@ func Main() error {
 						pbPath = ""
 					}
 					if err := oracall.SaveFunctions(
+						ctx,
 						out, functions,
 						dbPkg, pbPath, false,
 					); err != nil {

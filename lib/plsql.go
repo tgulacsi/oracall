@@ -1,4 +1,4 @@
-// Copyright 2013, 2022 Tamás Gulácsi
+// Copyright 2013, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -32,7 +32,7 @@ const batchSize = 1024
 func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	decls, pre, call, post, convIn, convOut, err := fun.prepareCall()
 	if err != nil {
-		logger.Error("error preparing", "function", fun, "error", err)
+		// logger.Error("error preparing", "function", fun, "error", err)
 		panic(fmt.Errorf("%s: %w", fun.Name(), err))
 	}
 	fn := fun.name
@@ -141,7 +141,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 
 	i := strings.Index(call, fun.RealName())
 	if i < 0 {
-		logger.Info("not found", "name", fun.RealName(), "in", call)
+		slog.Info("not found", "name", fun.RealName(), "in", call)
 	}
 	j := i + strings.Index(call[i:], ")") + 1
 	fmt.Fprintf(callBuf, `
@@ -301,7 +301,7 @@ func demap(plsql, callFun string) (string, string) {
 					}
 					arr := paramsMap[key]
 					if len(arr) == 0 {
-						logger.Info("paramsIdx", "key", key, "val", arr, "map", paramsMap)
+						slog.Info("paramsIdx", "key", key, "val", arr, "map", paramsMap)
 					}
 					i = arr[0]
 					if len(arr) > 1 {
@@ -365,7 +365,7 @@ func demap(plsql, callFun string) (string, string) {
 		old := prev[idx]
 		if old == "" {
 			fmt.Fprintf(callBuf, "params[%d] = params[%d]  // %s\n", v.New, v.Old, v.Name)
-			logger.Error("plusIdx", "v", v, "error", fmt.Errorf("cannot find %q in %+v", idx, prev))
+			slog.Error("plusIdx", "v", v, "error", fmt.Errorf("cannot find %q in %+v", idx, prev))
 		} else {
 			if !strings.HasPrefix(old, "sql.Out{") {
 				if old[0] != '&' {
@@ -554,7 +554,6 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
 				if arg.IsInput() {
-					logger.Info("cannot use IN cursor variables", "arg", arg)
 					panic(fmt.Sprintf("cannot use IN cursor variables (%v)", arg))
 				}
 				name := (CamelCase(arg.Name))
@@ -720,12 +719,10 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 						}
 					}
 				default:
-					logger.Info("Only table of simple or record types are allowed (no table of table!)", "function", fun.Name(), "arg", arg.Name)
 					panic(fmt.Errorf("only table of simple or record types are allowed (no table of table!) - %s(%v)", fun.Name(), arg.Name))
 				}
 			}
 		default:
-			logger.Info("unkown flavor", "flavor", arg.Flavor)
 			panic(fmt.Errorf("unknown flavor %s(%v)", fun.Name(), arg.Name))
 		}
 	}

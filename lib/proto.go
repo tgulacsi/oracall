@@ -1,4 +1,4 @@
-// Copyright 2019, 2021 Tamás Gulácsi
+// Copyright 2019, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/UNO-SOFT/zlog/v2"
 	fstructs "github.com/fatih/structs"
 )
 
@@ -29,6 +30,7 @@ var NumberAsString bool
 // build: protoc --go_out=. --go-grpc_out=. my.proto
 
 func SaveProtobuf(ctx context.Context, dst io.Writer, functions []Function, pkg, path string) error {
+	logger := zlog.SFromContext(ctx)
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
@@ -231,7 +233,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 				}
 			}
 			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, subArgs...); err != nil {
-				logger.Error("protoWriteMessageTyp", "error", err)
+				// logger.Error("protoWriteMessageTyp", "error", err)
 				return err
 			}
 		}

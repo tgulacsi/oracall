@@ -1,4 +1,4 @@
-// Copyright 2015, 2021 Tamás Gulácsi
+// Copyright 2015, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,7 +14,8 @@ import (
 )
 
 func TestQuery078(t *testing.T) {
-	logger = zlog.NewT(t).SLog()
+	logger := zlog.NewT(t).SLog()
+	ctx := zlog.NewSContext(t.Context(), logger)
 	functions, err := ParseCsv(strings.NewReader(query078Csv), nil)
 	if err != nil {
 		t.Errorf("error parsing csv: %v", err)
@@ -41,7 +42,7 @@ func TestQuery078(t *testing.T) {
 	t.Log(buf.String())
 
 	buf.Reset()
-	err = SaveFunctions(&buf, functions[:1], "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true)
+	err = SaveFunctions(ctx, &buf, functions[:1], "DB_spoolsys3", "unosoft.hu/ws/aeg/pb", true)
 	t.Log(buf.String())
 	if err != nil {
 		t.Error(err)

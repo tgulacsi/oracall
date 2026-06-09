@@ -1,4 +1,4 @@
-// Copyright 2013, 2022 Tamás Gulácsi
+// Copyright 2013, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,6 +6,7 @@ package oracall
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"go/format"
@@ -17,12 +18,15 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/UNO-SOFT/zlog/v2"
 )
 
 var ErrMissingTableOf = errors.New("missing TableOf info")
 var ErrInvalidArgument = errors.New("invalid argument")
 
-func SaveFunctions(dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool) error {
+func SaveFunctions(ctx context.Context, dst io.Writer, functions []Function, pkg, pbImport string, saveStructs bool) error {
+	logger := zlog.SFromContext(ctx)
 	var err error
 	w := errWriter{Writer: dst, err: &err}
 
@@ -586,7 +590,6 @@ func genChecks(checks []string, arg Argument, base string, parentIsTable bool) [
 			checks = append(checks, "}")
 		}
 	default:
-		logger.Info("unknown flavor", "flavor", arg.Flavor)
 		panic(fmt.Errorf("unknown flavor %v", arg.Flavor))
 	}
 	return checks
@@ -700,7 +703,7 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 
 	// FLAVOR_RECORD
 	if false && arg.TypeName == "" {
-		logger.Info("arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
+		// logger.Info("arg has no TypeName", "arg", arg, "arg", fmt.Sprintf("%#v", arg))
 		arg.TypeName = strings.ToLower(arg.Name)
 	}
 	return "*" + typName, nil
