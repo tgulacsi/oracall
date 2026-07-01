@@ -1,7 +1,7 @@
 //go:build posix || linux || !windows
 // +build posix linux !windows
 
-// Copyright 2019, 2021 Tamás Gulácsi
+// Copyright 2019, 2026 Tamás Gulácsi
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -36,11 +36,13 @@ func Mmap(f *os.File) ([]byte, error) {
 		return p, err
 	}
 
-	runtime.SetFinalizer(&p, func(p *[]byte) {
-		if p != nil {
-			syscall.Munmap(*p)
-		}
-	})
+	runtime.AddCleanup(
+		&p,
+		func(p []byte) {
+			syscall.Munmap(p)
+		},
+		p,
+	)
 
 	return p, nil
 }
