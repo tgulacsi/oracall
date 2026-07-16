@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -151,9 +152,9 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				if err = jenc.Encode(req); err != nil {
 					logger.Error("marshal", "req", req, "error", err)
 				}
-				logger = logger.With("request", ht.String())
+				reqS := stripJSON(ht.String(), "p_jelszo")
 				if logger.Enabled(ctx, slog.LevelDebug) {
-					logger.Debug("marshaled")
+					logger.Debug("marshaled", "request", reqS)
 				}
 
 				// Fill PArgsHidden
@@ -173,11 +174,12 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				ht.Reset()
 				if jErr := jenc.Encode(res); jErr != nil {
 					fmt.Fprintf(ht, ": %+v", res)
-					logger.Error("marshal", "response", ht.String(), "error", jErr)
+					logger.Error("marshal", "request", reqS, "response", ht.String(), "error", jErr)
 				}
 				lvl := slog.LevelInfo
 				if err != nil {
 					lvl = slog.LevelError
+					logger = logger.With("request", reqS)
 				}
 				logger.Log(ctx, lvl, "handled", "response", ht.String(),
 					"dur", dur.String(), "error", err)
@@ -231,4 +233,14 @@ func ContextGetReqID(ctx context.Context) string {
 }
 func NewULID() string {
 	return ulid.MustNew(ulid.Now(), ulid.DefaultEntropy()).String()
+}
+
+func stripJSON(s, k string) string {
+	if i := strings.Index(s, `"`+k+`":"`); i >= 0 {
+		off := i + 1 + len(k) + 3
+		if j := strings.IndexByte(s[off:], '"'); j >= 0 {
+			return s[:off] + strings.Repeat("*", j) + s[off+j:]
+		}
+	}
+	return s
 }
