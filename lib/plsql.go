@@ -39,7 +39,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	if fun.alias != "" {
 		fn = fun.alias
 	}
-	fn = strings.Replace(fn, ".", "__", -1)
+	fn = strings.ReplaceAll(fn, ".", "__")
 
 	plsBuf := Buffers.Get()
 	defer Buffers.Put(plsBuf)
@@ -149,7 +149,7 @@ func (fun Function) PlsqlBlock(checkName string) (plsql, callFun string) {
 	defer cancel()
 	var tx *sql.Tx
 	if tx, err = s.db.BeginTx(ctx, nil); err != nil {
-		return 
+		return
 	}
 	defer tx.Rollback()
 	ctx = godror.ContextWithTraceTag(ctx, godror.TraceTag{Module: %q, Action: %q})
@@ -171,6 +171,14 @@ if DebugLevel > 0 {
 			aS = "65536"
 		}
 	}
+	var hasPassword bool
+	for _, arg := range fun.Args {
+		if !hasPassword && arg.IsInput() {
+			if hasPassword = strings.HasSuffix(strings.TrimPrefix(strings.ToLower(arg.Name), "p_"), "jelszo"); hasPassword {
+				break
+			}
+		}
+	}
 
 	callBuf.WriteString(`
 	if s.PrepareHook != nil { if err = s.PrepareHook(ctx, funName, &qry, &params); err != nil { return } }
@@ -188,8 +196,14 @@ if DebugLevel > 0 {
 			logger.Error("dbLog", "fun", funName, "error", err)
 		}
 	}
-	logger.Info( "calling", "fun", funName, "input", input, "stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
-	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(` + aS + `))...)
+	logger.Info( "calling", "fun", funName, `)
+	if !hasPassword {
+		callBuf.WriteString(`"input", input, `)
+	}
+	callBuf.WriteString(`"stmt", stmtP, "deadline", dl.UTC().Format(time.RFC3339))
+	_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(`)
+	callBuf.WriteString(aS)
+	callBuf.WriteString(`))...)
 	logger.Info( "finished", "fun", funName, "stmt", stmtP, "error", err)
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -197,7 +211,9 @@ if DebugLevel > 0 {
 		}
 		if c, ok := err.(interface{ Code() int }); ok && c.Code() == 4068 {
 			// "existing state of packages has been discarded"
-			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(` + aS + `))...)
+			_, err = stmt.ExecContext(ctx, append(params, godror.PlSQLArrays, godror.ArraySize(`)
+	callBuf.WriteString(aS)
+	callBuf.WriteString(`))...)
 		}
 		if err != nil {
 			qe := oracall.NewQueryError(qry, fmt.Errorf("%v: %w", params, err))
@@ -549,7 +565,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 				}
 				convIn, convOut = v.getConvRec(convIn, convOut,
 					name, addParam(tmp),
-					0, arg, k, maxTableSize)
+					maxTableSize)
 			}
 		case FLAVOR_TABLE:
 			if arg.Type == "REF CURSOR" {
@@ -688,7 +704,7 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 							[2]string{aname, kName},
 							addParam(tmp),
 							uint(maxTableSize),
-							k, *arg.TableOf)
+							*arg.TableOf)
 
 						if arg.IsInput() {
 							if arg.IsNestedTable() {
@@ -732,7 +748,8 @@ func (fun Function) prepareCall() (decls, pre []string, call string, post []stri
 	if fun.Returns != nil {
 		callb.WriteString(":ret := ")
 	}
-	callb.WriteString(fun.RealName() + "(")
+	callb.WriteString(fun.RealName())
+	callb.WriteString("(")
 	for i, arg := range fun.Args {
 		if i > 0 {
 			callb.WriteString(",\n\t\t")
@@ -883,7 +900,7 @@ func (arg Argument) getConvRefCursor(
 	convOut = append(convOut, fmt.Sprintf(`
 	{
 		rset := *(%s.(sql.Out).Dest.(*driver.Rows))
-		if rset != nil { 
+		if rset != nil {
 			defer rset.Close()
 			iterators = append(iterators, iterator{
 				Reset: func() { output.%s = output.%s[:0] },
@@ -991,9 +1008,6 @@ func (arg Argument) getFromRset(rsetRow string) string {
 func (arg Argument) getConvRec(
 	convIn, convOut []string,
 	name, paramName string,
-	tableSize uint,
-	parentArg Argument,
-	key string,
 	maxTableSize int,
 ) ([]string, []string) {
 
@@ -1036,7 +1050,6 @@ func (arg Argument) getConvTableRec(
 	name [2]string,
 	paramName string,
 	tableSize uint,
-	key string,
 	parent Argument,
 ) ([]string, []string) {
 	absName := "x__" + name[0] + "__" + name[1]
