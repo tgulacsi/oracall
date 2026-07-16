@@ -11,7 +11,7 @@ func TestStripJSON(t *testing.T) {
 		`{"p_login_nev":"b1000392","p_jelszo":"LTeZMyQG6M4znBePYHHN","p_addr":"CALLER_SYSTEM__"}`: `{"p_login_nev":"b1000392","p_jelszo":"********************","p_addr":"CALLER_SYSTEM__"}`,
 		`{"p_login_nev":"b1000392","password":"LTeZMyQG6M4znBePYHHN","p_addr":"CALLER_SYSTEM__"}`: `{"p_login_nev":"b1000392","password":"LTeZMyQG6M4znBePYHHN","p_addr":"CALLER_SYSTEM__"}`,
 	} {
-		if got := stripJSON(in, "p_jelszo"); got != want {
+		if got := StripJSON(in, "p_jelszo"); got != want {
 			t.Errorf("got %s,\n wanted\n %s", got, want)
 		}
 	}

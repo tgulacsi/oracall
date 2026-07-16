@@ -152,7 +152,7 @@ func GRPCServer(globalCtx context.Context, logger *slog.Logger, verbose bool, ch
 				if err = jenc.Encode(req); err != nil {
 					logger.Error("marshal", "req", req, "error", err)
 				}
-				reqS := stripJSON(ht.String(), "p_jelszo")
+				reqS := StripJSON(ht.String(), "p_jelszo")
 				if logger.Enabled(ctx, slog.LevelDebug) {
 					logger.Debug("marshaled", "request", reqS)
 				}
@@ -235,7 +235,9 @@ func NewULID() string {
 	return ulid.MustNew(ulid.Now(), ulid.DefaultEntropy()).String()
 }
 
-func stripJSON(s, k string) string {
+// StripJSON strips the given json tag's value (replaces with stars).
+// It's a poor man's password leak plug.
+func StripJSON(s, k string) string {
 	if i := strings.Index(s, `"`+k+`":"`); i >= 0 {
 		off := i + 1 + len(k) + 3
 		if j := strings.IndexByte(s[off:], '"'); j >= 0 {
