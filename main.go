@@ -437,7 +437,6 @@ func parseDB(
 		Time     time.Time
 		Subtypes map[string]map[string]string
 	}
-	var pkgsMu sync.Mutex
 	pkgs := make(map[string]*pkgTimeSubtype)
 	for rows.Next() {
 		var nm string
@@ -451,9 +450,8 @@ func parseDB(
 			if err != nil {
 				return fmt.Errorf("getSubtypes(%s): %w", nm, err)
 			}
-			pkgsMu.Lock()
+			// logger.Debug("subtypes", "pkg", nm, "m", sTypes)
 			pts.Subtypes = sTypes
-			pkgsMu.Unlock()
 			return nil
 		})
 	}
@@ -791,8 +789,10 @@ func parseDB(
 			if row.Subname != "" {
 				ua.TypeSubname = row.Subname
 			}
-			if ua.TypeSubname == "" {
-				ua.TypeSubname = pkg.Subtypes[ua.ObjectName][ua.ArgumentName]
+			if ua.PlsType == "" || ua.PlsType == ua.DataType {
+				if t := pkg.Subtypes[ua.ObjectName][ua.ArgumentName]; t != "" {
+					ua.PlsType = t
+				}
 			}
 			if row.Link != "" {
 				ua.TypeLink = row.Link
@@ -938,7 +938,7 @@ func getSubtypes(ctx context.Context, tx queryExecer, packageName string) (map[s
 	if _, err := tx.ExecContext(ctx, alterQry); err != nil {
 		return nil, fmt.Errorf("%s: %w", alterQry, err)
 	}
-	const qry = `SELECT B.object_name, C.name, B.name
+	const qry = `SELECT C.name, B.name, A.name
   FROM user_identifiers A
     INNER JOIN user_identifiers B ON B.declared_object_type = A.declared_object_type AND B.object_type = A.object_type AND B.object_name = A.object_name AND B.usage_id = A.usage_context_id
     INNER JOIN user_identifiers C ON C.declared_object_type = A.declared_object_type AND C.object_name = B.object_name AND C.object_type = B.object_type AND C.usage_id = B.usage_context_id
@@ -959,6 +959,7 @@ func getSubtypes(ctx context.Context, tx queryExecer, packageName string) (map[s
 		if err = rows.Scan(&prc, &attr, &typ); err != nil {
 			return sTypes, fmt.Errorf("scan %s: %w", qry, err)
 		}
+		// logger.Debug("getSubtypes", "prc", prc, "attr", attr, "typ", typ)
 		m := sTypes[prc]
 		if m == nil {
 			m = make(map[string]string)
