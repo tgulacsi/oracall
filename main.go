@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 	"unicode"
+	"unique"
 
 	"golang.org/x/sync/errgroup"
 
@@ -422,6 +423,44 @@ func parseDB(
 		return packages, functions, annotations, err
 	}
 	defer tx1.Rollback()
+
+	pat, _, _ := strings.Cut(pattern, ".")
+	objTimeQry := `SELECT object_name, last_ddl_time FROM ` + objTbl + ` WHERE object_name LIKE UPPER(:1) AND object_type <> 'PACKAGE BODY'`
+	rows, err := tx1.QueryContext(ctx, objTimeQry, pat)
+	if err != nil {
+		return packages, functions, annotations, fmt.Errorf("%s [%s]: %w", objTimeQry, pattern, err)
+	}
+	defer rows.Close()
+	grp, grpCtx := errgroup.WithContext(ctx)
+	grp.SetLimit(4)
+	type pkgTimeSubtype struct {
+		Time     time.Time
+		Subtypes map[string]map[string]string
+	}
+	var pkgsMu sync.Mutex
+	pkgs := make(map[string]*pkgTimeSubtype)
+	for rows.Next() {
+		var nm string
+		pts := new(pkgTimeSubtype)
+		if err := rows.Scan(&nm, &pts.Time); err != nil {
+			return packages, functions, annotations, fmt.Errorf("scan %s [%s]: %w", objTimeQry, pattern, err)
+		}
+		pkgs[nm] = pts
+		grp.Go(func() error {
+			sTypes, err := getSubtypes(ctx, db, nm)
+			if err != nil {
+				return fmt.Errorf("getSubtypes(%s): %w", nm, err)
+			}
+			pkgsMu.Lock()
+			pts.Subtypes = sTypes
+			pkgsMu.Unlock()
+			return nil
+		})
+	}
+	if err := grp.Wait(); err != nil {
+		return packages, functions, annotations, err
+	}
+
 	tx2, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return packages, functions, annotations, err
@@ -454,22 +493,9 @@ func parseDB(
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	objTimeQry := `SELECT last_ddl_time FROM ` + objTbl + ` WHERE object_name = :1 AND object_type <> 'PACKAGE BODY'`
-	objTimeStmt, err := tx1.PrepareContext(ctx, objTimeQry)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("%s: %w", objTimeQry, err)
-	}
-	defer objTimeStmt.Close()
-	getObjTime := func(name string) (time.Time, error) {
-		var t time.Time
-		if err := objTimeStmt.QueryRowContext(ctx, name).Scan(&t); err != nil {
-			return t, fmt.Errorf("%s [%q]: %w", objTimeQry, name, err)
-		}
-		return t, nil
-	}
-
 	dbCh := make(chan dbRow)
-	grp, grpCtx := errgroup.WithContext(ctx)
+	grp, grpCtx = errgroup.WithContext(ctx)
+	grp.SetLimit(4)
 	grp.Go(func() error {
 		defer close(dbCh)
 		var collStmt, attrStmt *sql.Stmt
@@ -639,7 +665,6 @@ func parseDB(
 	userArgs := make(chan oracall.UserArgument, 16)
 	grp.Go(func() error {
 		defer close(userArgs)
-		var pkgTime time.Time
 		ctx := grpCtx
 	Loop:
 		for {
@@ -669,9 +694,6 @@ func parseDB(
 			}
 			ua.PackageName = row.Package.String
 			if ua.PackageName != prevPackage {
-				if pkgTime, err = getObjTime(ua.PackageName); err != nil {
-					return err
-				}
 				prevPackage = ua.PackageName
 				otherDocs := make(map[string]map[string]string)
 				if err := func() error {
@@ -740,7 +762,11 @@ func parseDB(
 					return err
 				}
 			}
-			ua.LastDDL = pkgTime
+			pkg, ok := pkgs[ua.PackageName]
+			if !ok {
+				logger.Warn("no time for", "PackageName", ua.PackageName)
+			}
+			ua.LastDDL = pkg.Time
 			if row.Object.Valid {
 				ua.ObjectName = row.Object.String
 			}
@@ -764,6 +790,9 @@ func parseDB(
 			}
 			if row.Subname != "" {
 				ua.TypeSubname = row.Subname
+			}
+			if ua.TypeSubname == "" {
+				ua.TypeSubname = pkg.Subtypes[ua.ObjectName][ua.ArgumentName]
 			}
 			if row.Link != "" {
 				ua.TypeLink = row.Link
@@ -815,6 +844,7 @@ func parseDB(
 		logger.Error("ParseArguments", "error", grpErr)
 		return packages, functions, annotations, grpErr
 	}
+
 	docNames := make([]string, 0, len(docs))
 	for k := range docs {
 		docNames = append(docNames, k)
@@ -896,6 +926,47 @@ func getSource(ctx context.Context, w io.Writer, tx *sql.Tx, packageName string)
 		return fmt.Errorf("%s: %w", qry, err)
 	}
 	return nil
+}
+
+type queryExecer interface {
+	godror.Querier
+	godror.Execer
+}
+
+func getSubtypes(ctx context.Context, tx queryExecer, packageName string) (map[string]map[string]string, error) {
+	alterQry := `ALTER PACKAGE ` + packageName + ` COMPILE plscope_settings = 'identifiers:all'`
+	if _, err := tx.ExecContext(ctx, alterQry); err != nil {
+		return nil, fmt.Errorf("%s: %w", alterQry, err)
+	}
+	const qry = `SELECT B.object_name, C.name, B.name
+  FROM user_identifiers A
+    INNER JOIN user_identifiers B ON B.declared_object_type = A.declared_object_type AND B.object_type = A.object_type AND B.object_name = A.object_name AND B.usage_id = A.usage_context_id
+    INNER JOIN user_identifiers C ON C.declared_object_type = A.declared_object_type AND C.object_name = B.object_name AND C.object_type = B.object_type AND C.usage_id = B.usage_context_id
+  WHERE C.usage = 'DECLARATION' AND
+        B.type IN ('FORMAL IN', 'FORMAL IN OUT', 'FORMAL OUT', 'INFORMAL IN') AND
+        B.usage = 'DECLARATION' AND
+        A.declared_object_type = 'PACKAGE' AND
+        A.object_name = :1 AND
+        A.type = 'SUBTYPE' AND A.USAGE = 'REFERENCE'`
+	rows, err := tx.QueryContext(ctx, qry, packageName)
+	if err != nil {
+		return nil, fmt.Errorf("%s [%s]: %w", qry, packageName, err)
+	}
+	defer rows.Close()
+	sTypes := make(map[string]map[string]string)
+	for rows.Next() {
+		var prc, attr, typ string
+		if err = rows.Scan(&prc, &attr, &typ); err != nil {
+			return sTypes, fmt.Errorf("scan %s: %w", qry, err)
+		}
+		m := sTypes[prc]
+		if m == nil {
+			m = make(map[string]string)
+		}
+		m[attr] = unique.Make(typ).Value()
+		sTypes[prc] = m
+	}
+	return sTypes, rows.Err()
 }
 
 func parsePkgFlag(s string) (string, string) {
