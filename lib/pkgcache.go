@@ -54,7 +54,9 @@ func WritePackageCache(ctx context.Context, dir string, pc PackageCache) error {
 	}
 	defer zw.Close()
 	logger.Debug("write", "file", fn)
-	if err := json.MarshalWrite(zw, pc, jsontext.WithIndent("  ")); err != nil {
+	if err := json.MarshalWrite(zw, pc,
+		json.Deterministic(true), jsontext.WithIndent("  "),
+	); err != nil {
 		logger.Error("marshal", "pc", pc, "error", err)
 		return err
 	}
