@@ -7,7 +7,7 @@ require (
 	github.com/antzucaro/matchr v0.0.0-20221106193745-7bed6ef61ef9
 	github.com/fatih/structs v1.1.0
 	github.com/go-stack/stack v1.8.1
-	github.com/godror/godror v0.50.0
+	github.com/godror/godror v0.51.4
 	github.com/google/go-cmp v0.7.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/kylelemons/godebug v1.1.0
