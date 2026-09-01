@@ -1,6 +1,6 @@
 module github.com/tgulacsi/oracall/protoc-gen-oracall/testdata/ORA21062
 
-go 1.23.0
+go 1.27
 
 require (
 	github.com/godror/godror v0.45.1
