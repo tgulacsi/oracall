@@ -1,6 +1,6 @@
 // Copyright 2017, 2021 Tamas Gulacsi
 //
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: EUPL-1.2
 
 package custom
 
