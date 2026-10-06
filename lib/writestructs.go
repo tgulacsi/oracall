@@ -46,10 +46,7 @@ func SaveFunctions(ctx context.Context, dst io.Writer, functions []Function, pkg
 		if lastDDL.IsZero() {
 			lastDDL = time.Now()
 		}
-		var implement string
-		if !Gogo {
-			implement = "pb.Unimplemented" + pbPkg + "Server"
-		}
+		implement := "pb.Unimplemented" + pbPkg + "Server"
 		tagB.Reset()
 		for _, fun := range functions {
 			if len(fun.Tag) == 0 {
@@ -139,14 +136,14 @@ type oracallServer struct {
 }
 
 func NewServer(
-	db *sql.DB, 
-	logger *slog.Logger, 
+	db *sql.DB,
+	logger *slog.Logger,
     dbLog func(context.Context, interface { ExecContext(context.Context, string, ...interface{}) (sql.Result, error) }, string, interface{}) (context.Context, error),
 ) *oracallServer {
 	return &oracallServer{
-		db: db, 
-		Logger: logger, DBLog: dbLog, 
-	    `+tagMap+` 
+		db: db,
+		Logger: logger, DBLog: dbLog,
+	    `+tagMap+`
 	}
 }
 
@@ -230,10 +227,10 @@ import (
 	"os"
 	"sync"
 	"testing"
-    "time"    
+    "time"
 
 	"github.com/go-logfmt/logfmt"
-	"github.com/tgulacsi/oracall/orasrv"	
+	"github.com/tgulacsi/oracall/orasrv"
 
 	_ "github.com/godror/godror" // Oracle
 	`+pbImport+`
@@ -248,7 +245,7 @@ var (
 
 func testSetup(t *testing.T) *oracallServer {
 	connectOnce.Do(func() {
-		flag.Parse() 
+		flag.Parse()
 		var err error
 		if testDB, err = sql.Open("godror", *flagConnect); err != nil {
 			panic(fmt.Errorf("%s: %s", *flagConnect, err))

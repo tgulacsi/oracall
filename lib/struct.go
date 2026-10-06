@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"encoding/json/v2"
 	"encoding/json/jsontext"
+	"encoding/json/v2"
 )
 
 const (
@@ -37,6 +37,7 @@ type Function struct {
 	Tag               []string   `json:",omitempty"`
 	handle            []string
 	maxTableSize      int
+	NumberAsString    bool `json:",omitzero"`
 	ReplacementIsJSON bool `json:",omitzero"`
 }
 

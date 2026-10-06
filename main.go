@@ -67,7 +67,6 @@ func Main() error {
 	flagBaseDir := FS.StringLong("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
 	flagPbOut := FS.StringLong("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
 	flagDbOut := FS.StringLong("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
-	FS.BoolVar(&oracall.NumberAsString, 0, "number-as-string", "add ,string to json tags")
 	FS.BoolVar(&custom.ZeroIsAlmostZero, 0, "zero-is-almost-zero", "zero should be just almost zero, to distinguish 0 and non-set field")
 	flagExcept := FS.StringLong("except", "", "except these functions")
 	flagReplace := FS.StringLong("replace", "", "funcA=>funcB")

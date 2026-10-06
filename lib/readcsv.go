@@ -443,7 +443,7 @@ func (a Annotation) String() string {
 		return ""
 	}
 	switch a.Type {
-	case "private":
+	case "number-as-string", "private":
 		return a.Type + " " + a.FullName()
 	case "max-table-size":
 		return fmt.Sprintf("%s.MaxTableSize=%d", a.FullName(), a.Size)
@@ -471,13 +471,17 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 		if a.Size <= 0 && a.Type == "max-table-size" {
 			continue
 		}
+		nm := L(a.FullName())
 		switch a.Type {
+		case "number-as-string":
+			if f := funcs[nm]; f != nil {
+				f.NumberAsString = true
+				funcs[nm] = f
+			}
 		case "private":
-			nm := L(a.FullName())
 			// logger.Info("directive", "private", nm)
 			delete(funcs, nm)
 		case "rename":
-			nm := L(a.FullName())
 			if f := funcs[nm]; f != nil {
 				delete(funcs, nm)
 				funcs[L(a.FullOther())] = f
@@ -485,7 +489,7 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 				f.alias = a.Other
 			}
 		case "replace", "replace_json":
-			k, v := L(a.FullName()), L(a.FullOther())
+			k, v := nm, L(a.FullOther())
 			if f := funcs[k]; f != nil {
 				// logger.Info("directive", "replace", k, "with", v)
 				f.Replacement = funcs[v]
@@ -505,7 +509,6 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 			}
 
 		case "max-table-size":
-			nm := L(a.FullName())
 			// logger.Info("directive", "max-table-size", nm, "size", a.Size)
 			if f := funcs[nm]; f != nil && a.Size >= f.maxTableSize {
 				f.maxTableSize = a.Size

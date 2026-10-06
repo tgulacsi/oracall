@@ -1098,7 +1098,7 @@ func (arg Argument) getConvTableRec(
 			panic(err)
 		}
 		convert := arg.FromOra(fmt.Sprintf("output.%s[i].%s", name[0], name[1]), "v", "v")
-		if !Gogo && oraTyp == "time.Time" {
+		if oraTyp == "time.Time" {
 			convert = fmt.Sprintf("output.%s[i].%s = timestamppb.New(v)", name[0], name[1])
 		}
 

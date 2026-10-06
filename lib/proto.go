@@ -20,9 +20,6 @@ import (
 
 var SkipMissingTableOf = true
 
-var Gogo bool
-var NumberAsString bool
-
 //go:generate sh ./download-protoc.sh
 //go:generate go install github.com/golang/protobuf/protoc-gen-go@latest
 //go:generate go install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@latest
@@ -49,9 +46,6 @@ import "github.com/tgulacsi/oracall/orasrv/tag.proto";
 		}
 	}
 
-	if Gogo {
-		io.WriteString(w, "\nimport \"github.com/gogo/protobuf/gogoproto/gogo.proto\";\n")
-	}
 	seen := make(map[string]struct{}, 16)
 
 	services := make([]string, 0, len(functions))
@@ -158,12 +152,12 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 	}
 	return protoWriteMessageTyp(dst,
 		CamelCase(dot2D.Replace(strings.ToLower(nm))+"__"+dirname),
-		seen, getDirDoc(f.Documentation, dirmap), args...)
+		seen, getDirDoc(f.Documentation, dirmap), f.NumberAsString, args...)
 }
 
 var dot2D = strings.NewReplacer(".", "__")
 
-func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, D argDocs, args ...Argument) error {
+func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, D argDocs, numberAsString bool, args ...Argument) error {
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			panic(fmt.Errorf("protoWriteMessageTyp: no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf))
@@ -203,7 +197,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		if got == "" {
 			got = mkRecTypName(arg.Name)
 		}
-		typ, pOpts := protoType(got, arg.Name, arg.AbsType)
+		typ, pOpts := protoType(got, arg.Name, arg.AbsType, numberAsString)
 		var optS string
 		if pOpts != nil {
 			if s := pOpts.String(); s != "" {
@@ -232,7 +226,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 					}
 				}
 			}
-			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, subArgs...); err != nil {
+			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, numberAsString, subArgs...); err != nil {
 				// logger.Error("protoWriteMessageTyp", "error", err)
 				return err
 			}
@@ -245,44 +239,27 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 	return err
 }
 
-func protoType(got, aName, absType string) (string, protoOptions) {
+func protoType(got, aName, absType string, numberAsString bool) (string, protoOptions) {
 	switch trimmed := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")); trimmed {
 	case "bool", "string":
 		return trimmed, nil
 
 	case "int32":
-		if NumberAsString {
-			if Gogo {
-				return "sint32", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
-			}
-		}
 		return "sint32", nil
 
 	case "int64":
-		if NumberAsString {
-			if Gogo {
-				return "sint64", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
-			}
-		}
 		return "sint64", nil
 
 	case "float32", "sql.nullfloat32":
-		if NumberAsString {
-			if Gogo {
-				return "float", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
-			}
-		}
 		return "float", nil
 
 	case "double", "float64", "sql.nullfloat64":
-		if NumberAsString {
-			if Gogo {
-				return "double", protoOptions{"gogoproto.jsontag": aName + ",string,omitempty"}
-			}
-		}
 		return "double", nil
 
 	case "godror.number", "n":
+		if numberAsString {
+			return "string", nil
+		}
 		if i := strings.IndexByte(absType, '('); i >= 0 && absType[len(absType)-1] == ')' {
 			if strings.HasPrefix(absType, "INTEGER(") || strings.HasPrefix(absType, "NUMBER(") {
 				s := absType[i+1 : len(absType)-1]
@@ -299,21 +276,9 @@ func protoType(got, aName, absType string) (string, protoOptions) {
 				}
 			}
 		}
-		if Gogo {
-			return "string", protoOptions{
-				"gogoproto.jsontag": aName + ",omitempty",
-			}
-		}
 		return "string", nil
 
 	case "custom.date", "time.time":
-		if Gogo {
-			return "google.protobuf.Timestamp", protoOptions{
-				//"gogoproto.stdtime":    true,
-				"gogoproto.customtype": "github.com/tgulacsi/oracall/custom.DateTime",
-				"gogoproto.moretags":   `xml:",omitempty"`,
-			}
-		}
 		return "google.protobuf.Timestamp", nil
 
 	case "raw", "byte":
