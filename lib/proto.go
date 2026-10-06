@@ -55,8 +55,7 @@ import "github.com/tgulacsi/oracall/orasrv/tag.proto";
 	var tags strings.Builder
 FunLoop:
 	for _, fun := range functions {
-		//b, _ := json.Marshal(struct{Name, Documentation string}{Name:fun.Name(), Documentation:fun.Documentation})
-		//fmt.Println(string(b))
+		// fmt.Println(fun.name, fun.NumberAsString)
 		fName := fun.name
 		if fun.alias != "" {
 			fName = fun.alias
@@ -158,6 +157,7 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 var dot2D = strings.NewReplacer(".", "__")
 
 func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, D argDocs, numberAsString bool, args ...Argument) error {
+	// fmt.Printf("protoWriteMessageTyp(%s nas=%t)\n", msgName, numberAsString)
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			panic(fmt.Errorf("protoWriteMessageTyp: no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf))

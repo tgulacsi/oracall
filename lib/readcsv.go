@@ -465,7 +465,7 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 		if a.Name == "" || a.Type == "" {
 			continue
 		}
-		if a.Other == "" && !(a.Type == "private" || a.Type == "handle" || a.Type == "max-table-size") {
+		if a.Other == "" && !(a.Type == "private" || a.Type == "handle" || a.Type == "max-table-size" || a.Type == "number-as-string") {
 			continue
 		}
 		if a.Size <= 0 && a.Type == "max-table-size" {
