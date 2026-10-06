@@ -1061,10 +1061,9 @@ func (arg Argument) getConvTableRec(
 	switch oraTyp {
 	case "custom.Date", "custom.DateTime":
 		oraTyp = "time.Time"
-	case "float64":
-		oraTyp = "float64"
-	case "int32":
-		oraTyp = "int32"
+	}
+	if NumberAsString && (oraTyp == "int32" || oraTyp == "int64") {
+		oraTyp = "godror.Number"
 	}
 	if arg.IsInput() {
 		lengthS := "len(input." + name[0] + ")"
@@ -1097,9 +1096,15 @@ func (arg Argument) getConvTableRec(
 		if err != nil {
 			panic(err)
 		}
-		convert := arg.FromOra(fmt.Sprintf("output.%s[i].%s", name[0], name[1]), "v", "v")
+		var convert string
 		if oraTyp == "time.Time" {
 			convert = fmt.Sprintf("output.%s[i].%s = timestamppb.New(v)", name[0], name[1])
+		} else if NumberAsString && oraTyp == "godror.Number" {
+			convert = fmt.Sprintf("output.%s[i].%s = string(v)", name[0], name[1])
+		} else if NumberAsString && (oraTyp == "int32" || oraTyp == "int64") {
+			convert = fmt.Sprintf("output.%s[i].%s = strconv.FormatInt(int64(v), 10)", name[0], name[1])
+		} else {
+			convert = arg.FromOra(fmt.Sprintf("output.%s[i].%s/*%s*/", name[0], name[1], "oraTyp="+oraTyp+" got="+got), "v", "v")
 		}
 
 		convOut = append(convOut,

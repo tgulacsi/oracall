@@ -18,7 +18,10 @@ import (
 	fstructs "github.com/fatih/structs"
 )
 
-var SkipMissingTableOf = true
+var (
+	SkipMissingTableOf = true
+	NumberAsString     = false
+)
 
 //go:generate sh ./download-protoc.sh
 //go:generate go install github.com/golang/protobuf/protoc-gen-go@latest
@@ -55,7 +58,6 @@ import "github.com/tgulacsi/oracall/orasrv/tag.proto";
 	var tags strings.Builder
 FunLoop:
 	for _, fun := range functions {
-		// fmt.Println(fun.name, fun.NumberAsString)
 		fName := fun.name
 		if fun.alias != "" {
 			fName = fun.alias
@@ -151,13 +153,12 @@ func (f Function) saveProtobufDir(dst io.Writer, seen map[string]struct{}, out b
 	}
 	return protoWriteMessageTyp(dst,
 		CamelCase(dot2D.Replace(strings.ToLower(nm))+"__"+dirname),
-		seen, getDirDoc(f.Documentation, dirmap), f.NumberAsString, args...)
+		seen, getDirDoc(f.Documentation, dirmap), args...)
 }
 
 var dot2D = strings.NewReplacer(".", "__")
 
-func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, D argDocs, numberAsString bool, args ...Argument) error {
-	// fmt.Printf("protoWriteMessageTyp(%s nas=%t)\n", msgName, numberAsString)
+func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{}, D argDocs, args ...Argument) error {
 	for _, arg := range args {
 		if arg.Flavor == FLAVOR_TABLE && arg.TableOf == nil {
 			panic(fmt.Errorf("protoWriteMessageTyp: no table of data for %s.%s (%v): %w", msgName, arg, arg, ErrMissingTableOf))
@@ -197,8 +198,8 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 		if got == "" {
 			got = mkRecTypName(arg.Name)
 		}
-		typ, pOpts := protoType(got, arg.Name, arg.AbsType, numberAsString)
-		// fmt.Printf("%s.protoType(%s, %s, %t): %s\n", msgName, arg.Name, arg.AbsType, numberAsString, typ)
+		typ, pOpts := protoType(got, arg.Name, arg.AbsType)
+		// fmt.Printf("%s.protoType(%s, %s): %s\n", msgName, arg.Name, arg.AbsType, typ)
 		var optS string
 		if pOpts != nil {
 			if s := pOpts.String(); s != "" {
@@ -227,8 +228,8 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 					}
 				}
 			}
-			// fmt.Printf("protoWriteMessageTyp(%s, %s, %t): %s\n", typ, aName, numberAsString)
-			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, numberAsString, subArgs...); err != nil {
+			// fmt.Printf("protoWriteMessageTyp(%s, %s, ): %s\n", typ, aName, )
+			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, subArgs...); err != nil {
 				// logger.Error("protoWriteMessageTyp", "error", err)
 				return err
 			}
@@ -241,37 +242,37 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 	return err
 }
 
-func protoType(got, aName, absType string, numberAsString bool) (string, protoOptions) {
+func protoType(got, aName, absType string) (string, protoOptions) {
 	switch trimmed := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(got, "[]"), "*")); trimmed {
 	case "bool", "string":
 		return trimmed, nil
 
 	case "int32":
-		if numberAsString {
+		if NumberAsString {
 			return "string", nil
 		}
 		return "sint32", nil
 
 	case "int64":
-		if numberAsString {
+		if NumberAsString {
 			return "string", nil
 		}
 		return "sint64", nil
 
 	case "float32", "sql.nullfloat32":
-		if numberAsString {
+		if NumberAsString {
 			return "string", nil
 		}
 		return "float", nil
 
 	case "double", "float64", "sql.nullfloat64":
-		if numberAsString {
+		if NumberAsString {
 			return "string", nil
 		}
 		return "double", nil
 
 	case "godror.number", "n":
-		if numberAsString {
+		if NumberAsString {
 			return "string", nil
 		}
 		if i := strings.IndexByte(absType, '('); i >= 0 && absType[len(absType)-1] == ')' {

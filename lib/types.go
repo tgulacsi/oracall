@@ -34,7 +34,8 @@ func (arg PlsType) FromOra(dst, src, varName string) string {
 			return fmt.Sprintf("%s = %s.Timestamp()", dst, varName)
 		}
 	}
-	switch arg.ora {
+	argOra := arg.ora
+	switch argOra {
 	case "BLOB":
 		if varName != "" {
 			return fmt.Sprintf("if %s.Reader != nil { if %s, err = custom.ReadAll(%s.Reader, 1<<20); err != nil { return } }", varName, dst, varName)
@@ -91,11 +92,12 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 	if dir.IsInput() {
 		inTrue = ",In:true"
 	}
-	if arg.ora == "NUMBER" && arg.Precision != 0 && arg.Precision < 10 && arg.Scale == 0 {
-		arg.ora = "PLS_INTEGER"
+	argOra := arg.ora
+	if argOra == "NUMBER" && arg.Precision != 0 && arg.Precision < 10 && arg.Scale == 0 {
+		argOra = "PLS_INTEGER"
 	}
 	np := strings.TrimPrefix(src, "&")
-	switch arg.ora {
+	switch argOra {
 	case "DATE":
 		if dir.IsOutput() {
 			if !strings.HasPrefix(dst, "params[") {
@@ -112,11 +114,16 @@ func (arg PlsType) ToOra(dst, src string, dir direction) (expr string, variable 
 
 	case "PLS_INTEGER", "PL/SQL PLS INTEGER":
 		if src[0] != '&' {
+			if NumberAsString {
+				return fmt.Sprintf("%s = godror.Number(%s)", dst, src), ""
+			}
 			return fmt.Sprintf("var %s sql.NullInt32; if %s != 0 { %s.Int32, %s.Valid = int32(%s), true }; %s = int32(%s.Int32)", dstVar, src, dstVar, dstVar, src, dst, dstVar), dstVar
 		}
 	case "NUMBER":
 		if src[0] != '&' {
-
+			if NumberAsString {
+				return fmt.Sprintf("%s = godror.Number(%s)", dst, src), ""
+			}
 			return fmt.Sprintf("%s := %s(%s); %s = %s", dstVar, goNumType(arg.Precision, arg.Scale), src, dst, dstVar), dstVar
 		}
 	case "CLOB":

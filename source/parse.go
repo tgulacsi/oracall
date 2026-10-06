@@ -116,6 +116,7 @@ Loop:
 func parseAnnotation(b string) (oracall.Annotation, error) {
 	var a oracall.Annotation
 	if i := strings.IndexByte(b, ' '); i < 0 {
+		a.Type = b
 		return a, nil
 	} else {
 		a.Type, b = string(b[:i]), b[i+1:]

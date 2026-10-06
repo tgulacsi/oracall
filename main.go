@@ -73,6 +73,7 @@ func Main() error {
 	FS.IntVar(&oracall.MaxTableSize, 0, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
 	FS.StringVar(&dsn, 0, "connect", "", "connect to DB for retrieving function arguments")
 	flagPkgCacheDir := FS.StringLong("pkg-cache-dir", "", "directory for per-package JSON cache files")
+	FS.BoolVar(&oracall.NumberAsString, 0, "number-as-srtring", "all number as string")
 
 	var db *sql.DB
 

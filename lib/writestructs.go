@@ -626,16 +626,18 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 	if arg.Flavor == FLAVOR_SIMPLE {
 		switch arg.Type {
 		case "CHAR", "VARCHAR2", "ROWID":
-			if !isTable && arg.IsOutput() {
-				//return "*string", nil
-				return "string", nil
-			}
 			return "string", nil // NULL is the same as the empty string for Oracle
 		case "RAW":
 			return "[]byte", nil
 		case "NUMBER":
+			if NumberAsString {
+				return "godror.Number", nil
+			}
 			return goNumType(arg.Precision, arg.Scale), nil
 		case "INTEGER":
+			if NumberAsString {
+				return "godror.Number", nil
+			}
 			if !isTable && arg.IsOutput() {
 				if arg.Scale < 10 {
 					return "*int32", nil
@@ -647,6 +649,9 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 			}
 			return "int64", nil
 		case "PLS_INTEGER", "BINARY_INTEGER":
+			if NumberAsString {
+				return "godror.Number", nil
+			}
 			if !isTable && arg.IsOutput() {
 				return "int32", nil
 			}

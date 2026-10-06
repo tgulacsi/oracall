@@ -37,7 +37,6 @@ type Function struct {
 	Tag               []string   `json:",omitempty"`
 	handle            []string
 	maxTableSize      int
-	NumberAsString    bool `json:",omitzero"`
 	ReplacementIsJSON bool `json:",omitzero"`
 }
 

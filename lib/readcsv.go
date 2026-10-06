@@ -438,12 +438,31 @@ func (a Annotation) FullOther() string {
 	}
 	return a.Package + "." + a.Other
 }
+func (a Annotation) IsZero() bool {
+	if a.Type == "" || (a.Name == "" && a.Type != "number-as-string") {
+		return true
+	}
+	if a.Other == "" {
+		switch a.Type {
+		case "private", "handle", "max-table-size", "number-as-string":
+			// ezeknél nem kötelező az Other
+		default:
+			return true
+		}
+	}
+	if a.Size <= 0 && a.Type == "max-table-size" {
+		return true
+	}
+	return false
+}
 func (a Annotation) String() string {
-	if a.Type == "" || a.Name == "" {
+	if a.IsZero() {
 		return ""
 	}
 	switch a.Type {
-	case "number-as-string", "private":
+	case "number-as-string":
+		return a.Type
+	case "private":
 		return a.Type + " " + a.FullName()
 	case "max-table-size":
 		return fmt.Sprintf("%s.MaxTableSize=%d", a.FullName(), a.Size)
@@ -462,22 +481,18 @@ func ApplyAnnotations(functions []Function, annotations []Annotation) []Function
 		funcs[L(f.RealName())] = &f
 	}
 	for _, a := range annotations {
-		if a.Name == "" || a.Type == "" {
+		if a.IsZero() {
 			continue
 		}
-		if a.Other == "" && !(a.Type == "private" || a.Type == "handle" || a.Type == "max-table-size" || a.Type == "number-as-string") {
-			continue
-		}
-		if a.Size <= 0 && a.Type == "max-table-size" {
+		// fmt.Println("ANNOTATION", a)
+		if a.Type == "number-as-string" {
+			NumberAsString = true
 			continue
 		}
 		nm := L(a.FullName())
 		switch a.Type {
 		case "number-as-string":
-			if f := funcs[nm]; f != nil {
-				f.NumberAsString = true
-				funcs[nm] = f
-			}
+			NumberAsString = true
 		case "private":
 			// logger.Info("directive", "private", nm)
 			delete(funcs, nm)
