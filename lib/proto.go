@@ -198,6 +198,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			got = mkRecTypName(arg.Name)
 		}
 		typ, pOpts := protoType(got, arg.Name, arg.AbsType, numberAsString)
+		// fmt.Printf("%s.protoType(%s, %s, %t): %s\n", msgName, arg.Name, arg.AbsType, numberAsString, typ)
 		var optS string
 		if pOpts != nil {
 			if s := pOpts.String(); s != "" {
@@ -226,6 +227,7 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 					}
 				}
 			}
+			// fmt.Printf("protoWriteMessageTyp(%s, %s, %t): %s\n", typ, aName, numberAsString)
 			if err = protoWriteMessageTyp(buf, typ, seen, argDocs{Pre: D.Map[aName]}, numberAsString, subArgs...); err != nil {
 				// logger.Error("protoWriteMessageTyp", "error", err)
 				return err
@@ -245,15 +247,27 @@ func protoType(got, aName, absType string, numberAsString bool) (string, protoOp
 		return trimmed, nil
 
 	case "int32":
+		if numberAsString {
+			return "string", nil
+		}
 		return "sint32", nil
 
 	case "int64":
+		if numberAsString {
+			return "string", nil
+		}
 		return "sint64", nil
 
 	case "float32", "sql.nullfloat32":
+		if numberAsString {
+			return "string", nil
+		}
 		return "float", nil
 
 	case "double", "float64", "sql.nullfloat64":
+		if numberAsString {
+			return "string", nil
+		}
 		return "double", nil
 
 	case "godror.number", "n":
