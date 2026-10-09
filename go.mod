@@ -1,12 +1,12 @@
 module github.com/tgulacsi/oracall
 
-go 1.27
+go 1.27.0
 
 require (
+	github.com/UNO-SOFT/cli v0.0.0-20261009074406-95b18dbd4953
 	github.com/UNO-SOFT/w3ctrace v0.0.0-20260217182632-62e23a54a05a
 	github.com/UNO-SOFT/zlog v0.8.6
 	github.com/antzucaro/matchr v0.0.0-20221106193745-7bed6ef61ef9
-	github.com/davecgh/go-spew v1.1.1
 	github.com/fatih/structs v1.1.0
 	github.com/go-stack/stack v1.8.1
 	github.com/godror/godror v0.51.5
@@ -17,10 +17,7 @@ require (
 	github.com/klauspost/compress v1.20.1
 	github.com/kylelemons/godebug v1.1.0
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
-	github.com/pkg/errors v0.9.1
 	github.com/tgulacsi/go v0.28.13
-	golang.org/x/net v0.50.0
 	golang.org/x/sync v0.23.0
 	google.golang.org/grpc v1.79.1
 	google.golang.org/protobuf v1.36.12
@@ -35,8 +32,8 @@ require (
 	github.com/mfridman/buildversion v0.3.0 // indirect
 	github.com/mfridman/protoc-gen-go-json v1.5.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	golang.org/x/exp v0.0.0-20261005173118-76772065c9b0 // indirect
+	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.34.0 // indirect

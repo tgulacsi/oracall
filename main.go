@@ -29,19 +29,20 @@ import (
 
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/renameio/v2"
-	"github.com/peterbourgon/ff/v4"
-	"github.com/peterbourgon/ff/v4/ffhelp"
+
 	custom "github.com/tgulacsi/oracall/custom"
 	oracall "github.com/tgulacsi/oracall/lib"
 	"github.com/tgulacsi/oracall/source"
 
 	// for Oracle-specific drivers
+	"flag"
 	"github.com/godror/godror"
-)
 
-//go:generate go generate ./lib
-// Should install protobuf-compiler to use it, like
-// curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
+	//go:generate go generate ./lib
+	// Should install protobuf-compiler to use it, like
+	// curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
+	"github.com/UNO-SOFT/cli"
+)
 
 var (
 	dsn     string
@@ -61,24 +62,25 @@ func main() {
 func Main() error {
 	gopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
 
-	FS := ff.NewFlagSet("call")
-	FS.BoolVar(&oracall.SkipMissingTableOf, 0, "skip-missing-table-of", "skip functions with missing TableOf info")
-	flagDump := FS.StringLong("dump", "", "dump to this csv")
-	flagBaseDir := FS.StringLong("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
-	flagPbOut := FS.StringLong("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
-	flagDbOut := FS.StringLong("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
-	FS.BoolVar(&custom.ZeroIsAlmostZero, 0, "zero-is-almost-zero", "zero should be just almost zero, to distinguish 0 and non-set field")
-	flagExcept := FS.StringLong("except", "", "except these functions")
-	flagReplace := FS.StringLong("replace", "", "funcA=>funcB")
-	FS.IntVar(&oracall.MaxTableSize, 0, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
-	FS.StringVar(&dsn, 0, "connect", "", "connect to DB for retrieving function arguments")
-	flagPkgCacheDir := FS.StringLong("pkg-cache-dir", "", "directory for per-package JSON cache files")
-	FS.BoolVar(&oracall.NumberAsString, 0, "number-as-srtring", "all number as string")
+	FS := flag.NewFlagSet("call", flag.ContinueOnError)
+	FS.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", false, "skip functions with missing TableOf info")
+	flagDump := FS.String("dump", "", "dump to this csv")
+	flagBaseDir := FS.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
+	flagPbOut := FS.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
+	flagDbOut := FS.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
+	FS.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
+	flagExcept := FS.String("except", "", "except these functions")
+	flagReplace := FS.String("replace", "", "funcA=>funcB")
+	FS.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
+	FS.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
+	flagPkgCacheDir := FS.String("pkg-cache-dir", "", "directory for per-package JSON cache files")
+	FS.BoolVar(&oracall.NumberAsString, "number-as-srtring", false, "all number as string")
 
 	var db *sql.DB
 
-	callCmd := ff.Command{Name: "call", Flags: FS,
-		Exec: func(ctx context.Context, args []string) error {
+	callCmd := cli.Command{Name: "call", Flags: FS,
+		Exec: func(ctx context.Context, state *cli.State) error {
+			args := state.Args
 			if *flagPbOut == "" {
 				if *flagDbOut == "" {
 					return errors.New("-pb-out or -db-out is required")
@@ -298,11 +300,12 @@ func Main() error {
 		},
 	}
 
-	FS = ff.NewFlagSet("model")
-	flagModelOut := FS.String('o', "out", "-", "output file")
-	flagModelPkg := FS.StringLong("pkg", "main", "package name to generate - when empty, no package or import is generated")
-	genModelCmd := ff.Command{Name: "model", Flags: FS,
-		Exec: func(ctx context.Context, args []string) error {
+	FS = flag.NewFlagSet("model", flag.ContinueOnError)
+	flagModelOut := FS.String("out", "-", "output file")
+	flagModelPkg := FS.String("pkg", "main", "package name to generate - when empty, no package or import is generated")
+	genModelCmd := cli.Command{Name: "model", Flags: FS,
+		Exec: func(ctx context.Context, state *cli.State) error {
+			args := state.Args
 			tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 			if err != nil {
 				return err
@@ -324,13 +327,14 @@ func Main() error {
 				return err
 			}
 			return closeOk()
-		},
+		}, FlagConfigs: []cli.FlagConfig{cli.FlagConfig{Name: "out", Short: "o"}},
 	}
 
-	FS = ff.NewFlagSet("update")
-	flagUpdatePkgCacheDir := FS.StringLong("pkg-cache-dir", "", "directory for per-package JSON cache files (required)")
-	updateCmd := ff.Command{Name: "update", Flags: FS,
-		Exec: func(ctx context.Context, args []string) error {
+	FS = flag.NewFlagSet("update", flag.ContinueOnError)
+	flagUpdatePkgCacheDir := FS.String("pkg-cache-dir", "", "directory for per-package JSON cache files (required)")
+	updateCmd := cli.Command{Name: "update", Flags: FS,
+		Exec: func(ctx context.Context, state *cli.State) error {
+			args := state.Args
 			if *flagUpdatePkgCacheDir == "" {
 				return errors.New("--pkg-cache-dir is required for update")
 			}
@@ -350,16 +354,16 @@ func Main() error {
 		},
 	}
 
-	FS = ff.NewFlagSet("oracall")
-	FS.Value('v', "verbose", &verbose, "verbose logging")
-	FS.StringVar(&dsn, 0, "connect", "", "connect to DB for retrieving function arguments")
-	app := ff.Command{Name: "oracall", Flags: FS,
-		Subcommands: []*ff.Command{&callCmd, &genModelCmd, &updateCmd},
+	FS = flag.NewFlagSet("oracall", flag.ContinueOnError)
+	FS.Var(&verbose, "verbose", "verbose logging")
+	FS.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
+	app := cli.Command{Name: "oracall", Flags: FS,
+		SubCommands: []*cli.Command{&callCmd, &genModelCmd, &updateCmd}, FlagConfigs: []cli.FlagConfig{cli.FlagConfig{Name: "verbose", Short: "v"}},
 	}
 
-	if err := app.Parse(os.Args[1:]); err != nil {
-		if errors.Is(err, ff.ErrHelp) {
-			ffhelp.Command(&app).WriteTo(os.Stderr)
+	if err := cli.Parse(&app, os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			cli.PrintHelp(os.Stderr, &app)
 			return nil
 		}
 		return err
@@ -383,7 +387,7 @@ func Main() error {
 	ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	return app.Run(ctx)
+	return cli.Run(ctx, &app, nil)
 }
 
 type dbRow struct {
