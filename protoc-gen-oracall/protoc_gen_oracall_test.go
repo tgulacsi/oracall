@@ -6,6 +6,7 @@ package main_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"flag"
 	"os"
@@ -17,7 +18,7 @@ import (
 
 var (
 	flagRun     = flag.String("only", "", "run this")
-	flagConnect = flag.String("connect", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_ID")), "DSN to connect with")
+	flagConnect = flag.String("connect", cmp.Or(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_ID")), "DSN to connect with")
 )
 
 func TestProtocGenOracall(t *testing.T) {
@@ -74,7 +75,7 @@ func TestProtocGenOracall(t *testing.T) {
 	}
 }
 
-func nvl[T comparable](a T, b ...T) T {
+func cmp.Or[T comparable](a T, b ...T) T {
 	var z T
 	if a != z {
 		return a

@@ -6,20 +6,20 @@ package objects_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"database/sql"
-	"slices"
-	// "encoding/json/v2"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"flag"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
-	"encoding/json/jsontext"
-	"encoding/json/v2"
 	"github.com/UNO-SOFT/zlog/v2"
 	_ "github.com/godror/godror"
 	"github.com/google/renameio/v2"
@@ -35,7 +35,7 @@ func TestReadTypes(t *testing.T) {
 	ctx := zlog.NewSContext(context.Background(), logger)
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	db, err := sql.Open("godror", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
+	db, err := sql.Open("godror", cmp.Or(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestReadProcedures(t *testing.T) {
 	ctx := zlog.NewSContext(context.Background(), zlog.NewT(t).SLog())
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	db, err := sql.Open("godror", nvl(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
+	db, err := sql.Open("godror", cmp.Or(os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,17 +246,4 @@ func TestWriteProcedureWrappers(t *testing.T) {
 	if err = os.WriteFile("testdata/funcs_procs_ora.go", buf.Bytes(), 0664); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func nvl[T comparable](a T, b ...T) T {
-	var z T
-	if a != z {
-		return a
-	}
-	for _, a := range b {
-		if a != z {
-			return a
-		}
-	}
-	return a
 }
