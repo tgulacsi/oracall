@@ -133,6 +133,9 @@ func goParamType(p ProcParameter, types *Types) string {
 	if t := resolveType(p.OraType, types); t != nil {
 		return "*" + t.ProtoMessageName()
 	}
+	if isNullablePLSIntegerType(p.OraType) {
+		return "*int32"
+	}
 	return oraTypeToGoType(p.OraType)
 }
 
@@ -291,6 +294,10 @@ func (p Procedure) WriteProcedureWrapper(ctx context.Context, w io.Writer, types
 	for _, param := range allParams {
 		varName := strings.ToLower(param.Name)
 		t := resolve(param.OraType)
+		if t == nil && isNullablePLSIntegerType(param.OraType) {
+			fmt.Fprintf(bw, "\tvar %s sql.NullInt32\n", varName)
+			continue
+		}
 		if t != nil {
 			// complex type: will use *godror.Object
 			fmt.Fprintf(bw, "\tvar %sObj *godror.Object\n", varName)
@@ -321,9 +328,13 @@ func (p Procedure) WriteProcedureWrapper(ctx context.Context, w io.Writer, types
 		varName := strings.ToLower(param.Name)
 		t := resolve(param.OraType)
 		if t == nil {
-			// simple: just copy from input
+			// Simple nullable integers require a sql.NullInt32 bind value.
 			if hasInput {
-				fmt.Fprintf(bw, "\t%s = input.%s\n", varName, oracall.CamelCase(param.Name))
+				if isNullablePLSIntegerType(param.OraType) {
+					fmt.Fprintf(bw, "\t%s = custom.ToSQLInt32(input.%s)\n", varName, oracall.CamelCase(param.Name))
+				} else {
+					fmt.Fprintf(bw, "\t%s = input.%s\n", varName, oracall.CamelCase(param.Name))
+				}
 			}
 			continue
 		}
@@ -385,6 +396,8 @@ func (p Procedure) WriteProcedureWrapper(ctx context.Context, w io.Writer, types
 			fmt.Fprintf(bw, "\t\toutput.%s = new(%s)\n", fieldName, t.ProtoMessageName())
 			fmt.Fprintf(bw, "\t\tif err = output.%s.Scan(%sObj); err != nil { return nil, err }\n", fieldName, varName)
 			fmt.Fprintf(bw, "\t}\n")
+		} else if isNullablePLSIntegerType(param.OraType) {
+			fmt.Fprintf(bw, "\toutput.%s = custom.FromSQLInt32(%s)\n", fieldName, varName)
 		} else {
 			fmt.Fprintf(bw, "\toutput.%s = %s\n", fieldName, varName)
 		}
@@ -428,8 +441,10 @@ func (ps *Procedures) WriteProceduresFile(ctx context.Context, w io.Writer, pkg 
 		bw.WriteString("\t\"time\"\n")
 	}
 	bw.WriteString("\n\t\"github.com/godror/godror\"\n")
+	bw.WriteString("\t\"github.com/tgulacsi/oracall/custom\"\n")
 	bw.WriteString(")\n\n")
 	bw.WriteString("var _ = sql.ErrNoRows // avoid unused import\n")
+	bw.WriteString("var _ = custom.ToSQLInt32 // avoid unused import\n")
 	if needsTime {
 		bw.WriteString("var _ = time.Time{} // avoid unused import\n")
 	}

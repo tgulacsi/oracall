@@ -14,9 +14,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/UNO-SOFT/zlog/v2"
-	"encoding/json/v2"
 	"encoding/json/jsontext"
+	"encoding/json/v2"
+	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/godror/godror"
 	"golang.org/x/sync/errgroup"
 )
@@ -199,7 +199,11 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				if err != nil {
 					return err
 				}
-				u := uint(tok.Uint())
+				u64, err := tok.Uint()
+				if err != nil {
+					return err
+				}
+				u := uint(u64)
 				if t := allTypes[u]; t == nil {
 					return fmt.Errorf("no type for %d", u)
 				} else {

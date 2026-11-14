@@ -469,7 +469,7 @@ func %s(s *pb.%s) error {
 		nm, structName,
 	)
 	for _, line := range checks {
-		fmt.Fprintf(buf, line+"\n")
+		fmt.Fprintln(buf, line)
 	}
 	if _, err := io.WriteString(buf, "\n\treturn nil\n}\n"); err != nil {
 		return "", err
@@ -607,6 +607,14 @@ func (arg *Argument) goType(isTable bool) (typName string, err error) {
 			typName = typName[1:]
 		}
 	}()
+	// Singular Oracle integers need a presence bit on both inputs and outputs.
+	// Don't cache this result: table bind elements still use plain int32.
+	if isNullablePLSInteger(*arg) && !NumberAsString {
+		if isTable {
+			return "int32", nil
+		}
+		return "*int32", nil
+	}
 	if arg.mu == nil {
 		arg.mu = new(sync.Mutex)
 	}

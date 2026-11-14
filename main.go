@@ -75,6 +75,8 @@ func Main() error {
 	FS.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
 	flagPkgCacheDir := FS.String("pkg-cache-dir", "", "directory for per-package JSON cache files")
 	FS.BoolVar(&oracall.NumberAsString, "number-as-srtring", false, "all number as string")
+	FS.BoolVar(&oracall.NullablePLSInteger, "nullable-pls-integer", false,
+		"preserve Oracle NULL versus zero for singular PLS_INTEGER/BINARY_INTEGER")
 
 	var db *sql.DB
 

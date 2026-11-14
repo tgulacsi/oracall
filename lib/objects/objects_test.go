@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/UNO-SOFT/zlog/v2"
-	"encoding/json/v2"
 	"encoding/json/jsontext"
+	"encoding/json/v2"
+	"github.com/UNO-SOFT/zlog/v2"
 	_ "github.com/godror/godror"
 	"github.com/google/renameio/v2"
 	"github.com/tgulacsi/oracall/lib/objects"

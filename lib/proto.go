@@ -21,6 +21,9 @@ import (
 var (
 	SkipMissingTableOf = true
 	NumberAsString     = false
+	// NullablePLSInteger preserves Oracle NULL separately from zero.
+	// Off by default to keep existing generated APIs unchanged.
+	NullablePLSInteger = false
 )
 
 //go:generate sh ./download-protoc.sh
@@ -199,6 +202,9 @@ func protoWriteMessageTyp(dst io.Writer, msgName string, seen map[string]struct{
 			got = mkRecTypName(arg.Name)
 		}
 		typ, pOpts := protoType(got, arg.Name, arg.AbsType)
+		if rule == "" && isNullablePLSInteger(arg) && typ == "sint32" {
+			rule = "optional "
+		}
 		// fmt.Printf("%s.protoType(%s, %s): %s\n", msgName, arg.Name, arg.AbsType, typ)
 		var optS string
 		if pOpts != nil {

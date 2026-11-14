@@ -127,6 +127,9 @@ func (t Type) WriteProtobufMessageType(ctx context.Context, w io.Writer) error {
 					name = "record"
 				}
 			}
+			if rule == "" && isNullablePLSIntegerType(s.Name) {
+				rule = "optional "
+			}
 			i++
 			fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n", rule, s.protoType(), strings.ToLower(name), i, oraType)
 		}
@@ -284,7 +287,11 @@ func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
 			fmt.Fprintf(bw, "\t\tif err = o.SetAttribute(%q, &data); err != nil { return fmt.Errorf(\"SetAttribute %s: %%w\", err) }\n", a.Name, a.Name)
 			fmt.Fprintf(bw, "\t}\n")
 		} else if isSimpleType(s.Name) {
-			fmt.Fprintf(bw, "\tif err := data.Set(%s); err != nil { return err }\n", s.writeObjectExpr("x.Get"+goName+"()"))
+			if isNullablePLSIntegerType(s.Name) {
+				fmt.Fprintf(bw, "\tif x.%s == nil { data.SetNull() } else if err := data.Set(*x.%s); err != nil { return err }\n", goName, goName)
+			} else {
+				fmt.Fprintf(bw, "\tif err := data.Set(%s); err != nil { return err }\n", s.writeObjectExpr("x.Get"+goName+"()"))
+			}
 			fmt.Fprintf(bw, "\tif err := o.SetAttribute(%q, &data); err != nil { return err }\n", a.Name)
 		} else {
 			// nested object
@@ -330,7 +337,11 @@ func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
 			fmt.Fprintf(bw, "\t\t}\n\t}\n")
 		} else if isSimpleType(s.Name) {
 			fmt.Fprintf(bw, "\tif err := o.GetAttribute(&data, %q); err != nil { return err }\n", a.Name)
-			fmt.Fprintf(bw, "\tx.%s = %s\n", goName, s.dataGetter("data"))
+			if isNullablePLSIntegerType(s.Name) {
+				fmt.Fprintf(bw, "\tif data.IsNull() { x.%s = nil } else { v := int32(data.GetInt64()); x.%s = &v }\n", goName, goName)
+			} else {
+				fmt.Fprintf(bw, "\tx.%s = %s\n", goName, s.dataGetter("data"))
+			}
 		} else {
 			// nested object
 			fmt.Fprintf(bw, "\tif err := o.GetAttribute(&data, %q); err != nil { return err }\n", a.Name)
@@ -364,7 +375,7 @@ func (t Type) dataGetter(dataName string) string {
 		return "string(" + dataName + ".GetBytes())"
 	case "bytes":
 		return dataName + ".GetBytes()"
-	case "int32":
+	case "int32", "sint32":
 		return "int32(" + dataName + ".GetInt64())"
 	case "int64":
 		return dataName + ".GetInt64()"

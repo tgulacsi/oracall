@@ -768,6 +768,20 @@ func (arg Argument) getConvSimple(
 	convIn, convOut []string,
 	name, paramName string,
 ) ([]string, []string) {
+	if isNullablePLSInteger(arg) && !NumberAsString {
+		v := mkVarName(paramName)
+		convIn = append(convIn, "var "+v+" sql.NullInt32")
+		if arg.IsInput() {
+			convIn = append(convIn, fmt.Sprintf("%s = custom.ToSQLInt32(input.%s)", v, name))
+		}
+		if arg.IsOutput() {
+			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest: &%s, In:%t}", paramName, v, arg.IsInput()))
+			convOut = append(convOut, fmt.Sprintf("output.%s = custom.FromSQLInt32(%s)", name, v))
+		} else {
+			convIn = append(convIn, fmt.Sprintf("%s = %s", paramName, v))
+		}
+		return convIn, convOut
+	}
 	if !arg.IsOutput() {
 		in, _ := arg.ToOra(paramName, "input."+name, arg.Direction)
 		convIn = append(convIn, in+"  // gcs4i")
@@ -949,7 +963,9 @@ func (arg Argument) getFromRset(rsetRow string) string {
 		if err != nil {
 			panic(err)
 		}
-		if strings.Contains(got, ".") {
+		if isNullablePLSInteger(*a.Argument) && !NumberAsString {
+			fmt.Fprintf(buf, "\t%s: func() *int32 { if %s[%d] == nil { return nil }; v := custom.AsInt32(%s[%d]); return &v }(),\n", CamelCase(a.Name), rsetRow, i, rsetRow, i)
+		} else if strings.Contains(got, ".") {
 			fmt.Fprintf(buf, "\t%s: %s, // %s\n", CamelCase(a.Name),
 				a.GetOra(fmt.Sprintf("%s[%d]", rsetRow, i), ""),
 				got)
@@ -1011,6 +1027,21 @@ func (arg Argument) getConvRec(
 	maxTableSize int,
 ) ([]string, []string) {
 
+	if isNullablePLSInteger(arg) && !NumberAsString {
+		v := mkVarName(paramName)
+		convIn = append(convIn, "var "+v+" sql.NullInt32")
+		if arg.IsInput() {
+			parent, _, _ := strings.Cut(name, ".")
+			convIn = append(convIn, fmt.Sprintf("if input.%s != nil { %s = custom.ToSQLInt32(input.%s) }", parent, v, name))
+		}
+		if arg.IsOutput() {
+			convIn = append(convIn, fmt.Sprintf("%s = sql.Out{Dest: &%s, In:%t}", paramName, v, arg.IsInput()))
+			convOut = append(convOut, fmt.Sprintf("output.%s = custom.FromSQLInt32(%s)", name, v))
+		} else {
+			convIn = append(convIn, fmt.Sprintf("%s = %s", paramName, v))
+		}
+		return convIn, convOut
+	}
 	if arg.IsOutput() {
 		too, varName := arg.ToOra(paramName, "&output."+name, arg.Direction)
 		if arg.TableOf != nil {
@@ -1062,12 +1093,18 @@ func (arg Argument) getConvTableRec(
 	case "custom.Date", "custom.DateTime":
 		oraTyp = "time.Time"
 	}
+	if isNullablePLSInteger(arg) && !NumberAsString {
+		oraTyp = "sql.NullInt32"
+	}
 	if NumberAsString && (oraTyp == "int32" || oraTyp == "int64") {
 		oraTyp = "godror.Number"
 	}
 	if arg.IsInput() {
 		lengthS := "len(input." + name[0] + ")"
 		too, _ := arg.ToOra(absName+"[i]", "v."+name[1], arg.Direction)
+		if isNullablePLSInteger(arg) && !NumberAsString {
+			too = fmt.Sprintf("%s[i] = custom.ToSQLInt32(v.%s)", absName, name[1])
+		}
 		setParams := absName
 		if arg.IsOutput() {
 			setParams = fmt.Sprintf("sql.Out{Dest:&%s,In:true} //gctr1", absName)
@@ -1099,6 +1136,8 @@ func (arg Argument) getConvTableRec(
 		var convert string
 		if oraTyp == "time.Time" {
 			convert = fmt.Sprintf("output.%s[i].%s = timestamppb.New(v)", name[0], name[1])
+		} else if isNullablePLSInteger(arg) && !NumberAsString {
+			convert = fmt.Sprintf("output.%s[i].%s = custom.FromSQLInt32(v)", name[0], name[1])
 		} else if NumberAsString && oraTyp == "godror.Number" {
 			convert = fmt.Sprintf("output.%s[i].%s = string(v)", name[0], name[1])
 		} else if NumberAsString && (oraTyp == "int32" || oraTyp == "int64") {

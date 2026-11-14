@@ -331,6 +331,8 @@ func fakeData(t *testing.T, dest any, fieldType string) {
 					Name: string(f.Name()), DBType: fieldType.String(),
 					NativeType: nativeType,
 					Repeated:   f.Cardinality() == protoreflect.Repeated,
+					NullableInt32: (f.Kind() == protoreflect.Sint32Kind || f.Kind() == protoreflect.Int32Kind) &&
+						f.HasPresence() && (f.ContainingOneof() == nil || f.ContainingOneof().IsSynthetic()),
 				})
 			}
 			msgs = append(msgs, m)
@@ -451,7 +453,9 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 		}
 		fieldName := FieldName(f)
 		if !f.Repeated {
-			if fun == "" {
+			if f.NullableInt32 {
+				getValue = "if x.%[1]s == nil { d.SetNull() } else { d.SetInt64(int64(*x.%[1]s)) }"
+			} else if fun == "" {
 				getValue = `if x.%[1]s == nil { d.SetNull() } else {
 				sub, err := x.%[1]s.ToObject(ctx, ex)
 				if err != nil {return err}
@@ -601,7 +605,11 @@ func (msg message) writeToFrom(w, tW io.Writer, pkg string) {
 				getValue = fmt.Sprintf(getValue, fieldName)
 			}
 			if !f.Repeated {
-				fmt.Fprintf(w, "%s\nx.%s = v\n", getValue, fieldName)
+				if f.NullableInt32 {
+					fmt.Fprintf(w, "v := int32(d.GetInt64()); x.%s = &v\n", fieldName)
+				} else {
+					fmt.Fprintf(w, "%s\nx.%s = v\n", getValue, fieldName)
+				}
 			} else {
 				fmt.Fprintf(w, `{
 	O := d.GetObject().Collection()
@@ -798,6 +806,7 @@ type (
 	nameType struct {
 		Name, NativeType, DBType string
 		Repeated                 bool
+		NullableInt32            bool
 	}
 
 	message struct {

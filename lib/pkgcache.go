@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/UNO-SOFT/zlog/v2"
-	"encoding/json/v2"
 	"encoding/json/jsontext"
+	"encoding/json/v2"
+	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/renameio/v2"
 	"github.com/klauspost/compress/zstd"
 )
@@ -73,7 +73,7 @@ func ReadPackageCache(ctx context.Context, dir, pkgName string) (PackageCache, e
 	logger.Debug("read", "file", fn)
 	fh, err := os.Open(fn)
 	if err != nil {
-		logger.Error("open", "file", "error", err)
+		logger.Error("open", "file", fn, "error", err)
 		return PackageCache{}, err
 	}
 	defer fh.Close()
