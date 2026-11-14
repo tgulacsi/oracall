@@ -1,0 +1,12 @@
+== 1. GetObjectType: which names resolve? ==
+  ORACALL_STUB.SIMPLE_REC      OK   fullname=DEMO.ORACALL_STUB.SIMPLE_REC attrs=3 collectionOf=-
+  ORACALL_STUB.NUM_TAB         OK   fullname=DEMO.ORACALL_STUB.NUM_TAB attrs=0 collectionOf=DEMO.NUM_TAB
+  ORACALL_STUB.SIMPLE_REC_TAB  OK   fullname=DEMO.ORACALL_STUB.SIMPLE_REC_TAB attrs=0 collectionOf=DEMO.ORACALL_STUB.SIMPLE_REC
+  SIMPLE_REC                   ERR  getObjectType("SIMPLE_REC") conn=0x2d41d9c0: ORA-22303: OCI-22303: type ""."SIMPLE_REC" not found
+  DEMO_OBJ_T                   OK   fullname=DEMO.DEMO_OBJ_T attrs=3 collectionOf=-
+== 2. tag-driven StructWriteObject/StructScan against a PL/SQL RECORD ==
+  StructWriteObject OK
+  StructScan OK num=42 txt="hello"
+== 3. collection of records: append an element object ==
+  AppendObject(element record) OK
+  elem 0 isObject=true NUM=[55]

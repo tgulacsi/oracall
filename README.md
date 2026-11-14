@@ -1,128 +1,102 @@
 # OraCall
-OraCall is a package for calling Oracle stored procedures with [gRPC](grpc.io).
-As OCI does not allow using PL/SQL record types, this causes some difficulty.
 
-# Getting Started
-## Prerequisities
-Of course you'll need a working Oracle environment. For instructions, see
-[godror](https://github.com/godror/godror/blob/master/README.md).
+OraCall generates Go code for calling Oracle PL/SQL procedures and functions. The main `oracall call` generator reads procedure signatures, creates Go request/response types and database-call wrappers, emits a Protocol Buffers schema and service, and invokes `protoc` to generate Go protobuf/gRPC code. The generated service wrappers call Oracle through [`godror`](https://github.com/godror/godror).
 
-As OraCall uses [gRPC](grpc.io) for the interface, you'll need `protoc`, the
-[Protocol Buffers](https://developers.google.com/protocol-buffers/)
-[code generator](https://github.com/google/protobuf/releases) and a Go code generator,
-such as [protoc-gen-gofast](https://github.com/gogo/protobuf/tree/master/protoc-gen-gofast).
-But these two is downloaded by `go generate`.
+The repository also contains `protoc-gen-oracall`, a separate Protocol Buffers plugin for generating conversions/accessors for godror Oracle objects. It is distinct from the metadata-driven `oracall call` workflow described below.
 
-## Installing
+## Requirements
 
-	go get github.com/tgulacsi/oracall
-	go generate github.com/tgulacsi/oracall  # this will download protoc and protoc-gen-gofast
+- A Go toolchain matching the version in [`go.mod`](go.mod).
+- `protoc`, `protoc-gen-go`, and `protoc-gen-go-grpc` on `PATH` when generating protobuf output. The repository's `go generate` setup provisions protobuf tools, but check that the plugins used by the current generator are installed.
+- Oracle access and the prerequisites for godror (including Oracle client requirements) when reading metadata from a live database or running generated callers. See godror's [installation documentation](https://github.com/godror/godror#installation).
 
-Then you can use it:
+Oracle is not needed to generate from a metadata CSV or a package cache, although Oracle is needed to run the generated database callers.
 
-	oracall -db-out ./pkg/db -pb-out ./pkg/pb -connect 'user/passw@sid' 'MY_PKG.%'
+## Generate callers and protobuf service
 
-This will generate
-  * `my_pkg_functions.go` with the calling machinery,
-  * `my_pkg.proto` with the Protocol Buffers messages and RPC service definitions,
-  * and call `protoco-gen-gofast` with `my_pkg.proto`, which will generate
-    `my_pkg.pb.go` with the Protocol Buffers (un)marshal code.
+Install/build the command from this module, then generate for a package or procedure pattern. For example:
 
-# How does it work?
-## 1. read stored procedures' definitions from the database
-First, it reads the functions, procedures' names and their arguments' types from
-the given database with the following query:
+```sh
+go install .
+oracall call \
+  -connect 'user/password@service' \
+  -base-dir . \
+  -db-out github.com/tgulacsi/oracall/generated/db:db \
+  -pb-out github.com/tgulacsi/oracall/generated/pb:pb \
+  'MY_PKG.%'
+```
 
-    SELECT object_id, subprogram_id, package_name, object_name,
-           data_level, sequence, argument_name, in_out,
-           data_type, data_precision, data_scale, character_set_name,
-           pls_type, char_length, type_owner, type_name, type_subname, type_link
-      FROM user_arguments
-      ORDER BY object_id, subprogram_id, SEQUENCE;
+`-connect` accepts a godror connection string. The pattern is Oracle `LIKE`-style (for example, `MY_PKG.%` selects procedures in that package). `-base-dir` is the filesystem root for generated paths; by default it is the current directory. The `-db-out` and `-pb-out` values are paths, optionally followed by `:package-name`, as in the example. They may be **relative to the current directory** (e.g. `-pb-out testdata/pb:pb`) — the generator then derives the full Go import path (used for `option go_package` and the generated imports) from the target directory's `go.mod` (walking up to the module root; falling back to `$GOPATH/src`). Alternatively they may be full import paths, in which case `-base-dir` should resolve them (e.g. a `$GOPATH`-style tree). When both are specified, the generator writes:
 
-So the argument's type must be readable in `user_arguments`!
-For a `SYS_REFCURSOR` (returning a cursor, a query's result set in Oracle parlance),
-you have to specialize the type for the returned columns -- see below.
+- Go caller/server code and generated tests under the `-db-out` path;
+- a `.proto` schema under the `-pb-out` path;
+- Go protobuf and gRPC files produced by `protoc`.
 
-## 2. generate calling machinery
+The generated Go package exposes a server constructor and procedure methods that accept protobuf request messages. The wrappers manage Oracle transactions, bind arguments, convert results, and can run as gRPC service implementations.
 
-## 3. generate .proto file
+### Metadata input alternatives
 
-## 4. call protoc-gen-gofast
+The `call` command selects its metadata source in this order:
 
-## 5. profit!
+1. With `-connect`, it reads Oracle dictionary metadata and package source. It normally uses `USER_ARGUMENTS`; for patterns beginning with `DBMS_` or `UTL_` it uses `ALL_ARGUMENTS`.
+2. With `-pkg-cache-dir`, it reads the per-package compressed JSON caches from that directory, without connecting to Oracle.
+3. Otherwise, it reads semicolon-delimited `USER_ARGUMENTS` CSV from standard input. The expected columns are documented in [`lib/readcsv.go`](lib/readcsv.go); [`one.csv`](one.csv) is a sample.
 
-# Restrictions
-Supported types:
-  * PL/SQL simple types
-  * PL/SQL record types (defined at stored package level)
-  * PL/SQL associative arrays, but just "INDEX BY BINARY_INTEGER" and this arrays
-  must be one of the previously supported types (but not arrays!)
-  'Cause of OCI restrictions, these arrays must be indexed from 1.
-  * cursors.
+Examples:
 
-## Tweaks
-If you have a package with mixed content, you can force oracall to ignore them
-either by
+```sh
+# Generate from a previously exported USER_ARGUMENTS CSV.
+oracall call -base-dir . \
+  -db-out github.com/tgulacsi/oracall/generated/db:db \
+  -pb-out github.com/tgulacsi/oracall/generated/pb:pb 'DB_WEB.%' < one.csv
 
-  * specify command-line flag: `-private pkg.func_to_be_ignored,pkg2.other_private`
-  * or add a comment: `--oracall:private func_to_be_ignored` to the package header.
+# Refresh a package cache from Oracle, then generate from it offline.
+oracall update -connect 'user/password@service' \
+  -pkg-cache-dir ./oracall-cache 'MY_PKG.%'
+oracall call -pkg-cache-dir ./oracall-cache -base-dir . \
+  -db-out github.com/tgulacsi/oracall/generated/db:db \
+  -pb-out github.com/tgulacsi/oracall/generated/pb:pb 'MY_PKG.%'
+```
 
-The latter can be used to implement two other hacks:
+`-dump FILE` can export metadata read from the database as CSV. The `model` subcommand is a separate database-backed model generator (`oracall model -connect DSN ...`). Run `oracall call -h`, `oracall update -h`, or `oracall model -h` for command flags.
 
-  1. *rename* a function (if you have a non-oracall-compliant and a replacement, and have to keep both):
-     `--oracall:rename non_compliant => compliant
-  2. *replace* a function's innards with another function getting and receiving xml as CLOB:
-     `--oracall:replace non_compliant_complex => xml_replacement`
-	 and this will create the `non_compliant_complex` function's call type in the protobuf file
-	 (so this will look like the original complex function), but will call the `xml_replacement`
-	 function with the protobuf serialized to XML, and deserialized from the returned XML.
+## How generation works
 
+1. **Read metadata.** The generator reads procedure/function arguments and type metadata from Oracle. It also reads package source for documentation and `--oracall:` annotations. Alternatively, it parses the CSV or package cache described above.
+2. **Build a PL/SQL argument model.** Metadata rows are grouped by package and subprogram and assembled into arguments, records, and supported associative-array shapes.
+3. **Generate callers.** The generator emits Go request/response types and a wrapper for each selected procedure/function. It creates an anonymous PL/SQL block to bridge PL/SQL record and collection arguments to database binds, then executes it using godror. The default maximum table size is 128; `-max-table-size` overrides it.
+4. **Generate the API schema.** It emits protobuf messages and a service definition. A `SYS_REFCURSOR` output is represented as a streaming RPC. `protoc` plus its Go and gRPC plugins generate the Go API files.
 
-## REF_CURSOR
-For example for
+Package source comments can customize generation. For example, `--oracall:private proc_name` excludes a procedure, `--oracall:rename old_name => new_name` changes its generated name, and `--oracall:replace complex_proc => xml_proc` substitutes an XML/CLOB-backed implementation. The source parser also supports JSON replacements and other annotations; see [`source/parse.go`](source/parse.go).
 
-    FUNCTION ret_cur(p_id IN INTEGER) RETURN SYS_REFCURSOR IS
-	  v_cur SYS_REFCURSOR;
-	BEGIN
-	  OPEN v_cur FOR
-	    SELECT state, amount FROM table;
-	  RETURN v_cur;
-	END;
+## Supported types and limitations
 
-You'll have to define the type in the package HEAD:
+The main `call` generator supports these PL/SQL argument shapes:
 
-    TYPE state_amount_rec_typ IS RECORD (state table.state%TYPE, amount table.amount%TYPE);
-	TYPE state_amount_cur_typ IS REF CURSOR RETURN state_amount_rec_typ;
+- simple/scalar PL/SQL types;
+- package-level PL/SQL records whose fields are simple types;
+- associative arrays (`INDEX BY BINARY_INTEGER`) of simple types;
+- associative arrays (`INDEX BY BINARY_INTEGER`) of records whose fields are simple types;
+- strongly typed `REF CURSOR` outputs.
 
-Then only change the type in the BODY:
+In short: **only** simple types, arrays of simple types, records of simple types, and arrays of such records are supported. **Array of array and array in record are not supported.**
 
-    FUNCTION ret_cur(p_id IN INTEGER) RETURN state_amount_cur_typ IS
-	  v_cur state_amount_cur_typ;
-	BEGIN
-	  OPEN v_cur FOR
-	    SELECT state, amount FROM table;
-	  RETURN v_cur;
-	END;
+Nested composite shapes are not supported: **arrays of arrays are unsupported, and records containing arrays are unsupported**. Nested records and other composite-in-composite shapes are outside the supported record model as well. Associative arrays must use `BINARY_INTEGER` indexing; the existing caller path expects the arrays to be indexed from 1. A returned `SYS_REFCURSOR` must have a declared, strongly typed cursor return type (a `REF CURSOR RETURN` package type); an untyped cursor does not provide enough output-column metadata for generation.
 
-TL;DR; oracall needs "strongly typed" REF CURSOR - see http://www.dba-oracle.com/plsql/t_plsql_cursor_variables.htm for example!
+These restrictions apply to the main `oracall call` generator. The separate `lib/objects` and `protoc-gen-oracall` code paths have their own metadata/type behavior and should not be assumed to remove these limitations from the main caller generator.
 
-## Examples
-### Minimal
-Minimal is a minimal example using OraCall: a simple main package which
-connects to the database and calls the function specified on the command line.
-Args are specified using JSON.
+## Roadmap: Oracle Objects
 
-This must be compiled with your oracall output - such as
+A planned transition from the flattened PL/SQL binding shims to direct Oracle Objects binding (godror `SliceScan`, `SliceWriteObject`, `ObjectScanner`, `ObjectCollectionWriter` and the related interfaces/helpers) is documented in [PLAN.md](PLAN.md). That work aims to lift the nested composite-shape limitations described above.
 
-    oracall <one.csv >examples/minimal/generated_functions.go \
-    && go fmt ./examples/minimal/ \
-    && go build ./examples/minimal/ \
-    && ./minimal DB_web.sendpreoffer_31101
+## Tests
 
-This calls oracall with one.csv as stdin, and redirects its output to
-examples/minimal/generated_functions.go.
-Then formats the output (good for safety check, too)
-after this it builds the "minimal" binary (into the current dir).
-If all this was successful, than calls the resulting binary
-to call the specified function.
+Run the repository tests with:
+
+```sh
+go test ./...
+```
+
+The Oracle-free tests run everywhere. The supported-shape surface is covered by `lib/surface_test.go` (metadata CSV → PL/SQL + protobuf) and, end-to-end, by `TestStubSurfaceE2E`, which installs the stub package in `testdata/stub/stub.sql`, generates callers from it, and exercises every supported shape. Oracle-dependent tests need an `ORACALL_DSN` (and, for the end-to-end test, `protoc` plus the Go protoc plugins); they skip cleanly when those are absent.
+
+Some integration and object-generation tests additionally require Oracle privileges or external protobuf tooling. The root integration tests exercise simple values, simple arrays, records, and arrays of records against stored procedures; set up the required database before running those tests.

@@ -1,0 +1,17 @@
+===== USER_PLSQL_TYPES: nested probe (record containing a record and a collection) =====
+pkg=NESTED_PROBE type=INNER_REC typecode=PL/SQL RECORD attributes=2 contains_plsql=NO
+pkg=NESTED_PROBE type=INNER_TAB typecode=COLLECTION attributes=0 contains_plsql=NO
+pkg=NESTED_PROBE type=OUTER_REC typecode=PL/SQL RECORD attributes=3 contains_plsql=YES
+pkg=NESTED_PROBE type=OUTER_TAB typecode=COLLECTION attributes=0 contains_plsql=YES
+===== USER_PLSQL_TYPE_ATTRS: nested probe (populated ATTR_TYPE_* marks composite fields) =====
+pkg=NESTED_PROBE type=INNER_REC attr_no=1 attr=A attr_type_owner=- attr_type_name=NUMBER attr_type_package=-
+pkg=NESTED_PROBE type=INNER_REC attr_no=2 attr=B attr_type_owner=- attr_type_name=VARCHAR2 attr_type_package=-
+pkg=NESTED_PROBE type=OUTER_REC attr_no=1 attr=X attr_type_owner=DEMO attr_type_name=INNER_REC attr_type_package=NESTED_PROBE
+pkg=NESTED_PROBE type=OUTER_REC attr_no=2 attr=Y attr_type_owner=DEMO attr_type_name=INNER_TAB attr_type_package=NESTED_PROBE
+pkg=NESTED_PROBE type=OUTER_REC attr_no=3 attr=Z attr_type_owner=- attr_type_name=NUMBER attr_type_package=-
+===== USER_PLSQL_COLL_TYPES: nested probe =====
+pkg=NESTED_PROBE type=INNER_TAB coll_type=PL/SQL INDEX TABLE elem_owner=- elem_name=NUMBER elem_package=- index_by=BINARY_INTEGER
+pkg=NESTED_PROBE type=OUTER_TAB coll_type=PL/SQL INDEX TABLE elem_owner=DEMO elem_name=OUTER_REC elem_package=NESTED_PROBE index_by=BINARY_INTEGER
+===== USER_ARGUMENTS: nested probe (composite args are ONE row; no attribute rows) =====
+pkg=NESTED_PROBE obj=P arg=O in_out=IN data_type=PL/SQL RECORD data_level=0 type_owner=DEMO type_name=NESTED_PROBE type_subname=OUTER_REC type_object_type=PACKAGE
+pkg=NESTED_PROBE obj=P arg=T in_out=IN/OUT data_type=PL/SQL TABLE data_level=0 type_owner=DEMO type_name=NESTED_PROBE type_subname=OUTER_TAB type_object_type=PACKAGE

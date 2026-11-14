@@ -5,23 +5,32 @@
 package objects
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"maps"
 	"slices"
 	"strings"
 	"sync"
 
-	"encoding/json/jsontext"
-	"encoding/json/v2"
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/godror/godror"
 	"golang.org/x/sync/errgroup"
 )
 
 type (
+	TypeParams struct {
+		DataType, PlsType                      string
+		Owner, Name, Subname, Link, ObjectType string
+		Length, Precision, Scale               sql.NullInt32
+	}
+
 	Types struct {
 		db            querier `json:"-"`
 		m             map[string]*Type
@@ -142,7 +151,7 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				t := &Type{
 					Owner: tm.Owner, Package: tm.Package, Name: tm.Name,
 					TypeCode: tm.TypeCode, CollType: tm.CollType, IndexBy: tm.IndexBy,
-					Length: tm.Length, Precision: tm.Precision, Scale: tm.Scale,
+					TypeParams: TypeParams{Length: tm.Length, Precision: tm.Precision, Scale: tm.Scale},
 				}
 				if tm.ElemTypeIdx != 0 {
 					t.Elem = allTypes[tm.ElemTypeIdx]
@@ -201,7 +210,7 @@ func (tt *Types) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				}
 				u64, err := tok.Uint()
 				if err != nil {
-					return err
+					return fmt.Errorf("got tok=%+v: %w", tok, err)
 				}
 				u := uint(u64)
 				if t := allTypes[u]; t == nil {
@@ -230,6 +239,22 @@ func NewTypes(ctx context.Context, db querier) (*Types, error) {
 		}
 	}
 	return &Types{db: db, m: make(map[string]*Type), currentSchema: currentSchema}, nil
+}
+
+func (tt *Types) WritePB(ctx context.Context, w io.Writer) error {
+	bw := bufio.NewWriter(w)
+	bw.WriteString(`
+` + ProtoImports.String() + `
+` + ProtoExtends.String() + `
+`)
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	for _, x := range tt.m {
+		if m := x.GenProto().Message; m != nil {
+			m.Print(bw)
+		}
+	}
+	return bw.Flush()
 }
 
 func (tt *Types) Names(ctx context.Context, only ...string) ([]string, error) {
@@ -328,6 +353,45 @@ SELECT A.type_name, A.package_name, A.typecode FROM user_plsql_types A
 
 var errUnknownType = errors.New("unknown type")
 
+func (tt *Types) FromParams(ctx context.Context, params TypeParams) (*Type, error) {
+	logger := zlog.SFromContext(ctx)
+	logger.Info("Resolve", "params", params)
+	var k, name string
+	switch params.DataType {
+	case "BINARY_INTEGER", "CLOB", "DATE", "PL/SQL BOOLEAN":
+		k = params.DataType
+	case "CHAR", "VARCHAR2":
+		if params.Length.Int32 == 0 {
+			params.Length.Int32 = 32767
+		}
+		k = fmt.Sprintf("%s(%d)", params.DataType, params.Length.Int32)
+	case "NUMBER":
+		if params.Precision.Int32 == 0 {
+			k = "NUMBER"
+		} else if params.Scale.Int32 == 0 {
+			k = fmt.Sprintf("NUMBER(%d)", params.Precision.Int32)
+		} else {
+			k = fmt.Sprintf("NUMBER(%d,%d)", params.Precision.Int32, params.Scale.Int32)
+		}
+	case "PL/SQL RECORD", "PL/SQL TABLE", "REF CURSOR":
+		name = params.Owner + "." + params.Name + "." + params.Subname
+	case "TABLE":
+		name = params.Owner + "." + params.Name
+	default:
+		return nil, fmt.Errorf("unknown DataType=%q", params.DataType)
+	}
+	if k != "" {
+		tt.mu.Lock()
+		t := tt.m[k]
+		if t == nil {
+			t = &Type{Name: k, TypeParams: params}
+			tt.m[k] = t
+		}
+		tt.mu.Unlock()
+		return t, nil
+	}
+	return tt.Get(ctx, name)
+}
 func (tt *Types) Get(ctx context.Context, name string) (*Type, error) {
 	tt.mu.Lock()
 	defer tt.mu.Unlock()
@@ -344,10 +408,27 @@ func (tt *Types) get(ctx context.Context, name string) (*Type, error) {
 		return v, nil
 	}
 	logger := zlog.SFromContext(ctx)
-	logger.Warn("get", "name", name, "t", fmt.Sprintf("%#v", tt.m[name]))
-	_ = logger
+	if logger.Enabled(ctx, slog.LevelDebug) {
+		logger.Debug("get", "name", name, "t", fmt.Sprintf("%#v", tt.m[name]))
+	}
 	t := tt.m[name]
 	if t == nil || t.TypeCode == "" {
+		if strings.Count(name, ".") < 2 {
+			const qry = `SELECT table_owner||'.'||table_name||(
+			CASE WHEN db_link IS NULL THEN NULL ELSE '@'||db_link END
+		) FROM user_synonyms WHERE synonym_name = :1`
+			var nm string
+			if err := tt.db.QueryRowContext(ctx, qry,
+				strings.TrimPrefix(name, tt.currentSchema+"."),
+			).Scan(&nm); err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, fmt.Errorf("%s [%q]: %w", qry, name, err)
+				}
+			} else if nm != "" {
+				name = nm
+			}
+		}
+
 		const qry = `SELECT A.owner, A.type_name, NULL AS package_name, A.typecode
   FROM all_types A
   WHERE owner IN (COALESCE(:owner, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')), COALESCE(:package, SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA'))) AND
@@ -532,48 +613,4 @@ SELECT 'T' AS orig, B.column_id AS attr_no, B.column_name, B.data_type_owner, B.
 	tt.m[name] = t
 
 	return t, nil
-}
-
-var ProtoImports = protoImports{
-	"google/protobuf/timestamp.proto",
-	"google/protobuf/descriptor.proto",
-}
-
-type protoImport string
-
-func (p protoImport) String() string {
-	return fmt.Sprintf("import %q;\n", string(p))
-}
-
-type protoImports []protoImport
-
-func (p protoImports) String() string {
-	var buf strings.Builder
-	for _, s := range p {
-		buf.WriteString(s.String())
-	}
-	return buf.String()
-}
-
-const (
-	MessageTypeExtension = 79396128
-	FieldTypeExtension   = 79396128
-)
-
-// a number between 1 and 536,870,911 with the following restrictions:
-// The given number must be unique among all fields for that message.
-// Field numbers 19,000 to 19,999 are reserved for the Protocol Buffers implementation. The protocol buffer compiler will complain if you use one of these reserved field numbers in your message.
-var ProtoExtends = protoExtends{
-	`extend google.protobuf.MessageOptions {
-  string oracall_object_type = 79396128;
-}`,
-	`extend google.protobuf.FieldOptions {
-  string oracall_field_type = 79396128;
-}`,
-}
-
-type protoExtends []string
-
-func (p protoExtends) String() string {
-	return strings.Join(p, "\n")
 }

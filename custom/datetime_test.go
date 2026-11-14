@@ -14,6 +14,11 @@ import (
 )
 
 func TestDateTimeXML(t *testing.T) {
+	// Pin time.Local to a deterministic +02:00 zone (the expectations below are
+	// written for it), so the test does not depend on the runner's TZ.
+	savedLocal := time.Local
+	time.Local = time.FixedZone("CET", 2*60*60)
+	defer func() { time.Local = savedLocal }()
 	var buf strings.Builder
 	enc := xml.NewEncoder(&buf)
 	st := xml.StartElement{Name: xml.Name{Local: "element"}}

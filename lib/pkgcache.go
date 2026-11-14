@@ -6,6 +6,8 @@ package oracall
 
 import (
 	"context"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"log/slog"
 	"maps"
 	"os"
@@ -14,8 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"encoding/json/jsontext"
-	"encoding/json/v2"
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/renameio/v2"
 	"github.com/klauspost/compress/zstd"

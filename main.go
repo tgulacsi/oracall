@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -27,6 +28,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/UNO-SOFT/cli"
 	"github.com/UNO-SOFT/zlog/v2"
 	"github.com/google/renameio/v2"
 
@@ -35,17 +37,15 @@ import (
 	"github.com/tgulacsi/oracall/source"
 
 	// for Oracle-specific drivers
-	"flag"
 	"github.com/godror/godror"
-
-	//go:generate go generate ./lib
-	// Should install protobuf-compiler to use it, like
-	// curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
-	"github.com/UNO-SOFT/cli"
 )
 
+//go:generate go generate ./lib
+// Should install protobuf-compiler to use it, like
+// curl -L https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protoc-3.0.0-beta-2-linux-x86_64.zip -o /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip && unzip -p /tmp/protoc-3.0.0-beta-2-linux-x86_64.zip protoc >$HOME/bin/protoc
+
 var (
-	dsn     string
+	dsn     = os.Getenv("ORACALL_DSN")
 	verbose zlog.VerboseVar
 	logger  = zlog.NewLogger(zlog.MaybeConsoleHandler(&verbose, os.Stderr)).SLog()
 
@@ -60,27 +60,35 @@ func main() {
 }
 
 func Main() error {
-	gopSrc := filepath.Join(os.Getenv("GOPATH"), "src")
+	var gopSrc string
+	if b, err := exec.Command("go", "env", "GOPATH").Output(); err != nil {
+		return fmt.Errorf("go env GOPATH: %w", err)
+	} else {
+		gopSrc = string(bytes.TrimSpace(b))
+	}
+	cwd, _ := os.Getwd()
 
-	FS := flag.NewFlagSet("call", flag.ContinueOnError)
-	FS.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", false, "skip functions with missing TableOf info")
-	flagDump := FS.String("dump", "", "dump to this csv")
-	flagBaseDir := FS.String("base-dir", gopSrc, "base dir for the -pb-out, -db-out flags")
-	flagPbOut := FS.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
-	flagDbOut := FS.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
-	FS.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
-	flagExcept := FS.String("except", "", "except these functions")
-	flagReplace := FS.String("replace", "", "funcA=>funcB")
-	FS.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
-	FS.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
-	flagPkgCacheDir := FS.String("pkg-cache-dir", "", "directory for per-package JSON cache files")
-	FS.BoolVar(&oracall.NumberAsString, "number-as-srtring", false, "all number as string")
-	FS.BoolVar(&oracall.NullablePLSInteger, "nullable-pls-integer", false,
+	flags := flag.NewFlagSet("call", flag.ContinueOnError)
+	flags.BoolVar(&oracall.SkipMissingTableOf, "skip-missing-table-of", false, "skip functions with missing TableOf info")
+	flagDump := flags.String("dump", "", "dump to this csv")
+	flagBaseDir := flags.String("base-dir", cwd, "base dir for the -pb-out, -db-out flags")
+	flagOut := flags.String("out", "", "dump output to this file, not stdout")
+	flagPbOut := flags.String("pb-out", "", "package import path for the Protocol Buffers files, optionally with the package name, like \"my/pb-pkg:main\"")
+	flagDbOut := flags.String("db-out", "-:main", "package name of the generated functions, optionally with the package name, like \"my/db-pkg:main\"")
+	flags.BoolVar(&custom.ZeroIsAlmostZero, "zero-is-almost-zero", false, "zero should be just almost zero, to distinguish 0 and non-set field")
+	flagExcept := flags.String("except", "", "except these functions")
+	flagReplace := flags.String("replace", "", "funcA=>funcB")
+	flags.IntVar(&oracall.MaxTableSize, "max-table-size", oracall.MaxTableSize, "maximum table size for PL/SQL associative arrays")
+	flags.StringVar(&dsn, "connect", dsn, "connect to DB for retrieving function arguments")
+	flagPkgCacheDir := flags.String("pkg-cache-dir", "", "directory for per-package JSON cache files")
+	flags.BoolVar(&oracall.NumberAsString, "number-as-srtring", false, "all number as string")
+	flags.BoolVar(&oracall.NullablePLSInteger, "nullable-pls-integer", false,
 		"preserve Oracle NULL versus zero for singular PLS_INTEGER/BINARY_INTEGER")
 
 	var db *sql.DB
 
-	callCmd := cli.Command{Name: "call", Flags: FS,
+	callCmd := cli.Command{Name: "call", Flags: flags,
+		FlagConfigs: []cli.FlagConfig{{Name: "out", Short: "o"}},
 		Exec: func(ctx context.Context, state *cli.State) error {
 			args := state.Args
 			if *flagPbOut == "" {
@@ -94,6 +102,27 @@ func Main() error {
 			pbPath, pbPkg := parsePkgFlag(*flagPbOut)
 			dbPath, dbPkg := parsePkgFlag(*flagDbOut)
 
+			// -pb-out may be a plain (relative) path like "testdata/pb" - resolve
+			// it to the real filesystem dir (relative to base-dir), then derive
+			// the full Go import path from that dir's module (go.mod), so
+			// go_package and the generated imports are correct without the user
+			// having to spell out the module prefix.
+			baseDirAbs, err := filepath.Abs(*flagBaseDir)
+			if err != nil {
+				return fmt.Errorf("abs %q: %w", *flagBaseDir, err)
+			}
+			pbImport := pbPath
+			if pbPath != "" {
+				pbDirFS := pbPath
+				if !filepath.IsAbs(pbDirFS) {
+					pbDirFS = filepath.Join(baseDirAbs, pbDirFS)
+				}
+				if imp, ok := importPathFor(pbDirFS, gopSrc); ok {
+					pbImport = imp
+				}
+			}
+			logger.Debug("pb-out", "fsPath", pbPath, "importPath", pbImport, "baseDir", baseDirAbs)
+
 			var pattern string
 			if len(args) != 0 {
 				pattern = args[0]
@@ -103,7 +132,7 @@ func Main() error {
 			}
 
 			var functions []oracall.Function
-			var err error
+			// err is declared above (baseDirAbs derivation).
 
 			filters := [](func(string) bool){func(string) bool { return true }}
 			filter := func(s string) bool {
@@ -163,25 +192,39 @@ func Main() error {
 				return fmt.Errorf("parse: %w", err)
 			}
 
-			defer os.Stdout.Sync()
-			out := os.Stdout
+			dbOut, dbOutStdout := os.Stdout, true
+			if *flagOut != "" && *flagOut != "-" {
+				if dbOut, err = os.Create(*flagOut); err != nil {
+					return err
+				}
+				dbOutStdout = false
+			}
+			defer dbOut.Close()
+
 			var testOut *os.File
 			if dbPath != "" && dbPath != "-" {
-				fn := "oracall.go"
+				dbFn := "oracall.go"
 				if dbPkg != "main" {
-					fn = dbPkg + ".go"
+					dbFn = dbPkg + ".go"
 				}
-				fn = filepath.Join(*flagBaseDir, dbPath, fn)
-				logger.Info("Writing generated functions", "file", fn)
+				dbFn = filepath.Join(*flagBaseDir, dbPath, dbFn)
+				logger.Info("Writing generated functions", "file", dbFn)
 				// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
-				_ = os.MkdirAll(filepath.Dir(fn), 0775)
-				outP, err := renameio.NewPendingFile(fn)
-				if err != nil {
-					return fmt.Errorf("create %s: %w", fn, err)
+				_ = os.MkdirAll(filepath.Dir(dbFn), 0775)
+				if dbOutStdout {
+					dbOutP, err := renameio.NewPendingFile(dbFn)
+					if err != nil {
+						return fmt.Errorf("create %s: %w", dbFn, err)
+					}
+					defer dbOutP.Cleanup()
+					dbOut = dbOutP.File
+					defer func() {
+						if err := dbOutP.CloseAtomicallyReplace(); err != nil {
+							logger.Error("close", "file", dbOut.Name(), "error", err)
+						}
+					}()
 				}
-				defer outP.Cleanup()
-				out = outP.File
-				testFn := fn[:len(fn)-3] + "_test.go"
+				testFn := dbFn[:len(dbFn)-3] + "_test.go"
 				testOutP, err := renameio.NewPendingFile(testFn)
 				if err != nil {
 					return fmt.Errorf("create %s: %w", testFn, err)
@@ -189,9 +232,6 @@ func Main() error {
 				defer testOutP.Cleanup()
 				testOut = testOutP.File
 				defer func() {
-					if err := outP.CloseAtomicallyReplace(); err != nil {
-						logger.Error("close", "file", out.Name(), "error", err)
-					}
 					if err := testOutP.CloseAtomicallyReplace(); err != nil {
 						logger.Error("close", "file", testOut.Name(), "error", err)
 					}
@@ -221,14 +261,14 @@ func Main() error {
 			grp.SetLimit(2)
 			if dbPath != "" {
 				grp.Go(func() error {
-					pbPath := pbPath
+					pbImport := pbImport
 					if pbPath == dbPath {
-						pbPath = ""
+						pbImport = ""
 					}
 					if err := oracall.SaveFunctions(
 						ctx,
-						out, functions,
-						dbPkg, pbPath, false,
+						dbOut, functions,
+						dbPkg, pbImport, false,
 					); err != nil {
 						return fmt.Errorf("save functions: %w", err)
 					}
@@ -237,13 +277,13 @@ func Main() error {
 			}
 			if testOut != nil {
 				grp.Go(func() error {
-					pbPath := pbPath
+					pbImport := pbImport
 					if pbPath == dbPath {
-						pbPath = ""
+						pbImport = ""
 					}
 					if err := oracall.SaveFunctionTests(
 						testOut, functions,
-						dbPkg, pbPath, false,
+						dbPkg, pbImport, false,
 					); err != nil {
 						return fmt.Errorf("save function tests: %w", err)
 					}
@@ -258,7 +298,11 @@ func Main() error {
 					if pbPkg != "main" {
 						pbFn = pbPkg + ".proto"
 					}
-					pbFn = filepath.Join(*flagBaseDir, pbPath, pbFn)
+					pbDir := pbPath
+					if !filepath.IsAbs(pbDir) {
+						pbDir = filepath.Join(baseDirAbs, pbDir)
+					}
+					pbFn = filepath.Join(pbDir, pbFn)
 					// nosemgrep: go.lang.correctness.permissions.file_permission.incorrect-default-permission
 					_ = os.MkdirAll(filepath.Dir(pbFn), 0775)
 					logger.Info("Writing Protocol Buffers", "file", pbFn)
@@ -266,7 +310,7 @@ func Main() error {
 					if err != nil {
 						return fmt.Errorf("create proto: %w", err)
 					}
-					err = oracall.SaveProtobuf(ctx, fh, functions, pbPkg, pbPath)
+					err = oracall.SaveProtobuf(ctx, fh, functions, pbPkg, pbImport)
 					if closeErr := fh.Close(); closeErr != nil && err == nil {
 						err = closeErr
 					}
@@ -274,23 +318,42 @@ func Main() error {
 						return fmt.Errorf("SaveProtobuf: %w", err)
 					}
 
-					args := append(make([]string, 0, 5),
-						"--proto_path="+*flagBaseDir+":.")
-					args = append(args, "--go_out="+*flagBaseDir, "--go-grpc_out="+*flagBaseDir)
-					// args = append(args, "--go-vtproto_out=:"+*flagBaseDir)
-					cmd := exec.CommandContext(grpCtx, "protoc", append(args, pbFn)...)
-					cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-					logger.Info("calling", "protoc", cmd.Args)
-					if err := cmd.Run(); err != nil {
-						return fmt.Errorf("%q: %w", cmd.Args, err)
+					// Generate the Go/gRPC code with buf instead of protoc. The
+					// generation template is written next to the .proto; the output
+					// lands in <pbDir> — the same place the .proto is, thanks to
+					// paths=source_relative — while go_package (pbImport) is the
+					// full import path derived from the dir's go.mod. The
+					// timestamppb import is redirected to godror/knownpb through
+					// the M mapping below, replacing the former sed step.
+					genYaml := filepath.Join(pbDir, "buf.gen.yaml")
+					logger.Debug("buf", "pbFn", pbFn, "pbDir", pbDir, "genYaml", genYaml, "importPath", pbImport)
+					tmpl := "version: v2\n" +
+						"plugins:\n" +
+						"  - local: protoc-gen-go\n" +
+						"    out: " + pbDir + "\n" +
+						"    opt:\n" +
+						"      - paths=source_relative\n" +
+						"      - Mgoogle/protobuf/timestamp.proto=github.com/godror/knownpb/timestamppb\n" +
+						"  - local: protoc-gen-go-grpc\n" +
+						"    opt:\n" +
+						"      - paths=source_relative\n" +
+						"    out: " + pbDir + "\n"
+					if err := os.WriteFile(genYaml, []byte(tmpl), 0644); err != nil {
+						return fmt.Errorf("write %s: %w", genYaml, err)
 					}
-					cmd = exec.CommandContext(ctx,
-						"sed", "-i", "-e",
-						(`/timestamp "github.com\/golang\/protobuf\/ptypes\/timestamp"/ s,timestamp.*$,timestamp "github.com/godror/knownpb/timestamppb",; ` +
-							`/timestamppb "google.golang.org\/protobuf\/types\/known\/timestamppb"/ s,timestamp.*$,timestamppb "github.com/godror/knownpb/timestamppb",; `),
-						strings.TrimSuffix(pbFn, ".proto")+".pb.go",
-					)
+					// Prefer the buf binary from PATH (works from any module dir);
+					// fall back to "go tool buf", which needs buf in the current
+					// module's tool directives (i.e. running inside the oracall
+					// module itself).
+					cmdBuf := "buf"
+					args := []string{"generate", "--template", genYaml, pbDir}
+					if _, err := exec.LookPath("buf"); err != nil {
+						cmdBuf, args = "go", append([]string{"tool", "buf"}, args...)
+					}
+					cmd := exec.CommandContext(grpCtx, cmdBuf, args...)
 					cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+					// cmd.Dir = srcDir
+					logger.Info("calling", "buf", cmd.Args)
 					if err := cmd.Run(); err != nil {
 						return fmt.Errorf("%q: %w", cmd.Args, err)
 					}
@@ -302,10 +365,10 @@ func Main() error {
 		},
 	}
 
-	FS = flag.NewFlagSet("model", flag.ContinueOnError)
-	flagModelOut := FS.String("out", "-", "output file")
-	flagModelPkg := FS.String("pkg", "main", "package name to generate - when empty, no package or import is generated")
-	genModelCmd := cli.Command{Name: "model", Flags: FS,
+	flags = flag.NewFlagSet("model", flag.ContinueOnError)
+	flagModelOut := flags.String("out", "-", "output file")
+	flagModelPkg := flags.String("pkg", "main", "package name to generate - when empty, no package or import is generated")
+	genModelCmd := cli.Command{Name: "model", Flags: flags,
 		Exec: func(ctx context.Context, state *cli.State) error {
 			args := state.Args
 			tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
@@ -332,9 +395,9 @@ func Main() error {
 		}, FlagConfigs: []cli.FlagConfig{cli.FlagConfig{Name: "out", Short: "o"}},
 	}
 
-	FS = flag.NewFlagSet("update", flag.ContinueOnError)
-	flagUpdatePkgCacheDir := FS.String("pkg-cache-dir", "", "directory for per-package JSON cache files (required)")
-	updateCmd := cli.Command{Name: "update", Flags: FS,
+	flags = flag.NewFlagSet("update", flag.ContinueOnError)
+	flagUpdatePkgCacheDir := flags.String("pkg-cache-dir", "", "directory for per-package JSON cache files (required)")
+	updateCmd := cli.Command{Name: "update", Flags: flags,
 		Exec: func(ctx context.Context, state *cli.State) error {
 			args := state.Args
 			if *flagUpdatePkgCacheDir == "" {
@@ -356,10 +419,10 @@ func Main() error {
 		},
 	}
 
-	FS = flag.NewFlagSet("oracall", flag.ContinueOnError)
-	FS.Var(&verbose, "verbose", "verbose logging")
-	FS.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
-	app := cli.Command{Name: "oracall", Flags: FS,
+	flags = flag.NewFlagSet("oracall", flag.ContinueOnError)
+	flags.Var(&verbose, "verbose", "verbose logging")
+	flags.StringVar(&dsn, "connect", "", "connect to DB for retrieving function arguments")
+	app := cli.Command{Name: "oracall", Flags: flags,
 		SubCommands: []*cli.Command{&callCmd, &genModelCmd, &updateCmd}, FlagConfigs: []cli.FlagConfig{cli.FlagConfig{Name: "verbose", Short: "v"}},
 	}
 
@@ -988,6 +1051,57 @@ func parsePkgFlag(s string) (string, string) {
 		pkg = "main"
 	}
 	return s, pkg
+}
+
+// importPathFor returns the Go import path of dir, derived from the go.mod
+// found in dir or one of its parents (module path + relative dir). If no
+// go.mod is found up to the filesystem root, it falls back to a GOPATH/src
+// relative path (gopSrc is the output of "go env GOPATH"), and returns ok=false
+// when even that fails — the caller should then use the raw path as-is.
+func importPathFor(dir, gopSrc string) (string, bool) {
+	dir = filepath.Clean(dir)
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return "", false
+	}
+	for d := dir; ; d = filepath.Dir(d) {
+		if b, err := os.ReadFile(filepath.Join(d, "go.mod")); err == nil {
+			if mod := moduleLine(b); mod != "" {
+				rel, err := filepath.Rel(d, dir)
+				if err != nil {
+					return mod, true
+				}
+				return path.Join(mod, filepath.ToSlash(rel)), true
+			}
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			break
+		}
+	}
+	// GOPATH fallback: dir under $GOPATH/src => import path is the path
+	// relative to $GOPATH/src.
+	for _, gopath := range filepath.SplitList(gopSrc) {
+		src := filepath.Join(gopath, "src")
+		if rel, err := filepath.Rel(src, dir); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return filepath.ToSlash(rel), true
+		}
+	}
+	return "", false
+}
+
+// moduleLine extracts the "module X" directive from go.mod contents.
+func moduleLine(b []byte) string {
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if rest, ok := strings.CutPrefix(line, "module"); ok {
+			return strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), "//"))
+		}
+		if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "(") {
+			continue
+		}
+		// anything before the module line (only comments expected) - keep looking
+	}
+	return ""
 }
 
 func resolveType(ctx context.Context, collStmt, attrStmt *sql.Stmt, typ, owner, pkg, sub string) ([]dbType, error) {

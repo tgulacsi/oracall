@@ -1,6 +1,6 @@
-// Copyright 2017, 2022 Tamás Gulácsi
+// Copyright 2017, 2026 Tamás Gulácsi
 //
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0
 
 /*
 Package main for minimal is a minimal example for oracall usage
@@ -18,11 +18,11 @@ import (
 	"flag"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"reflect"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	oracall "github.com/tgulacsi/oracall/lib"
 	"golang.org/x/net/context"
 )
@@ -43,7 +43,7 @@ func main() {
 	}
 	defer db.Close()
 
-	srv := NewServer(db)
+	srv := NewServer(db, slog.Default(), nil)
 	funName := flag.Arg(0)
 	rs := reflect.ValueOf(srv)
 	// nosemgrep: go.lang.security.audit.unsafe-reflect-by-name.unsafe-reflect-by-name
@@ -109,6 +109,6 @@ func main() {
 	os.Stdout.Close()
 	if err != nil {
 		log.Fatalf("error marshaling output: %s\n%+v\n%s", err, out,
-			spew.Sdump(out))
+			out)
 	}
 }

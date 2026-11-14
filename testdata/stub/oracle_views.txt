@@ -1,0 +1,60 @@
+===== USER_ARGUMENTS: package-level PL/SQL composite arguments =====
+pkg=ORACALL_STUB obj=F_NUM_SUM seq=2 pos=1 arg=NUMS in_out=IN data_type=PL/SQL TABLE pls_type=- type_owner=DEMO type_name=ORACALL_STUB type_subname=NUM_TAB type_object_type=PACKAGE data_level=0 defaulted=N
+pkg=ORACALL_STUB obj=F_REC_ECHO seq=2 pos=1 arg=REC in_out=IN data_type=PL/SQL RECORD pls_type=- type_owner=DEMO type_name=ORACALL_STUB type_subname=SIMPLE_REC type_object_type=PACKAGE data_level=0 defaulted=N
+pkg=ORACALL_STUB obj=F_REC_TAB_COUNT seq=2 pos=1 arg=TAB in_out=IN data_type=PL/SQL TABLE pls_type=- type_owner=DEMO type_name=ORACALL_STUB type_subname=SIMPLE_REC_TAB type_object_type=PACKAGE data_level=0 defaulted=N
+pkg=ORACALL_STUB obj=F_TXT_COUNT seq=2 pos=1 arg=TXTS in_out=IN data_type=PL/SQL TABLE pls_type=- type_owner=DEMO type_name=ORACALL_STUB type_subname=TXT_TAB type_object_type=PACKAGE data_level=0 defaulted=N
+pkg=ORACALL_STUB obj=P_NUM_DOUBLE seq=1 pos=1 arg=NUMS in_out=IN data_type=PL/SQL TABLE pls_type=- type_owner=DEMO type_name=ORACALL_STUB type_subname=NUM_TAB type_object_type=PACKAGE data_level=0 defaulted=N
+pkg=ORACALL_STUB obj=P_NUM_DOUBLE seq=2 pos=2 arg=OUTNUMS in_out=OUT data_type=PL/SQL TABLE pls_type=- type_owner=DEMO type_name=ORACALL_STUB type_subname=NUM_TAB type_object_type=PACKAGE data_level=0 defaulted=N
+pkg=ORACALL_STUB obj=P_REC_TAB_OUT seq=1 pos=1 arg=TAB in_out=OUT data_type=PL/SQL TABLE pls_type=- type_owner=DEMO type_name=ORACALL_STUB type_subname=SIMPLE_REC_TAB type_object_type=PACKAGE data_level=0 defaulted=N
+===== USER_ARGUMENTS: scalar arguments (for comparison) =====
+pkg=ORACALL_STUB obj=F_CHAR_ECHO seq=1 pos=0 arg=- in_out=OUT data_type=VARCHAR2 pls_type=VARCHAR2 type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=F_CHAR_ECHO seq=2 pos=1 arg=TXT in_out=IN data_type=VARCHAR2 pls_type=VARCHAR2 type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=F_NUM_ADD seq=1 pos=0 arg=- in_out=OUT data_type=NUMBER pls_type=NUMBER type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=F_NUM_ADD seq=2 pos=1 arg=A in_out=IN data_type=NUMBER pls_type=NUMBER type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=F_NUM_ADD seq=3 pos=2 arg=B in_out=IN data_type=NUMBER pls_type=NUMBER type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=F_NUM_SUM seq=1 pos=0 arg=- in_out=OUT data_type=NUMBER pls_type=NUMBER type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=F_REC_ECHO seq=1 pos=0 arg=- in_out=OUT data_type=VARCHAR2 pls_type=VARCHAR2 type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=F_REC_TAB_COUNT seq=1 pos=0 arg=- in_out=OUT data_type=BINARY_INTEGER pls_type=PLS_INTEGER type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=F_TXT_COUNT seq=1 pos=0 arg=- in_out=OUT data_type=BINARY_INTEGER pls_type=PLS_INTEGER type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=P_CHAR_INOUT seq=1 pos=1 arg=TXT in_out=IN/OUT data_type=VARCHAR2 pls_type=VARCHAR2 type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=P_DATE_OUT seq=1 pos=1 arg=DT in_out=OUT data_type=DATE pls_type=DATE type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=P_NUM_INOUT seq=1 pos=1 arg=NUM in_out=IN/OUT data_type=NUMBER pls_type=NUMBER type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=P_REC_OUT seq=1 pos=1 arg=NUM in_out=OUT data_type=NUMBER pls_type=NUMBER type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=P_REC_OUT seq=2 pos=2 arg=TXT in_out=OUT data_type=VARCHAR2 pls_type=VARCHAR2 type_owner=- type_name=- data_level=0
+pkg=ORACALL_STUB obj=P_REC_OUT seq=3 pos=3 arg=DT in_out=OUT data_type=DATE pls_type=DATE type_owner=- type_name=- data_level=0
+===== USER_PLSQL_TYPES: package-level PL/SQL types ONLY =====
+pkg=ORACALL_STUB type=NUM_TAB typecode=COLLECTION attributes=0 contains_plsql=NO
+pkg=ORACALL_STUB type=SIMPLE_REC typecode=PL/SQL RECORD attributes=3 contains_plsql=NO
+pkg=ORACALL_STUB type=SIMPLE_REC_TAB typecode=COLLECTION attributes=0 contains_plsql=YES
+pkg=ORACALL_STUB type=TXT_TAB typecode=COLLECTION attributes=0 contains_plsql=NO
+===== USER_PLSQL_TYPE_ATTRS: fields of a package-level PL/SQL record =====
+pkg=ORACALL_STUB type=SIMPLE_REC attr_no=1 attr=NUM attr_type_name=NUMBER attr_type_owner=- attr_type_package=- len=- prec=- scale=- cs=-
+pkg=ORACALL_STUB type=SIMPLE_REC attr_no=2 attr=TXT attr_type_name=VARCHAR2 attr_type_owner=- attr_type_package=- len=100 prec=- scale=- cs=CHAR_CS
+pkg=ORACALL_STUB type=SIMPLE_REC attr_no=3 attr=DT attr_type_name=DATE attr_type_owner=- attr_type_package=- len=- prec=- scale=- cs=-
+===== USER_PLSQL_COLL_TYPES: package-level PL/SQL collections =====
+pkg=ORACALL_STUB type=NUM_TAB coll_type=PL/SQL INDEX TABLE elem_owner=- elem_name=NUMBER elem_package=- index_by=BINARY_INTEGER upper_bound=- len=- cs=- nulls_stored=YES
+pkg=ORACALL_STUB type=SIMPLE_REC_TAB coll_type=PL/SQL INDEX TABLE elem_owner=DEMO elem_name=SIMPLE_REC elem_package=ORACALL_STUB index_by=BINARY_INTEGER upper_bound=- len=- cs=- nulls_stored=YES
+pkg=ORACALL_STUB type=TXT_TAB coll_type=PL/SQL INDEX TABLE elem_owner=- elem_name=VARCHAR2 elem_package=- index_by=BINARY_INTEGER upper_bound=- len=- cs=CHAR_CS nulls_stored=YES
+===== USER_TYPES: schema-level SQL object/collection types =====
+type=DEMO_OBJ_T typecode=OBJECT attributes=3 methods=0 final=YES
+type=DEMO_OBJ_TAB_T typecode=COLLECTION attributes=0 methods=0 final=YES
+type=PAIR_PY typecode=OBJECT attributes=2 methods=0 final=YES
+===== USER_TYPE_ATTRS: fields of a schema-level SQL OBJECT type =====
+type=DEMO_OBJ_T attr_no=1 attr=NUM attr_type_name=NUMBER attr_type_owner=- len=- prec=- cs=-
+type=DEMO_OBJ_T attr_no=2 attr=TXT attr_type_name=VARCHAR2 attr_type_owner=- len=100 prec=- cs=CHAR_CS
+type=DEMO_OBJ_T attr_no=3 attr=DT attr_type_name=DATE attr_type_owner=- len=- prec=- cs=-
+type=PAIR_PY attr_no=1 attr=KEY attr_type_name=NUMBER attr_type_owner=- len=- prec=3 cs=-
+type=PAIR_PY attr_no=2 attr=VALUE attr_type_name=NUMBER attr_type_owner=- len=- prec=18 cs=-
+===== USER_COLL_TYPES: schema-level SQL collection types =====
+type=DEMO_OBJ_TAB_T coll_type=TABLE elem_owner=DEMO elem_name=DEMO_OBJ_T upper_bound=- len=-
+type=TEST_CWO_TBL_T coll_type=TABLE elem_owner=DEMO elem_name=TEST_CWO_REC_T upper_bound=- len=-
+===== USER_ARGUMENTS: schema-level type arguments (constructor rows included!) =====
+pkg=DEMO_OBJ_PKG obj=P_OBJ_IN arg=O in_out=IN data_type=OBJECT type_owner=DEMO type_name=DEMO_OBJ_T type_subname=- type_object_type=TYPE
+pkg=DEMO_OBJ_PKG obj=P_OBJ_TAB_IN arg=T in_out=IN data_type=TABLE type_owner=DEMO type_name=DEMO_OBJ_TAB_T type_subname=- type_object_type=TYPE
+pkg=DEMO_OBJ_PKG obj=P_OBJ_TAB_OUT arg=T in_out=OUT data_type=TABLE type_owner=DEMO type_name=DEMO_OBJ_TAB_T type_subname=- type_object_type=TYPE
+pkg=TEST_CWO_REC_T obj=TEST_CWO_REC_T arg=- in_out=OUT data_type=OBJECT type_owner=DEMO type_name=TEST_CWO_REC_T type_subname=- type_object_type=TYPE
+pkg=TEST_CWO_REC_T obj=TEST_CWO_REC_T arg=SELF in_out=IN/OUT data_type=OBJECT type_owner=DEMO type_name=TEST_CWO_REC_T type_subname=- type_object_type=TYPE
+pkg=TEST_PKG_SAMPLE_NESTED_PY obj=TEST_POBJ_IN arg=RECS in_out=IN/OUT data_type=TABLE type_owner=DEMO type_name=POBJ_T_PY type_subname=- type_object_type=TYPE
+pkg=- obj=TEST_CREATE_TASK_ACTIVITY arg=- in_out=OUT data_type=OBJECT type_owner=DEMO type_name=TEST_PRJ_TASK_OT type_subname=- type_object_type=TYPE
+pkg=- obj=TEST_CREATE_TASK_ACTIVITY arg=P_CREATE_TASK_I in_out=IN data_type=TABLE type_owner=DEMO type_name=TEST_PRJ_TASK_TT type_subname=- type_object_type=TYPE
+pkg=- obj=TEST_CWO_GETSUM arg=A_MCALIST_I in_out=IN data_type=TABLE type_owner=DEMO type_name=TEST_CWO_TBL_T type_subname=- type_object_type=TYPE

@@ -6,13 +6,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +22,7 @@ import (
 	"github.com/antzucaro/matchr"
 	_ "github.com/godror/godror"
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/tgulacsi/go/bash"
 	oracall "github.com/tgulacsi/oracall/lib"
 )
 
@@ -30,7 +32,9 @@ var (
 )
 
 func init() {
-	flag.Parse()
+	if dsn == "" {
+		dsn = os.Getenv("ORACALL_DSN")
+	}
 
 	os.Setenv("NLS_LANG", "american_america.AL32UTF8")
 
@@ -57,6 +61,9 @@ func init() {
 // if you get "ORA-01031: insufficient privileges", then you need
 // GRANT CREATE PROCEDURE TO username;
 func TestGenSimple(t *testing.T) {
+	if dsn == "" {
+		t.Skip("ORACALL_DSN not set")
+	}
 	build(t)
 	outFn := generateAndBuild(t, "SIMPLE_")
 	var err error
@@ -122,6 +129,9 @@ func TestGenSimple(t *testing.T) {
 }
 
 func TestGenRec(t *testing.T) {
+	if dsn == "" {
+		t.Skip("ORACALL_DSN not set")
+	}
 	if finish {
 		t.FailNow()
 	}
@@ -502,13 +512,33 @@ func compile(t *testing.T, qry string) {
 }
 
 func runCommand(t *testing.T, prog string, args ...string) {
-	out, err := exec.Command(prog, args...).CombinedOutput()
+	cmd := exec.CommandContext(t.Context(), prog, args...)
+	cmd.Env = toolEnv(t.Context())
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Errorf("error '%q %s': %v\n%s", prog, args, err, out)
-		t.FailNow()
+		t.Fatalf("error '%s': %v\n%s", bash.QuotePrint(cmd.Args), err, out)
 	} else {
-		t.Logf("%q %s:\n%s", prog, args, out)
+		t.Logf("%s:\n%s", bash.QuotePrint(cmd.Args), out)
 	}
+}
+
+// toolEnv returns the process environment with GOBIN prepended to PATH, so
+// binaries installed by `go install` (oracall, the protoc plugins) resolve.
+func toolEnv(ctx context.Context) []string {
+	gobin := os.Getenv("GOBIN")
+	if gobin == "" {
+		if b, err := exec.CommandContext(ctx, "go", "env", "GOPATH").Output(); err == nil {
+			gobin = filepath.Join(strings.TrimSpace(string(b)), "bin")
+		}
+	}
+	env := os.Environ()
+	for i, kv := range env {
+		if strings.HasPrefix(kv, "PATH=") {
+			env[i] = "PATH=" + gobin + string(os.PathListSeparator) + strings.TrimPrefix(kv, "PATH=")
+			break
+		}
+	}
+	return env
 }
 
 func build(t *testing.T) {
@@ -519,10 +549,11 @@ func build(t *testing.T) {
 }
 
 func generateAndBuild(t *testing.T, prefix string) (outFn string) {
-	runCommand(t, "sh", "-c",
-		"oracall -connect='"+dsn+"' -pb-out=github.com/tgulacsi/oracall/testdata/integration_test/pb:pb"+
-			" TST_ORACALL."+strings.ToUpper(prefix)+"%"+
-			" >./testdata/integration_test/generated_functions.go")
+	runCommand(t, "oracall", "call", "--connect="+dsn,
+		"--out", "./testdata/integration_test/generated_functions.go",
+		"--pb-out=github.com/tgulacsi/oracall/testdata/integration_test/pb:pb",
+		"TST_ORACALL."+strings.ToUpper(prefix)+"%")
+	runCommand(t, "go", "get", "./testdata/integration_test")
 
 	if outFh, err := os.CreateTemp("", "oracall-integration_test"); err != nil {
 		t.Errorf("cannot create temp file: %v", err)
@@ -572,25 +603,28 @@ func runTest(t *testing.T, prog string, args ...string) string {
 // var dbg = flag.Bool("debug", false, "print debug messages?")
 var buildOnce sync.Once
 
-func init() {
-	flag.Parse()
-}
-
 var db *sql.DB
 
 func getConnection(t *testing.T) *sql.DB {
+	t.Helper()
 	if db != nil && db.Ping() == nil {
 		return db
 	}
 
 	if dsn == "" {
-		t.Logf("cannot test connection without dsn!")
-		t.FailNow()
+		t.Skip("cannot test connection without ORACALL_DSN/GODROR_TEST_DSN")
 	}
 	var err error
 	db, err = sql.Open("godror", dsn)
 	if err != nil {
-		log.Panicf("error creating connection to %s: %s", dsn, err)
+		t.Skipf("open connection: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		db = nil
+		t.Skipf("database not reachable: %v", err)
 	}
 	return db
 }

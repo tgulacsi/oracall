@@ -5,6 +5,7 @@
 package objects_test
 
 import (
+	"bufio"
 	"bytes"
 	"cmp"
 	"context"
@@ -17,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,7 +32,111 @@ import (
 
 var typesFn = filepath.Join("testdata", "funcs.types.json")
 
+// requireDSN skips a test that needs a live Oracle schema unless a DSN is set.
+func requireDSN(t *testing.T) {
+	t.Helper()
+	if os.Getenv("ORACALL_DSN") == "" && os.Getenv("BRUNO_OWNER_ID") == "" {
+		t.Skip("ORACALL_DSN/BRUNO_OWNER_ID not set")
+	}
+}
+
+func TestReadPackages(t *testing.T) {
+	requireDSN(t)
+	logger := zlog.NewT(t).SLog()
+	ctx := zlog.NewSContext(context.Background(), logger)
+	db, err := sql.Open("godror", cmp.Or(
+		os.Getenv("ORACALL_DSN"), os.Getenv("BRUNO_OWNER_ID"),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tt, err := objects.NewTypes(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const qry = `SELECT object_name FROM user_objects
+		WHERE object_type = 'PACKAGE' AND
+			object_name IN (
+ 'DB_ANYR',
+ 'DB_CASCO_LEKER',
+ 'DB_PGW_WS',
+ 'DB_WEB_GDPR',
+ 'DB_KAR_VEZENYLO4', 'DB_KAR_ONLINE', 'DB_KAR_MMB',
+ 'DB_KUT_WS',
+ 'DB_MMB2ABLAK',
+ 'DB_SAM',
+ 'DB_SPOOLSYS3',
+			'DB_WEB', 'DB_WEB_PORTAL', 'DB_UPORTAL'
+		)`
+	rows, err := db.QueryContext(ctx, qry)
+	if err != nil {
+		t.Fatalf("%s: %+v", err, qry)
+	}
+	defer rows.Close()
+	pkgs := make([]string, 0, 16)
+	for rows.Next() {
+		var pkg string
+		if err = rows.Scan(&pkg); err != nil {
+			t.Fatalf("scan %s: %+v", qry, err)
+		}
+		pkgs = append(pkgs, pkg)
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatalf("%s: %+v", qry, err)
+	}
+
+	var wg sync.WaitGroup
+	funcsCh := make(chan objects.Package, 1)
+	for _, pkg := range pkgs {
+		wg.Add(1)
+		t.Run(pkg, func(t *testing.T) {
+			defer wg.Done()
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			defer cancel()
+			P, err := tt.NewPackage(ctx, db, pkg)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					t.Skip(err)
+				}
+				t.Fatalf("%s: %+v", pkg, err)
+			}
+			funcsCh <- P
+		})
+	}
+	t.Run("wait", func(t *testing.T) { t.Parallel(); wg.Wait(); close(funcsCh) })
+
+	t.Run("funcs.proto", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		buf.WriteString(`
+syntax = "proto3";
+
+package objects;
+option go_package = "github.com/tgulacsi/oracall/lib/objects/testdata";
+
+` + objects.ProtoImports.String() + `
+` + objects.ProtoExtends.String() + `
+`)
+		var svcs objects.Protobuf
+		for pkg := range funcsCh {
+			svcs.Services = append(svcs.Services, pkg.GenProto())
+		}
+		bw := bufio.NewWriter(&buf)
+		svcs.Print(bw)
+		bw.Flush()
+		os.MkdirAll("testdata", 0755)
+		os.WriteFile("testdata/funcs.proto", buf.Bytes(), 0664)
+		if b, err := exec.CommandContext(ctx, "buf", "format", "-w", "testdata/funcs.proto").CombinedOutput(); err != nil {
+			t.Fatalf("buf format: %s: %+v", string(b), err)
+		}
+	})
+}
+
 func TestReadTypes(t *testing.T) {
+	requireDSN(t)
 	logger := zlog.NewT(t).SLog()
 	ctx := zlog.NewSContext(context.Background(), logger)
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -177,6 +283,7 @@ plugins:
 var procsFn = filepath.Join("testdata", "funcs_procs.json")
 
 func TestReadProcedures(t *testing.T) {
+	requireDSN(t)
 	ctx := zlog.NewSContext(context.Background(), zlog.NewT(t).SLog())
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()

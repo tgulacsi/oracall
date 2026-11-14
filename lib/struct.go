@@ -5,13 +5,12 @@
 package oracall
 
 import (
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
-
-	"encoding/json/jsontext"
-	"encoding/json/v2"
 )
 
 const (
@@ -317,6 +316,16 @@ func NewArgument(name, dataType, plsType, typeName, dirName string, dir directio
 		Precision: precision, Scale: scale, Charlength: charlength,
 		Charset: charset, IndexBy: indexBy,
 		mu: new(sync.Mutex),
+	}
+	if arg.ora == "" {
+		// user_arguments.pls_type is NULL for composite types (and the legacy
+		// CSV export therefore leaves the column empty). Fall back to the data
+		// type so a record/table/ref-cursor argument is still usable; the
+		// elements/fields carry their own concrete PL/SQL types.
+		switch arg.Type {
+		case "PL/SQL RECORD", "TABLE", "PL/SQL TABLE", "REF CURSOR":
+			arg.PlsType = NewPlsType(arg.Type, precision, scale)
+		}
 	}
 	if arg.ora == "" {
 		panic(fmt.Sprintf("empty PLS type of %#v", arg))

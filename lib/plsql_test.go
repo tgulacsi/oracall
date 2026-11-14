@@ -17,7 +17,7 @@ func TestOne(t *testing.T) {
 		d := diff.Diff(tc.PlSql, got)
 		if d != "" {
 			//FIXME(tgulacsi): this should be an error!
-			t.Log("plsql block diff:\n" + d)
+			t.Logf("plsql block diff:\n%s", d)
 			//fmt.Printf("GOT:\n", got)
 		}
 	}

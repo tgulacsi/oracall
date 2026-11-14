@@ -6,3 +6,4 @@ integration_test
 db_web
 function.py
 env.sh
+.opencode

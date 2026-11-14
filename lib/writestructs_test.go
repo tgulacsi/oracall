@@ -71,7 +71,11 @@ func TestWriteStruct(t *testing.T) {
 		cmd := exec.Command("go", "run", fh.Name())
 		var errBuf bytes.Buffer
 		cmd.Stderr = &errBuf
-		if err := cmd.Run(); err != nil {
+		err = cmd.Run()
+		if err != nil {
+			if strings.Contains(errBuf.String(), "no required module provides package") {
+				t.Skipf("generated code needs an unavailable module:\n%s", errBuf.String())
+			}
 			keep = true
 			t.Errorf("%d. go run %q: %v\n%s", i, fh.Name(), err, errBuf.String())
 			t.FailNow()

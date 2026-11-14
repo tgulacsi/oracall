@@ -22,7 +22,7 @@ type (
 		Owner, Package, Name        string
 		TypeCode, CollType, IndexBy string
 		Arguments                   []Argument
-		Length, Precision, Scale    sql.NullInt32
+		TypeParams
 	}
 	Argument struct {
 		Type *Type
@@ -353,6 +353,38 @@ func (t Type) WriteOraToFrom(ctx context.Context, w io.Writer) error {
 	}
 	fmt.Fprintf(bw, "\treturn nil\n}\n")
 	return bw.Flush()
+}
+
+func writeArguments(bw *bufio.Writer, args []Argument) error {
+	var i int
+	for _, a := range args {
+		name := a.Name
+		if strings.HasSuffix(name, "#") {
+			name = name[:len(name)-1] + "_hidden"
+		}
+		s := a.Type
+		oraType := s.OraType()
+		var rule string
+		if s.IsColl() {
+			rule = "repeated "
+			if !isSimpleType(s.Name) && s.Elem != nil {
+				s = s.Elem
+			}
+		} else if s.Elem != nil {
+			rule = "repeated "
+			s = s.Elem
+			if name == "" {
+				name = "record"
+			}
+		}
+		if rule == "" && isNullablePLSIntegerType(s.Name) {
+			rule = "optional "
+		}
+		i++
+		fmt.Fprintf(bw, "\t%s%s %s = %d [(oracall_field_type) = %q];\n",
+			rule, s.protoType(), strings.ToLower(name), i, oraType)
+	}
+	return nil
 }
 
 // writeObjectExpr returns a Go expression that converts val to something data.Set() accepts.

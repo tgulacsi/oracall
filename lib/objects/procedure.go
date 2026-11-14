@@ -279,7 +279,7 @@ func (p Procedure) WriteProcedureWrapper(ctx context.Context, w io.Writer, types
 	if hasOutput {
 		returnType = "(*" + p.goOutputStructName() + ", error)"
 	}
-	fmt.Fprintf(bw, "func %s(ctx context.Context, db godror.Execer%s) (%s) {\n",
+	fmt.Fprintf(bw, "func %s(ctx context.Context, db godror.Execer%s) %s {\n",
 		p.goFuncName(), inputArg, returnType)
 
 	errReturn := func(expr string) string {
