@@ -28,8 +28,6 @@ import (
 	"github.com/tgulacsi/oracall/lib/objects"
 )
 
-//go:generate go install github.com/bufbuild/buf/cmd/buf@latest
-
 var typesFn = filepath.Join("testdata", "funcs.types.json")
 
 // requireDSN skips a test that needs a live Oracle schema unless a DSN is set.

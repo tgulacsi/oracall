@@ -26,7 +26,7 @@ var (
 	NullablePLSInteger = false
 )
 
-//go:generate sh ./download-protoc.sh
+// go : generate sh ./download-protoc.sh
 //go:generate go install github.com/golang/protobuf/protoc-gen-go@latest
 //go:generate go install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@latest
 

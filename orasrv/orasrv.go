@@ -34,7 +34,7 @@ import (
 	godror "github.com/godror/godror"
 )
 
-//go:generate buf generate
+//go:generate go tool buf generate
 
 var Timeout = DefaultTimeout
 
