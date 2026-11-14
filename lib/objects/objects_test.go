@@ -26,8 +26,6 @@ import (
 	"github.com/tgulacsi/oracall/lib/objects"
 )
 
-//go:generate go install github.com/bufbuild/buf/cmd/buf@latest
-
 var typesFn = filepath.Join("testdata", "funcs.types.json")
 
 func TestReadTypes(t *testing.T) {
