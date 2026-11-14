@@ -108,7 +108,7 @@ func TestStubSurfaceE2E(t *testing.T) {
 		{"p_char_inout", `{"txt":"abraka"}`, "ABRAKA#"},
 		{"f_num_add", `{"a":"1","b":"2"}`, "3"},
 		{"f_num_sum", `{"nums":["1","2","3"]}`, "6"},
-		{"f_rec_echo", `{"rec":{"num":"7","txt":"x","dt":"2024-01-02T00:00:00Z"}}`, "7;x;2024-01-02"},
+		{"f_rec_echo", `{"rec":{"num":"7","txt":"x","dt":"2024-01-02T05:00:00Z"}}`, "7;x;2024-01-02"},
 		{"f_rec_tab_count", `{"tab":[{"num":"1"},{"num":"2"}]}`, "2"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -9,7 +9,7 @@ require (
 	github.com/antzucaro/matchr v0.0.0-20221106193745-7bed6ef61ef9
 	github.com/fatih/structs v1.1.0
 	github.com/go-stack/stack v1.8.1
-	github.com/godror/godror v0.52.0
+	github.com/godror/godror v0.52.1-0.20261114081448-b913de48c211
 	github.com/godror/knownpb v0.3.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/renameio/v2 v2.0.2

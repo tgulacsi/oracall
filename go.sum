@@ -104,6 +104,8 @@ github.com/godror/godror v0.51.6-0.20261108103743-d5815217c841 h1:j9uAbWPM5OI+ex
 github.com/godror/godror v0.51.6-0.20261108103743-d5815217c841/go.mod h1:cJC60zusesc1J1wnOTvYfkBr53UFKekY4MY8j2of2uc=
 github.com/godror/godror v0.52.0 h1:e5sERjZCZdp+nw8xgpMdOzSgAa98UcDVGz6G+hzX/Xo=
 github.com/godror/godror v0.52.0/go.mod h1:cJC60zusesc1J1wnOTvYfkBr53UFKekY4MY8j2of2uc=
+github.com/godror/godror v0.52.1-0.20261114081448-b913de48c211 h1:SNB1zeQOt8ftBs80J7wck10NM5XFHMXm33M3t5n2Z4M=
+github.com/godror/godror v0.52.1-0.20261114081448-b913de48c211/go.mod h1:cJC60zusesc1J1wnOTvYfkBr53UFKekY4MY8j2of2uc=
 github.com/godror/knownpb v0.3.0 h1:+caUdy8hTtl7X05aPl3tdL540TvCcaQA6woZQroLZMw=
 github.com/godror/knownpb v0.3.0/go.mod h1:PpTyfJwiOEAzQl7NtVCM8kdPCnp3uhxsZYIzZ5PV4zU=
 github.com/gofrs/flock v0.13.1 h1:jjREztyBeSKBZYAC+mgc1laB+xsgy4kYMf3FbKF2UBo=
